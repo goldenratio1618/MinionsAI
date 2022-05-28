@@ -80,8 +80,8 @@ loss_function = keras.losses.Huber()
 
 for t in range(100):  # Run until solved. Initially `while True`
     state = np.zeros((84,84,4))
-    win = 0#np.random.randint(4)
-    state[win,0,0] = 1
+    win = np.random.randint(4)
+    state[:,:,win] = 1
     episode_reward = 0
 
     for timestep in range(1, max_steps_per_episode):
@@ -107,8 +107,10 @@ for t in range(100):  # Run until solved. Initially `while True`
         epsilon = max(epsilon, epsilon_min)
 
         # Apply the sampled action in our environment
-        state_next = state
-        reward = state[action,0,0]
+        state_next = np.zeros((84,84,4))
+        win = np.random.randint(4)
+        state_next[0,0,win] = 1
+        reward = state[0,0,action]
         done = False
 
         episode_reward += reward
