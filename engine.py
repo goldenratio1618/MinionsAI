@@ -1,4 +1,5 @@
 import random
+import sys
 
 BOARD_SIZE = 5
 INCOME_BONUS = 3
@@ -178,10 +179,10 @@ class Unit():
     
     def receive_attack(self, attack):
         self.curr_health -= attack
-        if self.curr_health < 0:
+        if self.curr_health <= 0:
             if self.is_soulbound:
                 return -2
-            return unit_list[self.index].rebate
+            return unitList[self.index].rebate
         return -1
 
 # moves are in the form (xi, yi, xf, yf)
@@ -224,25 +225,18 @@ def main():
     # print final-state money
     print("Game over!")
     print(game.money[0], game.money[1])
+    # write final board state to file
+    with open("output.txt", "w") as f:
+        original_stdout = sys.stdout
+        sys.stdout = f
+        print(game.money[0], game.money[1])
+        print()
+        game.board.print_board_state()
+        sys.stdout = original_stdout
+    # throw exception if yellow loses (only way to get output to screen)
     if (game.money[0] < game.money[1]):
         raise Exception("Yellow loses!  Yellow money = " + str(game.money[0])
             + " but blue money = " + str(game.money[1]))
     
 if __name__ == "__main__":
   main()
-
-
-
-# turn 1: yellow moves captain from (0,0) to (0,1)
-# yellow attempts to buy zombie (fails for lack of funds)
-#move_list = parse_input()
-#spawn_list = parse_input()
-#game.turn(0, move_list, spawn_list)
-#game.board.print_board_state()
-
-# blue turn (passes)
-#game.turn(1, [], [])
-
-# turn 2: yellow moves captain to (1,1)
-#game.turn(0, [(0,1,1,1)], [(1,0,0), (1,2,0), (1,0,2)])
-#game.board.print_board_state()
