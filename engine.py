@@ -222,6 +222,7 @@ def main():
         if (game.money[1] != 3 * i + 9):
             raise Exception("Blue money is wrong!  Value is " + str(game.money[1]) + " and should be " + str(3 * i + 9))
     # print final-state money
+    print("Game over!")
     print(game.money[0], game.money[1])
     if (game.money[0] < game.money[1]):
         raise Exception("Yellow loses!  Yellow money = " + str(game.money[0])
