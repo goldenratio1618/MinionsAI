@@ -81,6 +81,8 @@ class Game():
                 if self.board.board[xi][yi].unit.hasMoved: continue
                 if not unitList[self.board.board[xi][yi].unit.index].flying and self.board.board[xf][yf].is_water: continue
                 self.board.board[xi][yi].unit.hasMoved = True
+                if unitList[self.board.board[xi][yi].unit.index].lumbering:
+                    self.board.board[xi][yi].unit.remainingAttack = 0
                 self.board.board[xf][yf].add_unit(self.board.board[xi][yi].unit)
                 self.board.board[xi][yi].remove_unit()
             # if target hex is occupied by friendly unit then swap the units
@@ -93,6 +95,10 @@ class Game():
                 if not unitList[self.board.board[xf][yf].unit.index].flying and self.board.board[xi][yi].is_water: continue
                 self.board.board[xi][yi].unit.hasMoved = True
                 self.board.board[xf][yf].unit.hasMoved = True
+                if unitList[self.board.board[xi][yi].unit.index].lumbering:
+                    self.board.board[xi][yi].unit.remainingAttack = 0
+                if unitList[self.board.board[xf][yf].unit.index].lumbering:
+                    self.board.board[xf][yf].unit.remainingAttack = 0
                 temp = self.board.board[xi][yi].unit
                 self.board.board[xi][yi].remove_unit()
                 self.board.board[xi][yi].add_unit(self.board.board[xf][yf].unit)
