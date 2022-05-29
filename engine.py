@@ -179,6 +179,15 @@ class Unit():
             return self.rebate
         return -1
 
+# moves are in the form (xi, yi, xf, yf)
+# move list is terminated by an empty line
+def parse_input():
+    input_list = []
+    line = input()
+    while line != "":
+        input_list.append([int(s) for s in line.split(" ")])
+        line = input()
+    return input_list
 
 # actual game
 game = Game(0, 6)
@@ -188,7 +197,9 @@ game = Game(0, 6)
 
 # turn 1: yellow moves captain from (0,0) to (0,1)
 # yellow attempts to buy zombie (fails for lack of funds)
-game.turn(0, [(0,0,0,1), (0,1,1,1)], [(1,0,0)])
+move_list = parse_input()
+spawn_list = parse_input()
+game.turn(0, move_list, spawn_list)
 game.board.print_board_state()
 
 # blue turn (passes)
