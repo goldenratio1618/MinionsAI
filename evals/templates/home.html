@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang = "en">
+   <head></head>
+   <body>
+      
+      <h3>
+        Envs
+      </h3>
+      
+      <table>
+         <tbody>
+            {% for env in envs %}
+               <tr>
+                  <td> <a href="env/{{env.name}}/view">{{ env.name }}</a></td>
+               </tr>
+            {% endfor %}
+         </tbody>
+      </table>
+      
+   </body>
+</html>
