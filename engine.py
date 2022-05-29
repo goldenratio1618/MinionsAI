@@ -3,7 +3,7 @@ import sys
 
 BOARD_SIZE = 5
 INCOME_BONUS = 3
-MAX_TURNS = 10000
+MAX_TURNS = 100
 
 # distance function between two hexes
 # when y is decreased, x can stay the same or be increased by 1
@@ -46,7 +46,7 @@ class Hex():
 class Game():
     def __init__(self, p0_money, p1_money):
         # starting position: captains on opposite corners with one graveyard in center
-        self.graveyard_locs = [(2, 3)]
+        self.graveyard_locs = [(2, 2)]
         self.water_locs = []
         self.board = Board(self.water_locs, self.graveyard_locs)
         self.board.board[0][0].add_unit(Unit(0, 0)) # yellow captain
@@ -206,6 +206,7 @@ def main():
     # turn loop
     for i in range(MAX_TURNS):
         # yellow turn -- get input from screen
+        print("Yellow turn")
         move_list = parse_input()
         spawn_list = parse_input()
         #xi = random.randrange(0, 5)
@@ -219,9 +220,12 @@ def main():
         print()
 
         # blue turn -- pass
-        game.turn(1, [], [])
-        if (game.money[1] != 3 * i + 9):
-            raise Exception("Blue money is wrong!  Value is " + str(game.money[1]) + " and should be " + str(3 * i + 9))
+        print("Blue turn")
+        move_list = [] #parse_input()
+        spawn_list = [] #parse_input()
+        game.turn(1, move_list, spawn_list)
+        game.board.print_board_state()
+        print()
     # print final-state money
     print("Game over!")
     print(game.money[0], game.money[1])

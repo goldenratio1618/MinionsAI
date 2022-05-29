@@ -3,16 +3,15 @@
 # spawn list is zombie on random hex
 
 import random
+import sys
 
 BOARD_SIZE=5
 
 def main():
-    while input() != "":
-        continue
-
+    color = sys.argv[1]
     while True:
         line = input()
-        while line != "":
+        while line != color + " turn":
             if line == "Game over!":
                 return
             line = input()
