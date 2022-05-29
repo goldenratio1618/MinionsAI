@@ -1,4 +1,5 @@
 BOARD_SIZE = 5
+INCOME_BONUS = 3
 
 # distance function between two hexes
 # when y is decreased, x can stay the same or be increased by 1
@@ -110,12 +111,25 @@ class Game():
                     self.board.board[xf][yf].remove_unit()
                     # process rebate
                     self_money[1 - color] += attack_outcome
-
-
-                
-
-
-        
+        # parse all spawns
+        # TODO: treat reinforcements explicitly (so that one can spawn bounced units without paying dollars)
+        for spawn in spawn_list:
+            index, x, y = spawn
+            # check to see if we have enough money
+            cost = unitList[spawn[0]].cost
+            if cost > self.money[color]: continue
+            # check to make sure hex is unoccupied
+            if self.board.board[x][y].unit != None: continue
+            # purchase unit
+            self.money[color] -= cost
+            # add unit to board
+            self.board.board[x][y].add_unit(Unit(color, index))
+        # collect money
+        income = INCOME_BONUS
+        for square in self.graveyard_locs:
+            x, y = square
+            if self.board.board[x][y].unit != None and self.board.board[x][y].unit.color == color: income += 1
+        self.money[color] += income
 
 class UnitType():
     def __init__(self, attack, defense, speed, attack_range, persistent, immune, max_stack, spawn, blink, unsummoner, deadly, flurry, flying, lumbering, terrain_ability, cost, rebate):
@@ -167,5 +181,13 @@ game = Game(0, 6)
 #game.board.print_board_state()
 
 # turn 1: yellow moves captain from (0,0) to (0,1)
-game.turn(0, [(0,0,0,1)], [])
+# yellow attempts to buy zombie (fails for lack of funds)
+game.turn(0, [(0,0,0,1)], [(1,0,0)])
+#game.board.print_board_state()
+
+# blue turn (passes)
+game.turn(1, [], [])
+
+# turn 2: yellow moves captain to (1,1)
+game.turn(0, [(0,1,1,1)], [(1,0,0), (1,2,0), (1,0,2)])
 game.board.print_board_state()
