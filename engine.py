@@ -1,5 +1,8 @@
+import random
+
 BOARD_SIZE = 5
 INCOME_BONUS = 3
+MAX_TURNS = 10000
 
 # distance function between two hexes
 # when y is decreased, x can stay the same or be increased by 1
@@ -47,7 +50,7 @@ class Game():
         self.board = Board(self.water_locs, self.graveyard_locs)
         self.board.board[0][0].add_unit(Unit(0, 0)) # yellow captain
         self.board.board[4][4].add_unit(Unit(1, 0)) # blue captain
-        self.board.board[1][1].add_unit(Unit(1, 1)) # blue zombie
+        #self.board.board[1][1].add_unit(Unit(1, 1)) # blue zombie
         # money for two sides
         self.money = [p0_money, p1_money]
 
@@ -58,13 +61,15 @@ class Game():
                 if square.unit != None and square.unit.color == color:
                     square.unit.hasMoved = False
                     square.unit.remainingAttack = unitList[square.unit.index].attack
-                    square.unit.health = unitList[square.unit.index].defense
+                    square.unit.curr_health = unitList[square.unit.index].defense
         # parse all moves
         # TODO: Make sure there is a path from origin to destination
         for move in move_list:
             xi, yi, xf, yf = move
             # make sure from hex has unit that can move
             if self.board.board[xi][yi].unit == None: continue
+            # only move your own units
+            if self.board.board[xi][yi].unit.color != color: continue
             # make sure origin and destination are sufficiently close
             speed = unitList[self.board.board[xi][yi].unit.index].speed
             attack_range = unitList[self.board.board[xi][yi].unit.index].attack_range
@@ -105,17 +110,17 @@ class Game():
                 # flurry deals 1 attack
                 if unitList[self.board.board[xi][yi].unit.index].flurry:
                     self.board.board[xi][yi].unit.remainingAttack -= 1
-                    attack_outcome = self.board.board[xf][yf].unit.receiveAttack(1)
+                    attack_outcome = self.board.board[xf][yf].unit.receive_attack(1)
                 # otherwise deal full attack
                 else:
                     self.board.board[xi][yi].unit.remainingAttack = 0
-                    attack_outcome = self.board.board[xf][yf].unit.receiveAttack(unitList[self.board.board[xi][yi].unit.index].attack)
+                    attack_outcome = self.board.board[xf][yf].unit.receive_attack(unitList[self.board.board[xi][yi].unit.index].attack)
                 # process dead unit, if applicable
                 if attack_outcome >= 0:
                     # remove unit from board
                     self.board.board[xf][yf].remove_unit()
                     # process rebate
-                    self_money[1 - color] += attack_outcome
+                    self.money[1 - color] += attack_outcome
         # parse all spawns
         # TODO: treat reinforcements explicitly (so that one can spawn bounced units without paying dollars)
         for spawn in spawn_list:
@@ -176,7 +181,7 @@ class Unit():
         if self.curr_health < 0:
             if self.is_soulbound:
                 return -2
-            return self.rebate
+            return unit_list[self.index].rebate
         return -1
 
 # moves are in the form (xi, yi, xf, yf)
@@ -190,17 +195,49 @@ def parse_input():
     return input_list
 
 # actual game
-game = Game(0, 6)
-#game.board.print_board_properties()
-#print()
-#game.board.print_board_state()
+def main():
+    game = Game(0, 6)
+    game.board.print_board_properties()
+    print()
+    game.board.print_board_state()
+    print()
+
+    # turn loop
+    for i in range(MAX_TURNS):
+        # yellow turn -- get input from screen
+        move_list = parse_input()
+        spawn_list = parse_input()
+        #xi = random.randrange(0, 5)
+        #yi = random.randrange(0, 5)
+        #xf = random.randrange(0, 5)
+        #yf = random.randrange(0, 5)
+        #move_list = [(xi, yi, xf, yf)]
+        #spawn_list = []
+        game.turn(0, move_list, spawn_list)
+        game.board.print_board_state()
+        print()
+
+        # blue turn -- pass
+        game.turn(1, [], [])
+        if (game.money[1] != 3 * i + 9):
+            raise Exception("Blue money is wrong!  Value is " + str(game.money[1]) + " and should be " + str(3 * i + 9))
+    # print final-state money
+    print(game.money[0], game.money[1])
+    if (game.money[0] < game.money[1]):
+        raise Exception("Yellow loses!  Yellow money = " + str(game.money[0])
+            + " but blue money = " + str(game.money[1]))
+    
+if __name__ == "__main__":
+  main()
+
+
 
 # turn 1: yellow moves captain from (0,0) to (0,1)
 # yellow attempts to buy zombie (fails for lack of funds)
-move_list = parse_input()
-spawn_list = parse_input()
-game.turn(0, move_list, spawn_list)
-game.board.print_board_state()
+#move_list = parse_input()
+#spawn_list = parse_input()
+#game.turn(0, move_list, spawn_list)
+#game.board.print_board_state()
 
 # blue turn (passes)
 #game.turn(1, [], [])
