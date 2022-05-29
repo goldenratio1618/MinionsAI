@@ -47,6 +47,7 @@ class Game():
         self.board = Board(self.water_locs, self.graveyard_locs)
         self.board.board[0][0].add_unit(Unit(0, 0)) # yellow captain
         self.board.board[4][4].add_unit(Unit(1, 0)) # blue captain
+        self.board.board[1][1].add_unit(Unit(1, 1)) # blue zombie
         # money for two sides
         self.money = [p0_money, p1_money]
 
@@ -94,6 +95,10 @@ class Game():
             # if target hex is occupied by enemy unit, then attack
             elif self.board.board[xf][yf].unit.color != color:
                 if distance > attack_range: continue
+                # unsummon removes non-persistent unit from board and refunds cost
+                if unitList[self.board.board[xi][yi].unit.index].unsummoner and not unitList[self.board.board[xf][yf].unit.index].persistent:
+                    self.money[1 - color] += unitList[self.board.board[xf][yf].unit.index].cost
+                    self.board.board[xf][yf].remove_unit()
                 if self.board.board[xi][yi].unit.remainingAttack == 0: continue
                 # attacking prevents later movement
                 self.board.board[xi][yi].unit.hasMoved = True
@@ -174,6 +179,7 @@ class Unit():
             return self.rebate
         return -1
 
+
 # actual game
 game = Game(0, 6)
 #game.board.print_board_properties()
@@ -182,12 +188,12 @@ game = Game(0, 6)
 
 # turn 1: yellow moves captain from (0,0) to (0,1)
 # yellow attempts to buy zombie (fails for lack of funds)
-game.turn(0, [(0,0,0,1)], [(1,0,0)])
-#game.board.print_board_state()
+game.turn(0, [(0,0,0,1), (0,1,1,1)], [(1,0,0)])
+game.board.print_board_state()
 
 # blue turn (passes)
-game.turn(1, [], [])
+#game.turn(1, [], [])
 
 # turn 2: yellow moves captain to (1,1)
-game.turn(0, [(0,1,1,1)], [(1,0,0), (1,2,0), (1,0,2)])
-game.board.print_board_state()
+#game.turn(0, [(0,1,1,1)], [(1,0,0), (1,2,0), (1,0,2)])
+#game.board.print_board_state()
