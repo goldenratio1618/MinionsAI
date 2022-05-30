@@ -9,8 +9,8 @@ from action import ActionType, ActionList
 import numpy as np
 
 BOARD_SIZE = 5
-INCOME_BONUS = 3
-MAX_TURNS = 20
+INCOME_BONUS = 0
+MAX_TURNS = 4
 
 # distance function between two hexes
 def dist(xi, yi, xf, yf):
@@ -40,6 +40,7 @@ class Board():
             b.board[i][j].is_graveyard = hex.is_graveyard
             if hex.unit is not None:
                 b.board[i][j].add_unit(Unit(color=hex.unit.color, unit_type=hex.unit.type))
+        return b
 
     def board_properties(self):
         return [(i, j, self.board[i][j].is_water, self.board[i][j].is_graveyard) for i in range(BOARD_SIZE) for j in range(BOARD_SIZE)]
@@ -95,8 +96,12 @@ class Game():
                  max_turns=MAX_TURNS, 
                  board=None, 
                  active_player_color=0, 
-                 phase=Phase.TURN_END,
-                 start_first_turn=True):
+                 phase=Phase.TURN_END):
+        """
+        Important API pieces:
+            game.full_turn(action_list) - process an action list for the current player
+            game.next_turn() - advance to the next player's turn. Should be called once before each call to game.full_turn.
+        """
         if board is None:
             # starting position: captains on opposite corners with one graveyard in center
             graveyard_locs = [(i, j) for i in range(BOARD_SIZE) for j in range(BOARD_SIZE) if random.random() < 0.25 and 1 < i + j < 2 * BOARD_SIZE - 1]
@@ -112,8 +117,6 @@ class Game():
         self.phase: Phase = phase
 
         self.remaining_turns = max_turns
-        if start_first_turn:
-            self.next_turn()
 
     @property
     def done(self):
@@ -262,7 +265,7 @@ class Game():
                 self.board.board[xf][yf].remove_unit()
                 # process rebate
                 self.money[self.inactive_player_color] += attack_outcome
-            return True
+        return True
 
     def process_single_spawn(self, spawn_action) -> bool:
         # returns true if spawn is legal & succesful, false otherwise
@@ -304,32 +307,40 @@ class Game():
         assert self.phase == Phase.MOVE, f"Tried to end move phase during phase {self.phase}"
         self.phase = Phase.SPAWN
 
-    def full_turn(self, action_list: ActionList):
+    def full_turn(self, action_list: ActionList, verbose=False):
+        """
+        Process a full turn of the game from a list of actions
+        Note that after this is called, the other player is active.
+        """
         assert self.phase == Phase.MOVE, f"Tried to full turn during phase {self.phase}"
+        if verbose:
+            print(f"Processing actionlist: {action_list}")
         for action in action_list.move_phase:
-            self.process_single_action(action)
+            success = self.process_single_action(action)
+            if verbose and not success:
+                print(f"Failed to process action: {action}")
         self.end_move_phase()
         for action in action_list.spawn_phase:
-            self.process_single_spawn(action)
+            success = self.process_single_spawn(action)
+            if verbose and not success:
+                print(f"Failed to process action: {action}")
         self.end_spawn_phase()
-        self.next_turn()
 
     def copy(self):
         return Game(money=self.money.copy(),
                     max_turns=self.remaining_turns, 
                     board=self.board.copy(), 
                     active_player_color=self.active_player_color, 
-                    phase=self.phase,
-                    start_first_turn=False)
+                    phase=self.phase)
 
 class Unit():
     def __init__(self, color, unit_type):
         self.type = unit_type
         self.color = color
         self.curr_health = self.type.defense
-        self.hasMoved = True
+        self.hasMoved = False
         self.remainingAttack = 0
-        self.isExhausted = True
+        self.isExhausted = False
         self.is_soulbound = False
     
     def receive_attack(self, attack):
@@ -350,8 +361,21 @@ def parse_input(proc):
         line = proc.stdout.readline().strip()
     return input_list
 
+def test_board():
+    gys = [(2, 3), (1, 1), (1, 0)]
+    water = [(1,1), (2, 2)]
+    b = Board(graveyard_locs=gys, water_locs=water)
+    b_copy = b.copy()
+    for i in range(BOARD_SIZE):
+        for j in range(BOARD_SIZE):
+            assert b.board[i][j].is_graveyard == b_copy.board[i][j].is_graveyard
+            assert b.board[i][j].is_water == b_copy.board[i][j].is_water
+
+
 # actual game
-def main():
+def main(): 
+    test_board()
+
     game = Game(money=(0, 6))
     game.board.print_board_properties()
     print()
