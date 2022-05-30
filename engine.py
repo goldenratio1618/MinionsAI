@@ -42,7 +42,7 @@ class Board():
             unit_index = None
             unit_color = None
         else:
-            unit_index = self.board[i][j].unit.index
+            unit_index = self.board[i][j].unit.type.name[0]
             unit_color = self.board[i][j].unit.color
         return i, j, unit_index, unit_color
 
@@ -258,7 +258,8 @@ class Game():
         self.backup_for_undo = None
 
 class UnitType():
-    def __init__(self, attack, defense, speed, attack_range, persistent, immune, max_stack, spawn, blink, unsummoner, deadly, flurry, flying, lumbering, terrain_ability, cost, rebate):
+    def __init__(self, name, cost, rebate, attack, defense, speed=1, attack_range=1, persistent=False, immune=False, max_stack=1, spawn=False, blink=False, unsummoner=False, deadly=False, flurry=False, flying=False, lumbering=False, terrain_ability=0):
+        self.name = name
         self.attack = attack
         self.defense = defense
         self.speed = speed
@@ -278,15 +279,16 @@ class UnitType():
         self.rebate = rebate
 
 unitList = [
-    UnitType(0, 7, 1, 1, True, True, 1, True, False, True, False, False, False, False, 0, 255, 0), # captain
-    UnitType(1, 2, 1, 1, False, False, 1, False, False, False, False, False, False, True, 0, 2, 0) # zombie
+    UnitType("Necromancer", 255, 0, 0, 7, persistent=True, immune=True, spawn=True, unsummoner=True),
+    UnitType("Zombie", 2, 0, 1, 2, lumbering=True)
 ]
 
 class Unit():
     def __init__(self, color, index):
         self.index = index
+        self.type = unitList[index]
         self.color = color
-        self.curr_health = unitList[index].defense
+        self.curr_health = self.type.defense
         self.hasMoved = True
         self.remainingAttack = 0
         self.isExhausted = True
