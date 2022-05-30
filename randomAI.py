@@ -8,10 +8,9 @@ import sys
 BOARD_SIZE=5
 
 def main():
-    color = sys.argv[1]
     while True:
         line = input()
-        while line != color + " turn":
+        while line != "Your turn":
             if line == "Game over!":
                 return
             line = input()

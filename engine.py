@@ -2,10 +2,12 @@ import copy
 import enum
 import random
 import sys
+import subprocess
+import threading
 
 BOARD_SIZE = 3
 INCOME_BONUS = 3
-MAX_TURNS = 40
+MAX_TURNS = 100
 
 # distance function between two hexes
 def dist(xi, yi, xf, yf):
@@ -300,12 +302,12 @@ class Unit():
 
 # moves are in the form (xi, yi, xf, yf)
 # move list is terminated by an empty line
-def parse_input():
+def parse_input(proc):
     input_list = []
-    line = input()
+    line = proc.stdout.readline().strip()
     while line != "":
-        input_list.append([int(s) for s in line.split(" ")])
-        line = input()
+        input_list.append([int(s) for s in line.split(" ") if s != ""])
+        line = proc.stdout.readline().strip()
     return input_list
 
 # actual game
@@ -316,12 +318,16 @@ def main():
     game.board.print_board_state()
     print()
 
+    yellow = subprocess.Popen(["python3", "-u", "randomAI.py"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1, universal_newlines=True)
+    blue = subprocess.Popen(["python3", "-u", "randomAI.py"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1, universal_newlines=True)
+
     # turn loop
     while not game.done:
         # yellow turn -- get input from screen
-        print("Yellow turn")
-        move_list = parse_input()
-        spawn_list = parse_input()
+        yellow.stdin.write("Your turn\n")
+        yellow.stdin.flush()
+        move_list = parse_input(yellow)
+        spawn_list = parse_input(yellow)
         #xi = random.randrange(0, 5)
         #yi = random.randrange(0, 5)
         #xf = random.randrange(0, 5)
@@ -333,9 +339,10 @@ def main():
         print()
 
         # blue turn -- pass
-        print("Blue turn")
-        move_list = [] #parse_input()
-        spawn_list = [] #parse_input()
+        blue.stdin.write("Your turn\n")
+        blue.stdin.flush()
+        move_list = parse_input(blue)
+        spawn_list = parse_input(blue)
         game.turn(move_list, spawn_list)
         game.board.print_board_state()
         print()
