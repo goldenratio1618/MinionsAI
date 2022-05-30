@@ -4,7 +4,7 @@ import sys
 
 BOARD_SIZE = 5
 INCOME_BONUS = 3
-MAX_TURNS = 100
+MAX_TURNS = 5
 
 # distance function between two hexes
 # when y is decreased, x can stay the same or be increased by 1
@@ -13,6 +13,19 @@ def dist(xi, yi, xf, yf):
     if (yi == yf): return abs(xi - xf)
     if (xi > xf): return dist(xi, yi, xf + 1, yf - 1) + 1
     return (yf - yi) + (xf - xi)
+
+# return an array of tuples of adjacent hexes
+def adjacent_hexes(x, y):
+    hex_list = []
+    if x > 0: hex_list.append((x-1,y))
+    if x < (BOARD_SIZE - 1): hex_list.append((x+1,y))
+    if y > 0:
+        hex_list.append((x,y-1))
+        if x < (BOARD_SIZE - 1): hex_list.append((x+1,y-1))
+    if y < (BOARD_SIZE - 1):
+        hex_list.append((x,y+1))
+        if x > 0: hex_list.append((x-1,y+1))
+    return hex_list
 
 class Board():
     def __init__(self, water_locs, graveyard_locs):
@@ -164,6 +177,14 @@ class Game():
         if cost > self.money[self.active_player_color]: return False
         # check to make sure hex is unoccupied
         if self.board.board[x][y].unit != None: return False
+        # check to make sure we are adjacent to spawner
+        adjacent_spawner = False
+        for square in adjacent_hexes(x, y):
+            ax, ay = square
+            if self.board.board[ax][ay].unit != None and self.board.board[ax][ay].unit.color == self.active_player_color \
+                    and unitList[self.board.board[ax][ay].unit.index].spawn:
+                adjacent_spawner = True
+        if not adjacent_spawner: return False
         # purchase unit
         self.money[self.active_player_color] -= cost
         # add unit to board
