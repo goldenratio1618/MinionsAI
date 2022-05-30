@@ -63,6 +63,7 @@ def single_rollout(game_kwargs, rollouts_per_turn_by_player=(ROLLOUTS_PER_TURN, 
             # print(f"    Turn rollout {i}")
             actions = generator.rollout(game)
             obs = translate(game)
+            obs = {k: th.Tensor(v).int().to(device) for k, v in obs.items()}
             disc_logprob = policy(obs).detach()
             scores.append(disc_logprob)
             options.append(actions)
@@ -127,7 +128,7 @@ while True:
             batch_obs = {}
             for key in states[0]:
                 batch_obs[key] = np.concatenate([states[i][key] for i in batch_idxes], axis=0)
-                
+                batch_obs[key] = th.from_numpy(batch_obs[key]).to(device)    
             batch_labels = np.array(labels)[batch_idxes]
             batch_labels = th.from_numpy(batch_labels).to(device)
             optimizer.zero_grad()

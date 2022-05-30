@@ -19,12 +19,11 @@ class MinionsDiscriminator(th.nn.Module):
 
         self.d_model = d_model
 
-    def process_input(self, obs):
+    def process_input(self, obs: th.Tensor):
         # obs is dict of:
-        # hexes: [batch, num_hexes, 1]
-        # units: [batch, num_units, 2]
+        # board: [batch, num_hexes, 3]
         # Extract these tensors, keeping the int type
-        board_obs = th.Tensor(obs['board']).long()
+        board_obs = obs['board']
         assert tuple(board_obs.shape[1:]) == (BOARD_SIZE ** 2, 3), board_obs.shape
         hex_embs = self.hex_embedding(board_obs[:, :, 0])  # [batch, num_hexes, d_model]
         terrain_emb = self.hex_embedding(board_obs[:, :, 1])  # [batch, num_hexes, d_model]
