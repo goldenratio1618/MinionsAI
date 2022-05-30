@@ -1,6 +1,6 @@
 
 import enum
-from typing import Tuple
+from typing import List, Tuple
 
 from unit_type import UnitType
 
@@ -8,8 +8,6 @@ from unit_type import UnitType
 class ActionType(enum.Enum):
     MOVE = "move"
     SPAWN = "spawn"
-    FINISH_PHASE = "finish"
-    END_TURN = "end"
 
 class Action():
     def __init__(self, action_type: ActionType):
@@ -26,6 +24,9 @@ class MoveAction(Action):
         self.from_xy = from_xy
         self.to_xy = to_xy
 
+    def __repr__(self):
+        return f"<MoveAction {self.from_xy} -> {self.to_xy}>"
+
 class SpawnAction(Action):
     """
     Can only be done during Spawn Phase
@@ -37,18 +38,13 @@ class SpawnAction(Action):
         self.unit_type = unit_type
         self.to_xy = to_xy
 
-class FinishPhaseAction(Action):
-    """
-    Move on to the next phase (Move->Spawn->Turn_end)
-    """
-    def __init__(self):
-        super().__init__(ActionType.FINISH_PHASE)
+    def __repr__(self):
+        return f"<SpawnAction {self.unit_type.name} @ {self.to_xy}>"
 
-class EndTurnAction(Action):
-    """
-    Can only be done during Turn End Phase
-    Either end the turn, or undo it and start over.
-    """
-    def __init__(self, undo_turn=False):
-        super().__init__(ActionType.END_TURN)
-        self.undo_turn = undo_turn
+class ActionList():
+    def __init__(self, move_phase: List[Action], spawn_phase: List[Action]):
+        self.move_phase: List[Action] = move_phase
+        self.spawn_phase: List[Action] = spawn_phase
+
+    def __repr__(self):
+        return f"<ActionList Move Phase: {self.move_phase} ||||| Spawn Phase: {self.spawn_phase}>"
