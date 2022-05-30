@@ -7,7 +7,6 @@ INCOME_BONUS = 3
 MAX_TURNS = 5
 
 # distance function between two hexes
-# when y is decreased, x can stay the same or be increased by 1
 def dist(xi, yi, xf, yf):
     return max(abs(yf - yi), abs(xf - xi) + (abs(yf - yi) if xi > xf == yi > yf else 0))
 
@@ -68,6 +67,7 @@ class Phase(enum.Enum):
     MOVE = "move"
     SPAWN = "spawn"
     TURN_END = "turn_end"
+
 class Game():
     def __init__(self, p0_money, p1_money):
         # starting position: captains on opposite corners with one graveyard in center
@@ -140,11 +140,11 @@ class Game():
         # if target hex is occupied by enemy unit, then attack
         elif self.board.board[xf][yf].unit.color != self.active_player_color:
             if distance > attack_range: return False
+            if self.board.board[xi][yi].unit.remainingAttack == 0: return False
             # unsummon removes non-persistent unit from board and refunds cost
             if unitList[self.board.board[xi][yi].unit.index].unsummoner and not unitList[self.board.board[xf][yf].unit.index].persistent:
                 self.money[self.inactive_player_color] += unitList[self.board.board[xf][yf].unit.index].cost
                 self.board.board[xf][yf].remove_unit()
-            if self.board.board[xi][yi].unit.remainingAttack == 0: return False
             # attacking prevents later movement
             self.board.board[xi][yi].unit.hasMoved = True
             # flurry deals 1 attack
