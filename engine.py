@@ -8,10 +8,7 @@ MAX_TURNS = 100
 # distance function between two hexes
 # when y is decreased, x can stay the same or be increased by 1
 def dist(xi, yi, xf, yf):
-    if (yi > yf): return dist(xf, yf, xi, yi)
-    if (yi == yf): return abs(xi - xf)
-    if (xi > xf): return dist(xi, yi, xf + 1, yf - 1) + 1
-    return (yf - yi) + (xf - xi)
+    return max(abs(yf - yi), abs(xf - xi) + (abs(yf - yi) if xi > xf == yi > yf else 0))
 
 class Board():
     def __init__(self, water_locs, graveyard_locs):
@@ -165,7 +162,7 @@ class UnitType():
 unitList = [
     UnitType(0, 7, 1, 1, True, True, 1, True, False, True, False, False, False, False, 0, 255, 0), # captain
     UnitType(1, 2, 1, 1, False, False, 1, False, False, False, False, False, False, True, 0, 2, 0) # zombie
-    ]
+]
 
 class Unit():
     def __init__(self, color, index):
