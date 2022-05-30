@@ -5,7 +5,7 @@ import sys
 import subprocess
 import threading
 
-BOARD_SIZE = 5
+BOARD_SIZE = 3
 INCOME_BONUS = 3
 MAX_TURNS = 100
 
@@ -78,13 +78,13 @@ class Phase(enum.Enum):
     TURN_END = "turn_end"
 
 class Game():
-    def __init__(self, p0_money, p1_money, max_turns=MAX_TURNS):
+    def __init__(self, p0_money=0, p1_money=0, max_turns=MAX_TURNS):
         # starting position: captains on opposite corners with one graveyard in center
-        self.graveyard_locs = [(2, 2)]
+        self.graveyard_locs = [(i, j) for i in range(BOARD_SIZE) for j in range(BOARD_SIZE)]
         self.water_locs = []
         self.board = Board(self.water_locs, self.graveyard_locs)
         self.board.board[0][0].add_unit(Unit(0, 0)) # yellow captain
-        self.board.board[4][4].add_unit(Unit(1, 0)) # blue captain
+        self.board.board[BOARD_SIZE - 1][ BOARD_SIZE - 1].add_unit(Unit(1, 0)) # blue captain
         #self.board.board[1][1].add_unit(Unit(1, 1)) # blue zombie
         # money for two sides
         self.money = [p0_money, p1_money]
@@ -93,9 +93,17 @@ class Game():
 
         self.backup_for_undo = None
         self.remaining_turns = max_turns
-        self.done = False
 
         self.next_turn()
+
+    @property
+    def done(self):
+        return self.remaining_turns <= 0
+
+    @property
+    def winner(self):
+        assert self.done
+        return 0 if self.money[0] > self.money[1] else 1
 
     @property
     def inactive_player_color(self):
@@ -103,16 +111,16 @@ class Game():
 
     def units_with_locations(self, color=None):
         result = []
-        for (i, j), hex in self.hexes():
+        for (i, j), hex in self.board.hexes():
             if hex.unit is not None and (color is None or hex.unit.color == color):
-                result.append(hex.unit, (i, j))
+                result.append([hex.unit, (i, j)])
         return result
 
     def next_turn(self):
         self.active_player_color = self.inactive_player_color
         self.remaining_turns -= 1
-        if self.remaining_turns == 0:
-            self.done = True
+        if self.done:
+            return
 
         for row in self.board.board:
             for square in row:
@@ -220,6 +228,8 @@ class Game():
         return True
 
     def turn(self, move_list, spawn_list, auto_continue=True):
+        assert not self.done
+
         # parse all moves
         self.phase = Phase.MOVE
         for move in move_list:
