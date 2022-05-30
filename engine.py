@@ -5,7 +5,7 @@ import sys
 import subprocess
 import threading
 
-BOARD_SIZE = 3
+BOARD_SIZE = 5
 INCOME_BONUS = 3
 MAX_TURNS = 100
 
@@ -80,7 +80,7 @@ class Phase(enum.Enum):
 class Game():
     def __init__(self, p0_money=0, p1_money=0, max_turns=MAX_TURNS):
         # starting position: captains on opposite corners with one graveyard in center
-        self.graveyard_locs = [(i, j) for i in range(BOARD_SIZE) for j in range(BOARD_SIZE)]
+        self.graveyard_locs = [(i, j) for i in range(BOARD_SIZE) for j in range(BOARD_SIZE) if random.random() < 0.25 and 1 < i + j < 2 * BOARD_SIZE - 1]
         self.water_locs = []
         self.board = Board(self.water_locs, self.graveyard_locs)
         self.board.board[0][0].add_unit(Unit(0, 0)) # yellow captain
