@@ -3,6 +3,7 @@ import random
 
 from action import Action, SpawnAction, MoveAction, FinishPhaseAction, EndTurnAction
 from engine import Game, BOARD_SIZE, Phase
+from unit_type import ZOMBIE
 
 class Agent(abc.ABC):
     @abc.abstractmethod
@@ -25,11 +26,11 @@ class RandomAIAgent(Agent):
             yf = random.randrange(0, BOARD_SIZE)
             return MoveAction((xi, yi), (xf, yf))
         elif game.phase == Phase.SPAWN:
-            if random.random() < 0.02 or game.money(game.active_player_color) < 2:
+            if random.random() < 0.02 or game.money[game.active_player_color] < 2:
                 return FinishPhaseAction()
             else:
                 x = random.randrange(0, BOARD_SIZE)
                 y = random.randrange(0, BOARD_SIZE)
-                return SpawnAction(1, (x, y))
-        elif game.phase == Phase.FINISH:
+                return SpawnAction(ZOMBIE, (x, y))
+        elif game.phase == Phase.TURN_END:
             return EndTurnAction()

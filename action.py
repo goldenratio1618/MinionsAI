@@ -2,7 +2,7 @@
 import enum
 from typing import Tuple
 
-from engine import UnitType
+from unit_type import UnitType
 
 
 class ActionType(enum.Enum):
@@ -23,8 +23,8 @@ class MoveAction(Action):
     """
     def __init__(self, from_xy: Tuple[int, int], to_xy: Tuple[int, int]):
         super().__init__(ActionType.MOVE)
-        self.from_ij = from_xy
-        self.to_ij = to_xy
+        self.from_xy = from_xy
+        self.to_xy = to_xy
 
 class SpawnAction(Action):
     """
@@ -35,7 +35,7 @@ class SpawnAction(Action):
     def __init__(self, unit_type: UnitType, to_xy: Tuple[int, int]):
         super().__init__(ActionType.SPAWN)
         self.unit_type = unit_type
-        self.to_ij = to_xy
+        self.to_xy = to_xy
 
 class FinishPhaseAction(Action):
     """

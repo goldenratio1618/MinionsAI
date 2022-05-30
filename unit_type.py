@@ -19,7 +19,7 @@ class UnitType():
         self.cost = cost
         self.rebate = rebate
 
-unitList = [
-    UnitType("Necromancer", 255, 0, 0, 7, persistent=True, immune=True, spawn=True, unsummoner=True),
-    UnitType("Zombie", 2, 0, 1, 2, lumbering=True)
-]
+NECROMANCER = UnitType("Necromancer", 255, 0, 0, 7, persistent=True, immune=True, spawn=True, unsummoner=True)
+ZOMBIE = UnitType("Zombie", 2, 0, 1, 2, lumbering=True)
+
+unitList = [NECROMANCER, ZOMBIE]
