@@ -1,5 +1,5 @@
 """
-Work in progress, but as of this commit I get to 95% winrate vs random bot in 3x3, all-graveyard world.
+Work in progress, but as of this commit I get to 95% winrate vs random bot in 5x5 world with 25% randomly graveyards.
 
 Reproduce by simply running `train.py`. After setting BOARD_SIZE and graveyard_locs in engine.py
 """
@@ -85,24 +85,27 @@ def eval_vs_random():
     for i in tqdm.tqdm(range(100)):
         good_idx = i % 2
         rollouts_per_turn_by_player = [1, 1]
-        rollouts_per_turn_by_player[good_idx] = ROLLOUTS_PER_TURN
+        rollouts_per_turn_by_player[good_idx] = ROLLOUTS_PER_TURN * 4
 
         _, _, winner = single_rollout(game_kwargs={}, rollouts_per_turn_by_player=rollouts_per_turn_by_player)
         if winner == good_idx:
             wins += 1
         games += 1
     return wins / games
-    
+
+iteration = 0
 while True:
+    print("===================================")
+    print(f"=========== Iteration: {iteration} ===========")
+    print("===================================")
     print("Starting rollouts...")
     states, labels = rollouts({})
-    print(len(states))
-    print(len(labels))
     print("Starting training...")
     for epoch in range(SAMPLE_REUSE):
         print(f"Epoch {epoch}")
         all_idxes = np.random.permutation(len(states))
         n_batches = len(all_idxes) // BATCH_SIZE
+        final_loss = None
         for idx in tqdm.tqdm(range(n_batches)):
             batch_idxes = all_idxes[idx * BATCH_SIZE: (idx + 1) * BATCH_SIZE]
             batch_obs = {}
@@ -115,10 +118,15 @@ while True:
             disc_logprob = policy(batch_obs) # [batch, 1]
             batch_labels = torch.unsqueeze(batch_labels, 1)
             loss = torch.nn.BCEWithLogitsLoss()(disc_logprob, batch_labels)
-            print(f"Loss: {loss}")
             loss.backward()
             optimizer.step()
+            if idx == n_batches - 1:
+                final_loss = loss.item()
+        print(f"Loss: {final_loss}")
 
-    print("Evaluating...")
-    eval_winrate = eval_vs_random()
-    print(f"Win rate vs random = {eval_winrate}")
+    iteration += 1
+
+    if iteration % 5 == 0:
+        print("Evaluating...")
+        eval_winrate = eval_vs_random()
+        print(f"Win rate vs random = {eval_winrate}")
