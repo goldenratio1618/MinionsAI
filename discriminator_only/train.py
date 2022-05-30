@@ -48,7 +48,7 @@ else:
 generator = RandomGenerator()
 
 print("Creating policy...")
-policy = MinionsDiscriminator(d_model=128)
+policy = MinionsDiscriminator(d_model=128).to(device)
 print("Policy intiialzied:")
 print(policy)
 
@@ -64,7 +64,7 @@ def single_rollout(game_kwargs, rollouts_per_turn_by_player=(ROLLOUTS_PER_TURN, 
             actions = generator.rollout(game)
             obs = translate(game)
             obs = {k: th.Tensor(v).int().to(device) for k, v in obs.items()}
-            disc_logprob = policy(obs).detach()
+            disc_logprob = policy(obs).detach().cpu().numpy()
             scores.append(disc_logprob)
             options.append(actions)
         best_option = options[np.argmax(scores)]
