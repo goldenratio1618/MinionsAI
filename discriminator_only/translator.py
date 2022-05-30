@@ -23,7 +23,7 @@ HEXES = ObservationEnum([(i, j) for i in range(BOARD_SIZE) for j in range(BOARD_
 LOCATIONS = ObservationEnum([(i, j) for i in range(BOARD_SIZE) for j in range(BOARD_SIZE)])
 
 # 2x embeddings for unit types to encompass "mine" (True) and "opponent" (False)
-UNIT_TYPES = ObservationEnum([(u, c) for u in range(len(unitList)) for c in [True, False]], none_value=True)
+UNIT_TYPES = ObservationEnum([(u, c) for u in [u.name for u in unitList] for c in [True, False]], none_value=True)
 
 TERRAIN_TYPES = ObservationEnum(['none', 'water', 'graveyard'])
 
@@ -34,7 +34,7 @@ def translate(game: Game):
         if hex.unit is None:
             unit_type = UNIT_TYPES.NULL
         else:
-            unit_type = (hex.unit.index, hex.unit.color == game.active_player_color)
+            unit_type = (hex.unit.name, hex.unit.color == game.active_player_color)
         
         board_obs.append([
             HEXES.encode((i, j)),
