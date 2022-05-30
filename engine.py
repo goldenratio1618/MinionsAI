@@ -141,7 +141,13 @@ class Game():
             rectangle_grid[grid_x, grid_y] = char
         print("\n".join("".join(row) for row in rectangle_grid))
         # print the two money numbers, one left aligned and one right aligned in the same row
-        print("${:<3}{:>3}$".format(self.money[0], self.money[1]))
+        money_width = (rectangle_grid_dim - 1 - 2) // 2 # -1 for space in middle, -2 for $s
+        print(f"${self.money[0]:<{money_width}} {self.money[1]:>{money_width}}$")
+        phase = self.phase.name.capitalize()
+        if self.active_player_color == 0:
+            print(f"{phase:<{rectangle_grid_dim}}")
+        else:
+            print(f"{phase:>{rectangle_grid_dim}}")
 
     def units_with_locations(self, color=None):
         result = []
@@ -166,7 +172,7 @@ class Game():
         self.backup_for_undo()
         self.phase = Phase.MOVE
 
-    def process_single_ation(self, action) -> bool:
+    def process_single_action(self, action) -> bool:
         if self.phase == Phase.MOVE:
             if action.action_type == ActionType.FINISH_PHASE:
                 self.phase = Phase.SPAWN
@@ -174,7 +180,7 @@ class Game():
             elif action.action_type == ActionType.MOVE:
                 return self.process_single_move(action)
             else:
-                raise ValueError(f"Wrong action type ({action.type}) for Move Phase.")
+                raise ValueError(f"Wrong action type ({action.action_type}) for Move Phase.")
         elif self.phase == Phase.SPAWN:
             if action.action_type == ActionType.FINISH_PHASE:
                 self.phase = Phase.TURN_END
@@ -183,7 +189,7 @@ class Game():
             elif action.action_type == ActionType.SPAWN:
                 return self.process_single_spawn(action)
             else:
-                raise ValueError(f"Wrong action type ({action.type}) for Spawn Phase.")
+                raise ValueError(f"Wrong action type ({action.action_type}) for Spawn Phase.")
         elif self.phase == Phase.TURN_END:
             if action.action_type == ActionType.END_TURN:
                 if action.undo_turn:
@@ -193,7 +199,7 @@ class Game():
                     self.next_turn()
                     return True
             else:
-                raise ValueError(f"Wrong action type ({action.type}) for Turn End Phase.")
+                raise ValueError(f"Wrong action type ({action.action_type}) for Turn End Phase.")
 
     def process_single_move(self, move_action) -> bool:
         # returns true if move is legal & succesful, false otherwise
@@ -322,6 +328,7 @@ class Game():
     def undo(self):
         self.board = self._backup_for_undo['board']
         self.money = self._backup_for_undo['money']
+        self.phase = Phase.MOVE
         self.backup_for_undo()
 
 class Unit():

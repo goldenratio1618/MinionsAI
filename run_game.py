@@ -6,7 +6,7 @@ def run_game(game: Game, agents: Tuple[Agent, Agent], verbose=False) -> int:
     while not game.done:
         active_agent = agents[game.active_player_color]
         action = active_agent.act(game)
-        game.process_single_ation(action)
+        game.process_single_action(action)
         if verbose:
             print("Remaining turns:", game.remaining_turns)
             game.board.print_board_state()

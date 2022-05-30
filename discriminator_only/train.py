@@ -6,6 +6,7 @@ Reproduce by simply running `train.py`. After setting BOARD_SIZE and graveyard_l
 
 
 from tabnanny import check
+from action import EndTurnAction
 from discriminator_only.agent import TrainedAgent
 from discriminator_only.model import MinionsDiscriminator
 from discriminator_only.random_generator import RandomGenerator
@@ -30,7 +31,7 @@ else:
 print("============================================================================================")
 
 ROLLOUTS_PER_TURN = 4
-EPISODES_PER_ITERATION = 512
+EPISODES_PER_ITERATION = 16
 SAMPLE_REUSE = 3
 BATCH_SIZE = 32
 EVAL_EVERY = 2
@@ -65,7 +66,8 @@ def single_rollout(game_kwargs, agents = (agent, agent)):
     while not game.done:
         agents[game.active_player_color].act(game)
         state_buffers[game.active_player_color].append(translator.translate(game))
-        game.next_turn()
+        # TODO move this into acent.act once the buffering moves in there.
+        game.process_single_action(EndTurnAction())
 
     winner = game.winner
     winner_states = state_buffers[winner]

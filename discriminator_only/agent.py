@@ -2,6 +2,7 @@ from agent import Agent
 import pickle
 import os
 import numpy as np
+from action import EndTurnAction
 
 class TrainedAgent(Agent):
     def __init__(self, policy, translator, generator, rollouts_per_turn):
@@ -21,12 +22,12 @@ class TrainedAgent(Agent):
             options.append(actions)
             # print(f"Option {i}")
             # game.pretty_print()
-            game.undo()
+            game.process_single_action(EndTurnAction(undo_turn=True))
         best_option_idx = np.argmax(scores)
         # print(f"Choosing option {best_option_idx}")
         best_option = options[best_option_idx]
         self.generator.redo(best_option, game)
-        
+        # print(f"Agent action complete")
 
     def save(self, checkpoint_path):
         os.makedirs(checkpoint_path)

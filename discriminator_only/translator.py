@@ -35,7 +35,7 @@ class Translator():
             if hex.unit is None:
                 unit_type = self.UNIT_TYPES.NULL
             else:
-                unit_type = (hex.unit.name, hex.unit.color == game.active_player_color)
+                unit_type = (hex.unit.type.name, hex.unit.color == game.active_player_color)
             
             board_obs.append([
                 self.HEXES.encode((i, j)),
