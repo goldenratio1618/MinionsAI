@@ -30,7 +30,7 @@ else:
 print("============================================================================================")
 
 ROLLOUTS_PER_TURN = 4
-EPISODES_PER_ITERATION = 128
+EPISODES_PER_ITERATION = 512
 SAMPLE_REUSE = 3
 BATCH_SIZE = 32
 EVAL_EVERY = 2
@@ -115,10 +115,6 @@ while True:
     if iteration % CHECKPOINT_EVERY == 0:
         print("Saving checkpoint...")
         agent.save(os.path.join(checkpoint_dir, f"{iteration}"))
-    if iteration % EVAL_EVERY == 0:
-        print("Evaluating...")
-        eval_winrate = eval_vs_random()
-        print(f"Win rate vs random = {eval_winrate}")
 
     print("Starting rollouts...")
     states, labels = rollouts({})
@@ -147,3 +143,7 @@ while True:
 
     iteration += 1
 
+    if iteration % EVAL_EVERY == 0:
+        print("Evaluating...")
+        eval_winrate = eval_vs_random()
+        print(f"Win rate vs random = {eval_winrate}")

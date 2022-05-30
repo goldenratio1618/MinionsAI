@@ -3,9 +3,9 @@ import enum
 import random
 import sys
 import subprocess
-import threading
 from unit_type import UnitType, NECROMANCER
 from action import ActionType
+import numpy as np
 
 BOARD_SIZE = 5
 INCOME_BONUS = 3
@@ -81,7 +81,7 @@ class Phase(enum.Enum):
     GAME_OVER = "game_over"
 
 class Game():
-    def __init__(self, p0_money=0, p1_money=0, max_turns=MAX_TURNS):
+    def __init__(self, p0_money=4, p1_money=8, max_turns=MAX_TURNS):
         # starting position: captains on opposite corners with one graveyard in center
         self.graveyard_locs = [(i, j) for i in range(BOARD_SIZE) for j in range(BOARD_SIZE) if random.random() < 0.25 and 1 < i + j < 2 * BOARD_SIZE - 1]
         self.water_locs = []
@@ -94,7 +94,7 @@ class Game():
         self.active_player_color = 0
         self.phase = Phase.TURN_END
 
-        self.backup_for_undo = None
+        self._backup_for_undo = None
         self.remaining_turns = max_turns
 
         self.next_turn()
@@ -111,6 +111,37 @@ class Game():
     @property
     def inactive_player_color(self):
         return 1 - self.active_player_color
+
+    def backup_for_undo(self):
+        self._backup_for_undo = {
+            'board': copy.deepcopy(self.board),
+            'money': copy.deepcopy(self.money),
+        }
+
+    def pretty_print(self):
+        rectangle_grid_dim = BOARD_SIZE * 2 - 1
+        rectangle_grid = np.array([[" " for _ in range(rectangle_grid_dim)] for _ in range(rectangle_grid_dim)], dtype=str)
+        for (i, j), hex in self.board.hexes():
+            grid_x, grid_y = (i-j + (rectangle_grid_dim - 1) // 2), i+j
+            if hex.unit is None:
+                if hex.is_water:
+                    char = '~'
+                elif hex.is_graveyard:
+                    char = '$'
+                else:
+                    char = '-'
+            else:
+                char = hex.unit.type.name[0]
+                if hex.unit.color == 0:
+                    char = char.lower()
+                else:
+                    char = char.upper()
+                # TODO units on graveyards / water?
+
+            rectangle_grid[grid_x, grid_y] = char
+        print("\n".join("".join(row) for row in rectangle_grid))
+        # print the two money numbers, one left aligned and one right aligned in the same row
+        print("${:<3}{:>3}$".format(self.money[0], self.money[1]))
 
     def units_with_locations(self, color=None):
         result = []
@@ -132,10 +163,7 @@ class Game():
                     square.unit.hasMoved = False
                     square.unit.remainingAttack = square.unit.type.attack
                     square.unit.curr_health = square.unit.type.defense
-        self.backup_for_undo = {
-            'board': copy.deepcopy(self.board),
-            'money': copy.deepcopy(self.money),
-        }
+        self.backup_for_undo()
         self.phase = Phase.MOVE
 
     def process_single_ation(self, action) -> bool:
@@ -166,7 +194,6 @@ class Game():
                     return True
             else:
                 raise ValueError(f"Wrong action type ({action.type}) for Turn End Phase.")
-
 
     def process_single_move(self, move_action) -> bool:
         # returns true if move is legal & succesful, false otherwise
@@ -293,9 +320,9 @@ class Game():
     #         self.next_turn()
 
     def undo(self):
-        self.board = self.backup_for_undo['board']
-        self.money = self.backup_for_undo['money']
-        self.backup_for_undo = None
+        self.board = self._backup_for_undo['board']
+        self.money = self._backup_for_undo['money']
+        self.backup_for_undo()
 
 class Unit():
     def __init__(self, color, unit_type):
@@ -331,6 +358,7 @@ def main():
     game.board.print_board_properties()
     print()
     game.board.print_board_state()
+    game.pretty_print()
     print()
 
     yellow = subprocess.Popen(["python3", "-u", "randomAI.py"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1, universal_newlines=True)

@@ -19,12 +19,16 @@ class TrainedAgent(Agent):
             disc_logprob = self.policy(obs).detach().cpu().numpy()
             scores.append(disc_logprob)
             options.append(actions)
-        best_option = options[np.argmax(scores)]
+            # print(f"Option {i}")
+            # game.pretty_print()
+            game.undo()
+        best_option_idx = np.argmax(scores)
+        # print(f"Choosing option {best_option_idx}")
+        best_option = options[best_option_idx]
         self.generator.redo(best_option, game)
         
 
     def save(self, checkpoint_path):
-        print(os.path.exists(checkpoint_path))
         os.makedirs(checkpoint_path)
         self.policy.save(os.path.join(checkpoint_path, "weights.pt"))
         pickle.dump(self, open(os.path.join(checkpoint_path, "agent.pkl"), "wb"))
