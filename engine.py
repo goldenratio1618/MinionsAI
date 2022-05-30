@@ -1,3 +1,4 @@
+import copy
 import enum
 import random
 import sys
@@ -6,15 +7,11 @@ import threading
 
 BOARD_SIZE = 5
 INCOME_BONUS = 3
-MAX_TURNS = 5
+MAX_TURNS = 100
 
 # distance function between two hexes
-# when y is decreased, x can stay the same or be increased by 1
 def dist(xi, yi, xf, yf):
-    if (yi > yf): return dist(xf, yf, xi, yi)
-    if (yi == yf): return abs(xi - xf)
-    if (xi > xf): return dist(xi, yi, xf + 1, yf - 1) + 1
-    return (yf - yi) + (xf - xi)
+    return max(abs(yf - yi), abs(xf - xi) + (abs(yf - yi) if xi > xf == yi > yf else 0))
 
 # return an array of tuples of adjacent hexes
 def adjacent_hexes(x, y):
@@ -55,6 +52,12 @@ class Board():
     def print_board_state(self):
         for entry in self.board_state():
             print(*entry)
+
+    def hexes(self):
+        # use like `for (i, j), hex in self.hexes():`
+        for i, row in enumerate(self.board):
+            for j, hex in enumerate(row):
+                yield (i, j), hex
                 
 class Hex():
     def __init__(self, is_water, is_graveyard):
@@ -73,8 +76,9 @@ class Phase(enum.Enum):
     MOVE = "move"
     SPAWN = "spawn"
     TURN_END = "turn_end"
+
 class Game():
-    def __init__(self, p0_money, p1_money):
+    def __init__(self, p0_money, p1_money, max_turns=MAX_TURNS):
         # starting position: captains on opposite corners with one graveyard in center
         self.graveyard_locs = [(2, 2)]
         self.water_locs = []
@@ -87,17 +91,39 @@ class Game():
         self.active_player_color = 0
         self.phase = Phase.TURN_END
 
+        self.backup_for_undo = None
+        self.remaining_turns = max_turns
+        self.done = False
+
+        self.next_turn()
+
     @property
     def inactive_player_color(self):
         return 1 - self.active_player_color
 
-    def turn_start(self):
+    def units_with_locations(self, color=None):
+        result = []
+        for (i, j), hex in self.hexes():
+            if hex.unit is not None and (color is None or hex.unit.color == color):
+                result.append(hex.unit, (i, j))
+        return result
+
+    def next_turn(self):
+        self.active_player_color = self.inactive_player_color
+        self.remaining_turns -= 1
+        if self.remaining_turns == 0:
+            self.done = True
+
         for row in self.board.board:
             for square in row:
                 if square.unit != None and square.unit.color == self.active_player_color:
                     square.unit.hasMoved = False
                     square.unit.remainingAttack = unitList[square.unit.index].attack
                     square.unit.curr_health = unitList[square.unit.index].defense
+        self.backup_for_undo = {
+            'board': copy.deepcopy(self.board),
+            'money': copy.deepcopy(self.money),
+        }
 
     def process_single_move(self, move_action) -> bool:
         # returns true if move is legal & succesful, false otherwise
@@ -145,11 +171,11 @@ class Game():
         # if target hex is occupied by enemy unit, then attack
         elif self.board.board[xf][yf].unit.color != self.active_player_color:
             if distance > attack_range: return False
+            if self.board.board[xi][yi].unit.remainingAttack == 0: return False
             # unsummon removes non-persistent unit from board and refunds cost
             if unitList[self.board.board[xi][yi].unit.index].unsummoner and not unitList[self.board.board[xf][yf].unit.index].persistent:
                 self.money[self.inactive_player_color] += unitList[self.board.board[xf][yf].unit.index].cost
                 self.board.board[xf][yf].remove_unit()
-            if self.board.board[xi][yi].unit.remainingAttack == 0: return False
             # attacking prevents later movement
             self.board.board[xi][yi].unit.hasMoved = True
             # flurry deals 1 attack
@@ -193,11 +219,7 @@ class Game():
         self.board.board[x][y].add_unit(Unit(self.active_player_color, index))
         return True
 
-    def turn(self, color, move_list, spawn_list):
-        self.active_player_color = color
-        # reset move, attack, and health
-        self.turn_start()
-
+    def turn(self, move_list, spawn_list, auto_continue=True):
         # parse all moves
         self.phase = Phase.MOVE
         for move in move_list:
@@ -213,8 +235,17 @@ class Game():
         income = INCOME_BONUS
         for square in self.graveyard_locs:
             x, y = square
-            if self.board.board[x][y].unit != None and self.board.board[x][y].unit.color == color: income += 1
-        self.money[color] += income
+            if self.board.board[x][y].unit != None and self.board.board[x][y].unit.color == self.active_player_color:
+                income += 1
+        self.money[self.active_player_color] += income
+
+        if auto_continue:
+            self.next_turn()
+
+    def undo(self):
+        self.board = self.backup_for_undo['board']
+        self.money = self.backup_for_undo['money']
+        self.backup_for_undo = None
 
 class UnitType():
     def __init__(self, attack, defense, speed, attack_range, persistent, immune, max_stack, spawn, blink, unsummoner, deadly, flurry, flying, lumbering, terrain_ability, cost, rebate):
@@ -239,7 +270,7 @@ class UnitType():
 unitList = [
     UnitType(0, 7, 1, 1, True, True, 1, True, False, True, False, False, False, False, 0, 255, 0), # captain
     UnitType(1, 2, 1, 1, False, False, 1, False, False, False, False, False, False, True, 0, 2, 0) # zombie
-    ]
+]
 
 class Unit():
     def __init__(self, color, index):
@@ -281,7 +312,7 @@ def main():
     blue = subprocess.Popen(["python3", "-u", "randomAI.py"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1, universal_newlines=True)
 
     # turn loop
-    for i in range(MAX_TURNS):
+    while not game.done:
         # yellow turn -- get input from screen
         yellow.stdin.write("Your turn\n")
         yellow.stdin.flush()
@@ -293,7 +324,7 @@ def main():
         #yf = random.randrange(0, 5)
         #move_list = [(xi, yi, xf, yf)]
         #spawn_list = []
-        game.turn(0, move_list, spawn_list)
+        game.turn(move_list, spawn_list)
         game.board.print_board_state()
         print()
 
@@ -302,7 +333,7 @@ def main():
         blue.stdin.flush()
         move_list = parse_input(blue)
         spawn_list = parse_input(blue)
-        game.turn(1, move_list, spawn_list)
+        game.turn(move_list, spawn_list)
         game.board.print_board_state()
         print()
     # print final-state money
