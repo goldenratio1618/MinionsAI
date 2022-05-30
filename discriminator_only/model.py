@@ -57,3 +57,9 @@ class MinionsDiscriminator(th.nn.Module):
         trunk_out = self.transformer(obs)  # [batch, num_things, d_model]
         output = self.process_output_into_scalar(trunk_out)  # [batch, num_units, num_hexes]
         return output
+
+    def save(self, checkpoint_path):
+        th.save(self.state_dict(), checkpoint_path)
+
+    def load(self, checkpoint_path):
+        self.load_state_dict(th.load(checkpoint_path, map_location=lambda storage, loc: storage))
