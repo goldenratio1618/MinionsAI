@@ -203,7 +203,6 @@ class Game():
     def turn(self, move_list, spawn_list, auto_continue=True):
         # parse all moves
         self.phase = Phase.MOVE
-        print(move_list)
         for move in move_list:
             self.process_single_move(move)
         
@@ -294,14 +293,14 @@ def main():
     while not game.done:
         # yellow turn -- get input from screen
         print("Yellow turn")
-        # move_list = parse_input()
-        # spawn_list = parse_input()
-        xi = random.randrange(0, 5)
-        yi = random.randrange(0, 5)
-        xf = random.randrange(0, 5)
-        yf = random.randrange(0, 5)
-        move_list = [(xi, yi, xf, yf)]
-        spawn_list = []
+        move_list = parse_input()
+        spawn_list = parse_input()
+        #xi = random.randrange(0, 5)
+        #yi = random.randrange(0, 5)
+        #xf = random.randrange(0, 5)
+        #yf = random.randrange(0, 5)
+        #move_list = [(xi, yi, xf, yf)]
+        #spawn_list = []
         game.turn(move_list, spawn_list)
         game.board.print_board_state()
         print()
