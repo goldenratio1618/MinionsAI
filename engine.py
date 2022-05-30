@@ -76,7 +76,7 @@ class Phase(enum.Enum):
     TURN_END = "turn_end"
 
 class Game():
-    def __init__(self, p0_money, p1_money, max_turns=MAX_TURNS):
+    def __init__(self, p0_money=0, p1_money=0, max_turns=MAX_TURNS):
         # starting position: captains on opposite corners with one graveyard in center
         self.graveyard_locs = [(2, 2)]
         self.water_locs = []
@@ -96,6 +96,15 @@ class Game():
         self.next_turn()
 
     @property
+    def done(self):
+        return self.remaining_turns <= 0
+
+    @property
+    def winner(self):
+        assert self.done
+        return 0 if self.money[0] > self.money[1] else 1
+
+    @property
     def inactive_player_color(self):
         return 1 - self.active_player_color
 
@@ -109,8 +118,8 @@ class Game():
     def next_turn(self):
         self.active_player_color = self.inactive_player_color
         self.remaining_turns -= 1
-        if self.remaining_turns == 0:
-            self.done = True
+        if self.done:
+            return
 
         for row in self.board.board:
             for square in row:
@@ -218,6 +227,8 @@ class Game():
         return True
 
     def turn(self, move_list, spawn_list, auto_continue=True):
+        assert not self.done
+
         # parse all moves
         self.phase = Phase.MOVE
         for move in move_list:
