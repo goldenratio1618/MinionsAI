@@ -6,14 +6,16 @@ Reproduce by simply running `train.py`. After setting BOARD_SIZE and graveyard_l
 
 
 from tabnanny import check
+from discriminator_only.agent import TrainedAgent
 from discriminator_only.model import MinionsDiscriminator
 from discriminator_only.random_generator import RandomGenerator
-from discriminator_only.translator import translate
+from discriminator_only.translator import Translator
 from engine import Game
 import torch as th
 import numpy as np
 import os
 import tqdm
+import shutil
 
 ################################## set device ##################################
 print("============================================================================================")
@@ -28,11 +30,12 @@ else:
 print("============================================================================================")
 
 ROLLOUTS_PER_TURN = 4
-EPISODES_PER_ITERATION = 16
-SAMPLE_REUSE = 2
+EPISODES_PER_ITERATION = 128
+SAMPLE_REUSE = 3
 BATCH_SIZE = 32
-EVAL_EVERY = 5
+EVAL_EVERY = 2
 CHECKPOINT_EVERY = 2
+EVAL_COMPUTE_BOOST = 1
 
 run_name = 'test'
 # TODO: make this location more reasonable
@@ -41,36 +44,29 @@ checkpoint_dir = f"C:\\Users/Maple/AppData/Local/Temp/MinionsAI/{run_name}"
 if not os.path.exists(checkpoint_dir):
     os.makedirs(checkpoint_dir)
 else:
-    print(f"Duplicate run name {run_name}; clearing checkpoint directory")
-    for file in os.listdir(checkpoint_dir):
-        os.remove(os.path.join(checkpoint_dir, file))
+    print(f"Duplicate run name {run_name}; clearing checkpoint directory f{checkpoint_dir}")
+    shutil.rmtree(checkpoint_dir)
+    os.makedirs(checkpoint_dir)
 
 generator = RandomGenerator()
 
 print("Creating policy...")
-policy = MinionsDiscriminator(d_model=128).to(device)
+policy = MinionsDiscriminator(d_model=128, device=device)
 print("Policy intiialzied:")
 print(policy)
 
-def single_rollout(game_kwargs, rollouts_per_turn_by_player=(ROLLOUTS_PER_TURN, ROLLOUTS_PER_TURN)):
+translator = Translator()
+agent = TrainedAgent(policy, translator, generator, ROLLOUTS_PER_TURN)
+
+# TODO - use run_game instead, with a custom Agent subclass that remembers the states.
+def single_rollout(game_kwargs, agents = (agent, agent)):
     game = Game(**game_kwargs)
     state_buffers = [[], []]  # one for each player
     while not game.done:
-        # print(f"  Game turns remaining: {game.remaining_turns}")
-        options = []
-        scores = []
-        for i in range(rollouts_per_turn_by_player[game.active_player_color]):
-            # print(f"    Turn rollout {i}")
-            actions = generator.rollout(game)
-            obs = translate(game)
-            obs = {k: th.Tensor(v).int().to(device) for k, v in obs.items()}
-            disc_logprob = policy(obs).detach().cpu().numpy()
-            scores.append(disc_logprob)
-            options.append(actions)
-        best_option = options[np.argmax(scores)]
-        generator.redo(best_option, game)
+        agents[game.active_player_color].act(game)
+        state_buffers[game.active_player_color].append(translator.translate(game))
         game.next_turn()
-        state_buffers[game.active_player_color].append(translate(game))
+
     winner = game.winner
     winner_states = state_buffers[winner]
     winner_labels = np.ones(len(winner_states))
@@ -96,11 +92,16 @@ def eval_vs_random():
     wins = 0
     games = 0
     for i in tqdm.tqdm(range(100)):
+        null_policy = lambda x: th.Tensor([0]).to(device)
+        random_agent = TrainedAgent(null_policy, translator, generator, 2)
+        good_agent = TrainedAgent(policy, translator, generator, ROLLOUTS_PER_TURN * EVAL_COMPUTE_BOOST)
         good_idx = i % 2
-        rollouts_per_turn_by_player = [1, 1]
-        rollouts_per_turn_by_player[good_idx] = ROLLOUTS_PER_TURN * 4
 
-        _, _, winner = single_rollout(game_kwargs={}, rollouts_per_turn_by_player=rollouts_per_turn_by_player)
+        agents = [None, None]
+        agents[good_idx] = good_agent
+        agents[1 - good_idx] = random_agent
+
+        _, _, winner = single_rollout(game_kwargs={}, agents=agents)
         if winner == good_idx:
             wins += 1
         games += 1
@@ -113,7 +114,11 @@ while True:
     print("===================================")
     if iteration % CHECKPOINT_EVERY == 0:
         print("Saving checkpoint...")
-        policy.save(os.path.join(checkpoint_dir, f"{iteration}.pt"))
+        agent.save(os.path.join(checkpoint_dir, f"{iteration}"))
+    if iteration % EVAL_EVERY == 0:
+        print("Evaluating...")
+        eval_winrate = eval_vs_random()
+        print(f"Win rate vs random = {eval_winrate}")
 
     print("Starting rollouts...")
     states, labels = rollouts({})
@@ -128,7 +133,6 @@ while True:
             batch_obs = {}
             for key in states[0]:
                 batch_obs[key] = np.concatenate([states[i][key] for i in batch_idxes], axis=0)
-                batch_obs[key] = th.from_numpy(batch_obs[key]).to(device)    
             batch_labels = np.array(labels)[batch_idxes]
             batch_labels = th.from_numpy(batch_labels).to(device)
             optimizer.zero_grad()
@@ -143,7 +147,3 @@ while True:
 
     iteration += 1
 
-    if iteration % EVAL_EVERY == 0:
-        print("Evaluating...")
-        eval_winrate = eval_vs_random()
-        print(f"Win rate vs random = {eval_winrate}")
