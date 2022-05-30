@@ -3,9 +3,9 @@ import enum
 import random
 import sys
 
-BOARD_SIZE = 5
+BOARD_SIZE = 3
 INCOME_BONUS = 3
-MAX_TURNS = 5
+MAX_TURNS = 40
 
 # distance function between two hexes
 def dist(xi, yi, xf, yf):
@@ -78,11 +78,11 @@ class Phase(enum.Enum):
 class Game():
     def __init__(self, p0_money=0, p1_money=0, max_turns=MAX_TURNS):
         # starting position: captains on opposite corners with one graveyard in center
-        self.graveyard_locs = [(2, 2)]
+        self.graveyard_locs = [(i, j) for i in range(BOARD_SIZE) for j in range(BOARD_SIZE)]
         self.water_locs = []
         self.board = Board(self.water_locs, self.graveyard_locs)
         self.board.board[0][0].add_unit(Unit(0, 0)) # yellow captain
-        self.board.board[4][4].add_unit(Unit(1, 0)) # blue captain
+        self.board.board[BOARD_SIZE - 1][ BOARD_SIZE - 1].add_unit(Unit(1, 0)) # blue captain
         #self.board.board[1][1].add_unit(Unit(1, 1)) # blue zombie
         # money for two sides
         self.money = [p0_money, p1_money]
@@ -91,7 +91,6 @@ class Game():
 
         self.backup_for_undo = None
         self.remaining_turns = max_turns
-        self.done = False
 
         self.next_turn()
 
@@ -110,9 +109,9 @@ class Game():
 
     def units_with_locations(self, color=None):
         result = []
-        for (i, j), hex in self.hexes():
+        for (i, j), hex in self.board.hexes():
             if hex.unit is not None and (color is None or hex.unit.color == color):
-                result.append(hex.unit, (i, j))
+                result.append([hex.unit, (i, j)])
         return result
 
     def next_turn(self):

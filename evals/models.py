@@ -17,7 +17,7 @@ class Env(Base):
     def build(self):
         # hack hack
         if self.game_python_path == "MinionsAI.engine.Game":
-            from MinionsAI.engine import Game
+            from engine.engine import Game
             cls = Game
         elif self.game_python_path == "MinionsAI.evals.test_game.Game":
             from MinionsAI.evals.test_game import Game

@@ -1,6 +1,13 @@
-from MinionsAI.discriminator_only.model import MinionsDiscriminator
-from MinionsAI.discriminator_only.random_generator import RandomGenerator
-from MinionsAI.discriminator_only.translator import translate
+"""
+Work in progress, but as of this commit I get to 95% winrate vs random bot in 3x3, all-graveyard world.
+
+Reproduce by simply running `train.py`. After setting BOARD_SIZE and graveyard_locs in engine.py
+"""
+
+
+from discriminator_only.model import MinionsDiscriminator
+from discriminator_only.random_generator import RandomGenerator
+from discriminator_only.translator import translate
 from engine import Game
 import torch
 import torch.nn as nn
@@ -23,7 +30,7 @@ else:
 print("============================================================================================")
 
 ROLLOUTS_PER_TURN = 4
-EPISODES_PER_ITERATION = 512
+EPISODES_PER_ITERATION = 128
 SAMPLE_REUSE = 2
 BATCH_SIZE = 32
 generator = RandomGenerator()
@@ -33,47 +40,64 @@ policy = MinionsDiscriminator(d_model=128)
 print("Policy intiialzied:")
 print(policy)
 
-def single_rollout(game_kwargs):
+def single_rollout(game_kwargs, rollouts_per_turn_by_player=(ROLLOUTS_PER_TURN, ROLLOUTS_PER_TURN)):
     game = Game(**game_kwargs)
     state_buffers = [[], []]  # one for each player
     while not game.done:
+        # print(f"  Game turns remaining: {game.remaining_turns}")
         options = []
         scores = []
-        for _ in range(ROLLOUTS_PER_TURN):
+        for i in range(rollouts_per_turn_by_player[game.active_player_color]):
+            # print(f"    Turn rollout {i}")
             actions = generator.rollout(game)
             obs = translate(game)
-            disc_logprob = policy(obs)
+            disc_logprob = policy(obs).detach()
             scores.append(disc_logprob)
             options.append(actions)
         best_option = options[np.argmax(scores)]
         generator.redo(best_option, game)
+        game.next_turn()
         state_buffers[game.active_player_color].append(translate(game))
-
     winner = game.winner
     winner_states = state_buffers[winner]
     winner_labels = np.ones(len(winner_states))
     loser_states = state_buffers[1 - winner]
     loser_labels = np.zeros(len(loser_states))
     all_states = winner_states + loser_states
-    all_labels = winner_labels + loser_labels
-    return all_states, all_labels
+    all_labels = np.concatenate([winner_labels, loser_labels])
+    return all_states, all_labels, winner
 
 def rollouts(game_kwargs):
     states = []
     labels = []
 
     for _ in tqdm.tqdm(range(EPISODES_PER_ITERATION)):
-        states_, labels_ = single_rollout(game_kwargs)
+        states_, labels_, _ = single_rollout(game_kwargs)
         states.extend(states_)
         labels.extend(labels_)
     return states, labels
 
 optimizer = torch.optim.Adam(policy.parameters(), lr=1e-3)
 
+def eval_vs_random():
+    wins = 0
+    games = 0
+    for i in tqdm.tqdm(range(100)):
+        good_idx = i % 2
+        rollouts_per_turn_by_player = [1, 1]
+        rollouts_per_turn_by_player[good_idx] = ROLLOUTS_PER_TURN
+
+        _, _, winner = single_rollout(game_kwargs={}, rollouts_per_turn_by_player=rollouts_per_turn_by_player)
+        if winner == good_idx:
+            wins += 1
+        games += 1
+    return wins / games
+    
 while True:
     print("Starting rollouts...")
     states, labels = rollouts({})
-
+    print(len(states))
+    print(len(labels))
     print("Starting training...")
     for epoch in range(SAMPLE_REUSE):
         print(f"Epoch {epoch}")
@@ -83,249 +107,18 @@ while True:
             batch_idxes = all_idxes[idx * BATCH_SIZE: (idx + 1) * BATCH_SIZE]
             batch_obs = {}
             for key in states[0]:
-                batch_obs[key] = torch.stack([states[i][key] for i in batch_idxes])
-
-            batch_labels = torch.tensor(labels[batch_idxes], dtype=torch.float32)
+                batch_obs[key] = np.concatenate([states[i][key] for i in batch_idxes], axis=0)
+                
+            batch_labels = np.array(labels)[batch_idxes]
+            batch_labels = torch.from_numpy(batch_labels).to(device)
             optimizer.zero_grad()
-            loss = torch.nn.BCEWithLogitsLoss(policy(batch_obs), batch_labels)
+            disc_logprob = policy(batch_obs) # [batch, 1]
+            batch_labels = torch.unsqueeze(batch_labels, 1)
+            loss = torch.nn.BCEWithLogitsLoss()(disc_logprob, batch_labels)
+            print(f"Loss: {loss}")
             loss.backward()
             optimizer.step()
 
-
-
-
-
-################################## PPO Policy ##################################
-class RolloutBuffer:
-    def __init__(self):
-        self.actions = []
-        self.states = []
-        self.logprobs = []
-        self.rewards = []
-        self.is_terminals = []
-    
-    def clear(self):
-        del self.actions[:]
-        del self.states[:]
-        del self.logprobs[:]
-        del self.rewards[:]
-        del self.is_terminals[:]
-
-
-class ActorCritic(nn.Module):
-    def __init__(self, state_dim, action_dim, has_continuous_action_space, action_std_init):
-        super(ActorCritic, self).__init__()
-
-        self.has_continuous_action_space = has_continuous_action_space
-        
-        if has_continuous_action_space:
-            self.action_dim = action_dim
-            self.action_var = torch.full((action_dim,), action_std_init * action_std_init).to(device)
-        # actor
-        if has_continuous_action_space :
-            self.actor = nn.Sequential(
-                            nn.Linear(state_dim, 64),
-                            nn.Tanh(),
-                            nn.Linear(64, 64),
-                            nn.Tanh(),
-                            nn.Linear(64, action_dim),
-                        )
-        else:
-            self.actor = nn.Sequential(
-                            nn.Linear(state_dim, 64),
-                            nn.Tanh(),
-                            nn.Linear(64, 64),
-                            nn.Tanh(),
-                            nn.Linear(64, action_dim),
-                            nn.Softmax(dim=-1)
-                        )
-        # critic
-        self.critic = nn.Sequential(
-                        nn.Linear(state_dim, 64),
-                        nn.Tanh(),
-                        nn.Linear(64, 64),
-                        nn.Tanh(),
-                        nn.Linear(64, 1)
-                    )
-        
-    def set_action_std(self, new_action_std):
-        if self.has_continuous_action_space:
-            self.action_var = torch.full((self.action_dim,), new_action_std * new_action_std).to(device)
-        else:
-            print("--------------------------------------------------------------------------------------------")
-            print("WARNING : Calling ActorCritic::set_action_std() on discrete action space policy")
-            print("--------------------------------------------------------------------------------------------")
-
-    def forward(self):
-        raise NotImplementedError
-    
-    def act(self, state):
-        if self.has_continuous_action_space:
-            action_mean = self.actor(state)
-            cov_mat = torch.diag(self.action_var).unsqueeze(dim=0)
-            dist = MultivariateNormal(action_mean, cov_mat)
-        else:
-            action_probs = self.actor(state)
-            dist = Categorical(action_probs)
-
-        action = dist.sample()
-        action_logprob = dist.log_prob(action)
-        
-        return action.detach(), action_logprob.detach()
-    
-    def evaluate(self, state, action):
-
-        if self.has_continuous_action_space:
-            action_mean = self.actor(state)
-            
-            action_var = self.action_var.expand_as(action_mean)
-            cov_mat = torch.diag_embed(action_var).to(device)
-            dist = MultivariateNormal(action_mean, cov_mat)
-            
-            # For Single Action Environments.
-            if self.action_dim == 1:
-                action = action.reshape(-1, self.action_dim)
-        else:
-            action_probs = self.actor(state)
-            dist = Categorical(action_probs)
-        action_logprobs = dist.log_prob(action)
-        dist_entropy = dist.entropy()
-        state_values = self.critic(state)
-        
-        return action_logprobs, state_values, dist_entropy
-
-
-class PPO:
-    def __init__(self, state_dim, action_dim, lr_actor, lr_critic, gamma, K_epochs, eps_clip, has_continuous_action_space, action_std_init=0.6):
-
-        self.has_continuous_action_space = has_continuous_action_space
-
-        if has_continuous_action_space:
-            self.action_std = action_std_init
-
-        self.gamma = gamma
-        self.eps_clip = eps_clip
-        self.K_epochs = K_epochs
-        
-        self.buffer = RolloutBuffer()
-
-        self.policy = ActorCritic(state_dim, action_dim, has_continuous_action_space, action_std_init).to(device)
-        self.optimizer = torch.optim.Adam([
-                        {'params': self.policy.actor.parameters(), 'lr': lr_actor},
-                        {'params': self.policy.critic.parameters(), 'lr': lr_critic}
-                    ])
-
-        self.policy_old = ActorCritic(state_dim, action_dim, has_continuous_action_space, action_std_init).to(device)
-        self.policy_old.load_state_dict(self.policy.state_dict())
-        
-        self.MseLoss = nn.MSELoss()
-
-    def set_action_std(self, new_action_std):
-        if self.has_continuous_action_space:
-            self.action_std = new_action_std
-            self.policy.set_action_std(new_action_std)
-            self.policy_old.set_action_std(new_action_std)
-        else:
-            print("--------------------------------------------------------------------------------------------")
-            print("WARNING : Calling PPO::set_action_std() on discrete action space policy")
-            print("--------------------------------------------------------------------------------------------")
-
-    def decay_action_std(self, action_std_decay_rate, min_action_std):
-        print("--------------------------------------------------------------------------------------------")
-        if self.has_continuous_action_space:
-            self.action_std = self.action_std - action_std_decay_rate
-            self.action_std = round(self.action_std, 4)
-            if (self.action_std <= min_action_std):
-                self.action_std = min_action_std
-                print("setting actor output action_std to min_action_std : ", self.action_std)
-            else:
-                print("setting actor output action_std to : ", self.action_std)
-            self.set_action_std(self.action_std)
-
-        else:
-            print("WARNING : Calling PPO::decay_action_std() on discrete action space policy")
-        print("--------------------------------------------------------------------------------------------")
-
-    def select_action(self, state):
-
-        if self.has_continuous_action_space:
-            with torch.no_grad():
-                state = torch.FloatTensor(state).to(device)
-                action, action_logprob = self.policy_old.act(state)
-
-            self.buffer.states.append(state)
-            self.buffer.actions.append(action)
-            self.buffer.logprobs.append(action_logprob)
-
-            return action.detach().cpu().numpy().flatten()
-        else:
-            with torch.no_grad():
-                state = torch.FloatTensor(state).to(device)
-                action, action_logprob = self.policy_old.act(state)
-            
-            self.buffer.states.append(state)
-            self.buffer.actions.append(action)
-            self.buffer.logprobs.append(action_logprob)
-
-            return action.item()
-
-    def update(self):
-        # Monte Carlo estimate of returns
-        rewards = []
-        discounted_reward = 0
-        for reward, is_terminal in zip(reversed(self.buffer.rewards), reversed(self.buffer.is_terminals)):
-            if is_terminal:
-                discounted_reward = 0
-            discounted_reward = reward + (self.gamma * discounted_reward)
-            rewards.insert(0, discounted_reward)
-            
-        # Normalizing the rewards
-        rewards = torch.tensor(rewards, dtype=torch.float32).to(device)
-        rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-7)
-
-        # convert list to tensor
-        old_states = torch.squeeze(torch.stack(self.buffer.states, dim=0)).detach().to(device)
-        old_actions = torch.squeeze(torch.stack(self.buffer.actions, dim=0)).detach().to(device)
-        old_logprobs = torch.squeeze(torch.stack(self.buffer.logprobs, dim=0)).detach().to(device)
-
-        # Optimize policy for K epochs
-        for _ in range(self.K_epochs):
-
-            # Evaluating old actions and values
-            logprobs, state_values, dist_entropy = self.policy.evaluate(old_states, old_actions)
-
-            # match state_values tensor dimensions with rewards tensor
-            state_values = torch.squeeze(state_values)
-            
-            # Finding the ratio (pi_theta / pi_theta__old)
-            ratios = torch.exp(logprobs - old_logprobs.detach())
-
-            # Finding Surrogate Loss
-            advantages = rewards - state_values.detach()   
-            surr1 = ratios * advantages
-            surr2 = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
-
-            # final loss of clipped objective PPO
-            loss = -torch.min(surr1, surr2) + 0.5*self.MseLoss(state_values, rewards) - 0.01*dist_entropy
-            
-            # take gradient step
-            self.optimizer.zero_grad()
-            loss.mean().backward()
-            self.optimizer.step()
-            
-        # Copy new weights into old policy
-        self.policy_old.load_state_dict(self.policy.state_dict())
-
-        # clear buffer
-        self.buffer.clear()
-    
-    def save(self, checkpoint_path):
-        torch.save(self.policy_old.state_dict(), checkpoint_path)
-   
-    def load(self, checkpoint_path):
-        self.policy_old.load_state_dict(torch.load(checkpoint_path, map_location=lambda storage, loc: storage))
-        self.policy.load_state_dict(torch.load(checkpoint_path, map_location=lambda storage, loc: storage))
-        
-        
-       
-
+    print("Evaluating...")
+    eval_winrate = eval_vs_random()
+    print(f"Win rate vs random = {eval_winrate}")
