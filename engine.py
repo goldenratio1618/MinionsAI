@@ -54,15 +54,20 @@ class Game():
         #self.board.board[1][1].add_unit(Unit(1, 1)) # blue zombie
         # money for two sides
         self.money = [p0_money, p1_money]
+        self.active_player_color = 0
 
-    def turn(self, color, move_list, spawn_list):
-        # reset move, attack, and health
+    def turn_start_cleanup(self):
         for row in self.board.board:
             for square in row:
-                if square.unit != None and square.unit.color == color:
+                if square.unit != None and square.unit.color == self.active_player_color:
                     square.unit.hasMoved = False
                     square.unit.remainingAttack = unitList[square.unit.index].attack
                     square.unit.curr_health = unitList[square.unit.index].defense
+
+    def turn(self, color, move_list, spawn_list):
+        self.active_player_color = color
+        # reset move, attack, and health
+        self.turn_start_cleanup()
         # parse all moves
         # TODO: Make sure there is a path from origin to destination
         for move in move_list:
