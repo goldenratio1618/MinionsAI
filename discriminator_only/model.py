@@ -1,10 +1,9 @@
-from discriminator_only.translator import HEXES
 import torch as th
 from engine import BOARD_SIZE
 from unit_type import unitList
 
 class MinionsDiscriminator(th.nn.Module):
-    def __init__(self, d_model):
+    def __init__(self, d_model, device):
         super().__init__()
         self.unit_embedding = th.nn.Embedding(len(unitList) * 2 + 1, d_model)
         self.location_embedding = th.nn.Embedding(BOARD_SIZE ** 2, d_model)
@@ -20,10 +19,15 @@ class MinionsDiscriminator(th.nn.Module):
 
         self.d_model = d_model
 
+        self.device = device
+        self.to(self.device)
+
     def process_input(self, obs: th.Tensor):
         # obs is dict of:
         # board: [batch, num_hexes, 3]
         # Extract these tensors, keeping the int type
+        obs = {k: th.Tensor(v).int().to(self.device) for k, v in obs.items()}
+
         board_obs = obs['board']
         assert tuple(board_obs.shape[1:]) == (BOARD_SIZE ** 2, 3), board_obs.shape
         hex_embs = self.hex_embedding(board_obs[:, :, 0])  # [batch, num_hexes, d_model]
