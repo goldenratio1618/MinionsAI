@@ -17,18 +17,28 @@ class Board():
     def __init__(self, water_locs, graveyard_locs):
         self.board = [[Hex((i,j) in water_locs, (i,j) in graveyard_locs) for j in range(BOARD_SIZE)] for i in range(BOARD_SIZE)]
 
+    def board_properties(self):
+        return [(i, j, self.board[i][j].is_water, self.board[i][j].is_graveyard) for i in range(BOARD_SIZE) for j in range(BOARD_SIZE)]
+
     def print_board_properties(self):
-        for i in range(BOARD_SIZE):
-            for j in range(BOARD_SIZE):
-                print(i, j, self.board[i][j].is_water, self.board[i][j].is_graveyard)
+        for entry in self.board_properties():
+            print(*entry)
+
+    def hex_state(self, i, j):
+        if self.board[i][j].unit is None:
+            unit_index = None
+            unit_color = None
+        else:
+            unit_index = self.board[i][j].unit.index
+            unit_color = self.board[i][j].unit.color
+        return i, j, unit_index, unit_color
+
+    def board_state(self):
+        return [self.hex_state(i, j) for i in range(BOARD_SIZE) for j in range(BOARD_SIZE)]
 
     def print_board_state(self):
-        for i in range(BOARD_SIZE):
-            for j in range(BOARD_SIZE):
-                if (self.board[i][j].unit == None):
-                    print(i, j)
-                else:
-                    print(i, j, self.board[i][j].unit.index, self.board[i][j].unit.color)
+        for entry in self.board_state():
+            print(*entry)
                 
 class Hex():
     def __init__(self, is_water, is_graveyard):
