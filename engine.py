@@ -1,3 +1,4 @@
+import copy
 import enum
 import random
 import sys
@@ -50,6 +51,12 @@ class Board():
     def print_board_state(self):
         for entry in self.board_state():
             print(*entry)
+
+    def hexes(self):
+        # use like `for (i, j), hex in self.hexes():`
+        for i, row in enumerate(self.board):
+            for j, hex in enumerate(row):
+                yield (i, j), hex
                 
 class Hex():
     def __init__(self, is_water, is_graveyard):
@@ -68,8 +75,9 @@ class Phase(enum.Enum):
     MOVE = "move"
     SPAWN = "spawn"
     TURN_END = "turn_end"
+
 class Game():
-    def __init__(self, p0_money, p1_money):
+    def __init__(self, p0_money, p1_money, max_turns=MAX_TURNS):
         # starting position: captains on opposite corners with one graveyard in center
         self.graveyard_locs = [(2, 2)]
         self.water_locs = []
@@ -82,17 +90,39 @@ class Game():
         self.active_player_color = 0
         self.phase = Phase.TURN_END
 
+        self.backup_for_undo = None
+        self.remaining_turns = max_turns
+        self.done = False
+
+        self.next_turn()
+
     @property
     def inactive_player_color(self):
         return 1 - self.active_player_color
 
-    def turn_start(self):
+    def units_with_locations(self, color=None):
+        result = []
+        for (i, j), hex in self.hexes():
+            if hex.unit is not None and (color is None or hex.unit.color == color):
+                result.append(hex.unit, (i, j))
+        return result
+
+    def next_turn(self):
+        self.active_player_color = self.inactive_player_color
+        self.remaining_turns -= 1
+        if self.remaining_turns == 0:
+            self.done = True
+
         for row in self.board.board:
             for square in row:
                 if square.unit != None and square.unit.color == self.active_player_color:
                     square.unit.hasMoved = False
                     square.unit.remainingAttack = unitList[square.unit.index].attack
                     square.unit.curr_health = unitList[square.unit.index].defense
+        self.backup_for_undo = {
+            'board': copy.deepcopy(self.board),
+            'money': copy.deepcopy(self.money),
+        }
 
     def process_single_move(self, move_action) -> bool:
         # returns true if move is legal & succesful, false otherwise
@@ -188,11 +218,7 @@ class Game():
         self.board.board[x][y].add_unit(Unit(self.active_player_color, index))
         return True
 
-    def turn(self, color, move_list, spawn_list):
-        self.active_player_color = color
-        # reset move, attack, and health
-        self.turn_start()
-
+    def turn(self, move_list, spawn_list, auto_continue=True):
         # parse all moves
         self.phase = Phase.MOVE
         for move in move_list:
@@ -208,8 +234,17 @@ class Game():
         income = INCOME_BONUS
         for square in self.graveyard_locs:
             x, y = square
-            if self.board.board[x][y].unit != None and self.board.board[x][y].unit.color == color: income += 1
-        self.money[color] += income
+            if self.board.board[x][y].unit != None and self.board.board[x][y].unit.color == self.active_player_color:
+                income += 1
+        self.money[self.active_player_color] += income
+
+        if auto_continue:
+            self.next_turn()
+
+    def undo(self):
+        self.board = self.backup_for_undo['board']
+        self.money = self.backup_for_undo['money']
+        self.backup_for_undo = None
 
 class UnitType():
     def __init__(self, attack, defense, speed, attack_range, persistent, immune, max_stack, spawn, blink, unsummoner, deadly, flurry, flying, lumbering, terrain_ability, cost, rebate):
@@ -273,7 +308,7 @@ def main():
     print()
 
     # turn loop
-    for i in range(MAX_TURNS):
+    while not game.done:
         # yellow turn -- get input from screen
         print("Yellow turn")
         move_list = parse_input()
@@ -284,7 +319,7 @@ def main():
         #yf = random.randrange(0, 5)
         #move_list = [(xi, yi, xf, yf)]
         #spawn_list = []
-        game.turn(0, move_list, spawn_list)
+        game.turn(move_list, spawn_list)
         game.board.print_board_state()
         print()
 
@@ -292,7 +327,7 @@ def main():
         print("Blue turn")
         move_list = [] #parse_input()
         spawn_list = [] #parse_input()
-        game.turn(1, move_list, spawn_list)
+        game.turn(move_list, spawn_list)
         game.board.print_board_state()
         print()
     # print final-state money
