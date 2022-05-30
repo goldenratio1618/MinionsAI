@@ -3,8 +3,9 @@ import enum
 import random
 import sys
 import subprocess
+from typing import List
 from unit_type import UnitType, NECROMANCER
-from action import ActionType
+from action import ActionType, ActionList
 import numpy as np
 
 BOARD_SIZE = 5
@@ -31,6 +32,14 @@ def adjacent_hexes(x, y):
 class Board():
     def __init__(self, water_locs, graveyard_locs):
         self.board = [[Hex((i,j) in water_locs, (i,j) in graveyard_locs) for j in range(BOARD_SIZE)] for i in range(BOARD_SIZE)]
+
+    def copy(self) -> "Board":
+        b = Board([], [])
+        for (i, j), hex in self.hexes():
+            b.board[i][j].is_water = hex.is_water
+            b.board[i][j].is_graveyard = hex.is_graveyard
+            if hex.unit is not None:
+                b.board[i][j].add_unit(Unit(color=hex.unit.color, unit_type=hex.unit.type))
 
     def board_properties(self):
         return [(i, j, self.board[i][j].is_water, self.board[i][j].is_graveyard) for i in range(BOARD_SIZE) for j in range(BOARD_SIZE)]
@@ -81,23 +90,30 @@ class Phase(enum.Enum):
     GAME_OVER = "game_over"
 
 class Game():
-    def __init__(self, p0_money=4, p1_money=8, max_turns=MAX_TURNS):
-        # starting position: captains on opposite corners with one graveyard in center
-        self.graveyard_locs = [(i, j) for i in range(BOARD_SIZE) for j in range(BOARD_SIZE) if random.random() < 0.25 and 1 < i + j < 2 * BOARD_SIZE - 1]
-        self.water_locs = []
-        self.board = Board(self.water_locs, self.graveyard_locs)
-        self.board.board[0][0].add_unit(Unit(0, NECROMANCER)) # yellow captain
-        self.board.board[BOARD_SIZE - 1][ BOARD_SIZE - 1].add_unit(Unit(1, NECROMANCER)) # blue captain
-        #self.board.board[1][1].add_unit(Unit(1, 1)) # blue zombie
+    def __init__(self, 
+                 money=(4, 8),
+                 max_turns=MAX_TURNS, 
+                 board=None, 
+                 active_player_color=0, 
+                 phase=Phase.TURN_END,
+                 start_first_turn=True):
+        if board is None:
+            # starting position: captains on opposite corners with one graveyard in center
+            graveyard_locs = [(i, j) for i in range(BOARD_SIZE) for j in range(BOARD_SIZE) if random.random() < 0.25 and 1 < i + j < 2 * BOARD_SIZE - 1]
+            water_locs = []
+            board = Board(water_locs, graveyard_locs)
+            board.board[0][0].add_unit(Unit(0, NECROMANCER)) # yellow captain
+            board.board[BOARD_SIZE - 1][ BOARD_SIZE - 1].add_unit(Unit(1, NECROMANCER)) # blue captain
+        self.board = board
+
         # money for two sides
-        self.money = [p0_money, p1_money]
-        self.active_player_color = 0
-        self.phase = Phase.TURN_END
+        self.money = list(money)
+        self.active_player_color: int = active_player_color
+        self.phase: Phase = phase
 
-        self._backup_for_undo = None
         self.remaining_turns = max_turns
-
-        self.next_turn()
+        if start_first_turn:
+            self.next_turn()
 
     @property
     def done(self):
@@ -111,12 +127,6 @@ class Game():
     @property
     def inactive_player_color(self):
         return 1 - self.active_player_color
-
-    def backup_for_undo(self):
-        self._backup_for_undo = {
-            'board': copy.deepcopy(self.board),
-            'money': copy.deepcopy(self.money),
-        }
 
     def pretty_print(self):
         rectangle_grid_dim = BOARD_SIZE * 2 - 1
@@ -157,6 +167,7 @@ class Game():
         return result
 
     def next_turn(self):
+        assert self.phase == Phase.TURN_END
         self.active_player_color = self.inactive_player_color
         self.remaining_turns -= 1
         if self.done:
@@ -169,37 +180,19 @@ class Game():
                     square.unit.hasMoved = False
                     square.unit.remainingAttack = square.unit.type.attack
                     square.unit.curr_health = square.unit.type.defense
-        self.backup_for_undo()
         self.phase = Phase.MOVE
 
     def process_single_action(self, action) -> bool:
         if self.phase == Phase.MOVE:
-            if action.action_type == ActionType.FINISH_PHASE:
-                self.phase = Phase.SPAWN
-                return True
-            elif action.action_type == ActionType.MOVE:
+            if action.action_type == ActionType.MOVE:
                 return self.process_single_move(action)
             else:
                 raise ValueError(f"Wrong action type ({action.action_type}) for Move Phase.")
         elif self.phase == Phase.SPAWN:
-            if action.action_type == ActionType.FINISH_PHASE:
-                self.phase = Phase.TURN_END
-                self.end_spawn_phase()
-                return True
-            elif action.action_type == ActionType.SPAWN:
+            if action.action_type == ActionType.SPAWN:
                 return self.process_single_spawn(action)
             else:
                 raise ValueError(f"Wrong action type ({action.action_type}) for Spawn Phase.")
-        elif self.phase == Phase.TURN_END:
-            if action.action_type == ActionType.END_TURN:
-                if action.undo_turn:
-                    self.undo()
-                    return True
-                else:
-                    self.next_turn()
-                    return True
-            else:
-                raise ValueError(f"Wrong action type ({action.action_type}) for Turn End Phase.")
 
     def process_single_move(self, move_action) -> bool:
         # returns true if move is legal & succesful, false otherwise
@@ -274,7 +267,7 @@ class Game():
     def process_single_spawn(self, spawn_action) -> bool:
         # returns true if spawn is legal & succesful, false otherwise
 
-        assert self.phase == Phase.SPAWN, f"Tried to move during phase {self.phase}"
+        assert self.phase == Phase.SPAWN, f"Tried to spawn during phase {self.phase}"
         # TODO: treat reinforcements explicitly (so that one can spawn bounced units without paying dollars)
         unit_type: UnitType = spawn_action.unit_type
         x, y = spawn_action.to_xy
@@ -298,38 +291,36 @@ class Game():
         return True
 
     def end_spawn_phase(self):
+        assert self.phase == Phase.SPAWN, f"Tried to end spawn phase during phase {self.phase}"
+        self.phase = Phase.TURN_END
         # collect money
         income = INCOME_BONUS
-        for square in self.graveyard_locs:
-            x, y = square
-            if self.board.board[x][y].unit != None and self.board.board[x][y].unit.color == self.active_player_color:
+        for _, hex in self.board.hexes():
+            if hex.unit != None and hex.unit.color == self.active_player_color:
                 income += 1
         self.money[self.active_player_color] += income
 
-    # def turn(self, move_list, spawn_list, auto_continue=True):
-    #     assert not self.done
+    def end_move_phase(self):
+        assert self.phase == Phase.MOVE, f"Tried to end move phase during phase {self.phase}"
+        self.phase = Phase.SPAWN
 
-    #     # parse all moves
-    #     self.phase = Phase.MOVE
-    #     for move in move_list:
-    #         self.process_single_move(move)
-        
-    #     # parse all spawns
-    #     self.phase = Phase.SPAWN
-    #     for spawn_action in spawn_list:
-    #         self.process_single_spawn(spawn_action)
+    def full_turn(self, action_list: ActionList):
+        assert self.phase == Phase.MOVE, f"Tried to full turn during phase {self.phase}"
+        for action in action_list.move_phase:
+            self.process_single_action(action)
+        self.end_move_phase()
+        for action in action_list.spawn_phase:
+            self.process_single_spawn(action)
+        self.end_spawn_phase()
+        self.next_turn()
 
-    #     self.phase = Phase.TURN_END
-    #     self.end_spawn_phase()
-
-    #     if auto_continue:
-    #         self.next_turn()
-
-    def undo(self):
-        self.board = self._backup_for_undo['board']
-        self.money = self._backup_for_undo['money']
-        self.phase = Phase.MOVE
-        self.backup_for_undo()
+    def copy(self):
+        return Game(money=self.money.copy(),
+                    max_turns=self.remaining_turns, 
+                    board=self.board.copy(), 
+                    active_player_color=self.active_player_color, 
+                    phase=self.phase,
+                    start_first_turn=False)
 
 class Unit():
     def __init__(self, color, unit_type):
@@ -361,7 +352,7 @@ def parse_input(proc):
 
 # actual game
 def main():
-    game = Game(0, 6)
+    game = Game(money=(0, 6))
     game.board.print_board_properties()
     print()
     game.board.print_board_state()
