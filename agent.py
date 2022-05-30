@@ -1,11 +1,10 @@
 import abc
 import random
 
-from MinionsAI.action import Action, SpawnAction, MoveAction, FinishPhaseAction, EndTurnAction
-from MinionsAI.engine import Game, BOARD_SIZE, Phase
+from action import Action, SpawnAction, MoveAction, FinishPhaseAction, EndTurnAction
+from engine import Game, BOARD_SIZE, Phase
 
-@abc.ABC
-class Agent():
+class Agent(abc.ABC):
     @abc.abstractmethod
     def act(self, game: Game) -> Action:
         raise NotImplementedError()

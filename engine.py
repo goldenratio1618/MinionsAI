@@ -5,6 +5,7 @@ import sys
 import subprocess
 import threading
 from unit_type import unitList
+from action import ActionType
 
 BOARD_SIZE = 5
 INCOME_BONUS = 3
@@ -77,6 +78,7 @@ class Phase(enum.Enum):
     MOVE = "move"
     SPAWN = "spawn"
     TURN_END = "turn_end"
+    GAME_OVER = "game_over"
 
 class Game():
     def __init__(self, p0_money=0, p1_money=0, max_turns=MAX_TURNS):
@@ -121,6 +123,7 @@ class Game():
         self.active_player_color = self.inactive_player_color
         self.remaining_turns -= 1
         if self.done:
+            self.phase = Phase.GAME_OVER
             return
 
         for row in self.board.board:
@@ -133,6 +136,37 @@ class Game():
             'board': copy.deepcopy(self.board),
             'money': copy.deepcopy(self.money),
         }
+        self.phase = Phase.MOVE
+
+    def process_single_ation(self, action) -> bool:
+        if self.phase == Phase.MOVE:
+            if action.type == ActionType.FINISH_PHASE:
+                self.phase = Phase.SPAWN
+                return True
+            elif action.Type == ActionType.MOVE:
+                return self.process_move_action(action)
+            else:
+                raise ValueError(f"Wrong action type ({action.type}) for Move Phase.")
+        elif self.phase == Phase.SPAWN:
+            if action.type == ActionType.FINISH_PHASE:
+                self.phase = Phase.TURN_END
+                self.end_spawn_phase()
+                return True
+            elif action.type == ActionType.SPAWN:
+                return self.process_spawn_action(action)
+            else:
+                raise ValueError(f"Wrong action type ({action.type}) for Spawn Phase.")
+        elif self.phase == Phase.TURN_END:
+            if action.type == ActionType.END_TURN:
+                if action.undo_turn:
+                    self.undo()
+                    return True
+                else:
+                    self.next_turn()
+                    return True
+            else:
+                raise ValueError(f"Wrong action type ({action.type}) for Turn End Phase.")
+
 
     def process_single_move(self, move_action) -> bool:
         # returns true if move is legal & succesful, false otherwise
@@ -228,20 +262,7 @@ class Game():
         self.board.board[x][y].add_unit(Unit(self.active_player_color, index))
         return True
 
-    def turn(self, move_list, spawn_list, auto_continue=True):
-        assert not self.done
-
-        # parse all moves
-        self.phase = Phase.MOVE
-        for move in move_list:
-            self.process_single_move(move)
-        
-        # parse all spawns
-        self.phase = Phase.SPAWN
-        for spawn_action in spawn_list:
-            self.process_single_spawn(spawn_action)
-
-        self.phase = Phase.TURN_END
+    def end_spawn_phase(self):
         # collect money
         income = INCOME_BONUS
         for square in self.graveyard_locs:
@@ -250,8 +271,24 @@ class Game():
                 income += 1
         self.money[self.active_player_color] += income
 
-        if auto_continue:
-            self.next_turn()
+    # def turn(self, move_list, spawn_list, auto_continue=True):
+    #     assert not self.done
+
+    #     # parse all moves
+    #     self.phase = Phase.MOVE
+    #     for move in move_list:
+    #         self.process_single_move(move)
+        
+    #     # parse all spawns
+    #     self.phase = Phase.SPAWN
+    #     for spawn_action in spawn_list:
+    #         self.process_single_spawn(spawn_action)
+
+    #     self.phase = Phase.TURN_END
+    #     self.end_spawn_phase()
+
+    #     if auto_continue:
+    #         self.next_turn()
 
     def undo(self):
         self.board = self.backup_for_undo['board']

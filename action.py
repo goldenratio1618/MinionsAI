@@ -2,7 +2,7 @@
 import enum
 from typing import Tuple
 
-from MinionsAI.engine import UnitType
+from engine import UnitType
 
 
 class ActionType(enum.Enum):
@@ -21,7 +21,7 @@ class MoveAction(Action):
     Move unit from (xi, yi) to (xf, yf)
     Attack if the destination is occupied
     """
-    def __init__(self, from_xy: Tuple(int, int), to_xy: Tuple(int, int)):
+    def __init__(self, from_xy: Tuple[int, int], to_xy: Tuple[int, int]):
         super().__init__(ActionType.MOVE)
         self.from_ij = from_xy
         self.to_ij = to_xy
@@ -32,7 +32,7 @@ class SpawnAction(Action):
     Spawn unit of type unit_type at (x, y)
     """
 
-    def __init__(self, unit_type: UnitType, to_xy: Tuple(int, int)):
+    def __init__(self, unit_type: UnitType, to_xy: Tuple[int, int]):
         super().__init__(ActionType.SPAWN)
         self.unit_type = unit_type
         self.to_ij = to_xy
