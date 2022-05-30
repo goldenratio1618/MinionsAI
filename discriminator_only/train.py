@@ -1,5 +1,5 @@
 """
-Work in progress, but as of this commit I get to 95% winrate vs random bot in 3x3, all-graveyard world.
+Work in progress, but as of this commit I get to 95% winrate vs random bot in 5x5 world with 25% randomly graveyards.
 
 Reproduce by simply running `train.py`. After setting BOARD_SIZE and graveyard_locs in engine.py
 """
