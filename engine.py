@@ -1,31 +1,55 @@
+import enum
 import random
 import sys
 
 BOARD_SIZE = 5
 INCOME_BONUS = 3
-MAX_TURNS = 100
+MAX_TURNS = 5
 
 # distance function between two hexes
 # when y is decreased, x can stay the same or be increased by 1
 def dist(xi, yi, xf, yf):
     return max(abs(yf - yi), abs(xf - xi) + (abs(yf - yi) if xi > xf == yi > yf else 0))
 
+# return an array of tuples of adjacent hexes
+def adjacent_hexes(x, y):
+    hex_list = []
+    if x > 0: hex_list.append((x-1,y))
+    if x < (BOARD_SIZE - 1): hex_list.append((x+1,y))
+    if y > 0:
+        hex_list.append((x,y-1))
+        if x < (BOARD_SIZE - 1): hex_list.append((x+1,y-1))
+    if y < (BOARD_SIZE - 1):
+        hex_list.append((x,y+1))
+        if x > 0: hex_list.append((x-1,y+1))
+    return hex_list
+
 class Board():
     def __init__(self, water_locs, graveyard_locs):
         self.board = [[Hex((i,j) in water_locs, (i,j) in graveyard_locs) for j in range(BOARD_SIZE)] for i in range(BOARD_SIZE)]
 
+    def board_properties(self):
+        return [(i, j, self.board[i][j].is_water, self.board[i][j].is_graveyard) for i in range(BOARD_SIZE) for j in range(BOARD_SIZE)]
+
     def print_board_properties(self):
-        for i in range(BOARD_SIZE):
-            for j in range(BOARD_SIZE):
-                print(i, j, self.board[i][j].is_water, self.board[i][j].is_graveyard)
+        for entry in self.board_properties():
+            print(*entry)
+
+    def hex_state(self, i, j):
+        if self.board[i][j].unit is None:
+            unit_index = None
+            unit_color = None
+        else:
+            unit_index = self.board[i][j].unit.index
+            unit_color = self.board[i][j].unit.color
+        return i, j, unit_index, unit_color
+
+    def board_state(self):
+        return [self.hex_state(i, j) for i in range(BOARD_SIZE) for j in range(BOARD_SIZE)]
 
     def print_board_state(self):
-        for i in range(BOARD_SIZE):
-            for j in range(BOARD_SIZE):
-                if (self.board[i][j].unit == None):
-                    print(i, j)
-                else:
-                    print(i, j, self.board[i][j].unit.index, self.board[i][j].unit.color)
+        for entry in self.board_state():
+            print(*entry)
                 
 class Hex():
     def __init__(self, is_water, is_graveyard):
@@ -39,7 +63,11 @@ class Hex():
     
     def remove_unit(self):
         self.unit = None
-    
+
+class Phase(enum.Enum):
+    MOVE = "move"
+    SPAWN = "spawn"
+    TURN_END = "turn_end"
 class Game():
     def __init__(self, p0_money, p1_money):
         # starting position: captains on opposite corners with one graveyard in center
@@ -51,87 +79,131 @@ class Game():
         #self.board.board[1][1].add_unit(Unit(1, 1)) # blue zombie
         # money for two sides
         self.money = [p0_money, p1_money]
+        self.active_player_color = 0
+        self.phase = Phase.TURN_END
 
-    def turn(self, color, move_list, spawn_list):
-        # reset move, attack, and health
+    @property
+    def inactive_player_color(self):
+        return 1 - self.active_player_color
+
+    def turn_start(self):
         for row in self.board.board:
             for square in row:
-                if square.unit != None and square.unit.color == color:
+                if square.unit != None and square.unit.color == self.active_player_color:
                     square.unit.hasMoved = False
                     square.unit.remainingAttack = unitList[square.unit.index].attack
                     square.unit.curr_health = unitList[square.unit.index].defense
-        # parse all moves
+
+    def process_single_move(self, move_action) -> bool:
+        # returns true if move is legal & succesful, false otherwise
+
+        assert self.phase == Phase.MOVE, f"Tried to move during phase {self.phase}"
         # TODO: Make sure there is a path from origin to destination
-        for move in move_list:
-            xi, yi, xf, yf = move
-            # make sure from hex has unit that can move
-            if self.board.board[xi][yi].unit == None: continue
-            # only move your own units
-            if self.board.board[xi][yi].unit.color != color: continue
-            # make sure origin and destination are sufficiently close
-            speed = unitList[self.board.board[xi][yi].unit.index].speed
-            attack_range = unitList[self.board.board[xi][yi].unit.index].attack_range
-            distance = dist(xi, yi, xf, yf)
-            # if target hex is empty parse move as movement
-            if self.board.board[xf][yf].unit == None:
-                if distance > speed: continue
-                if self.board.board[xi][yi].unit.hasMoved: continue
-                if not unitList[self.board.board[xi][yi].unit.index].flying and self.board.board[xf][yf].is_water: continue
-                self.board.board[xi][yi].unit.hasMoved = True
-                self.board.board[xf][yf].add_unit(self.board.board[xi][yi].unit)
-                self.board.board[xi][yi].remove_unit()
-            # if target hex is occupied by friendly unit then swap the units
-            elif self.board.board[xf][yf].unit.color == color:
-                if distance > speed: continue
-                if distance > unitList[self.board.board[xf][yf].unit.index].speed: continue
-                if self.board.board[xi][yi].unit.hasMoved: continue
-                if self.board.board[xf][yf].unit.hasMoved: continue
-                if not unitList[self.board.board[xi][yi].unit.index].flying and self.board.board[xf][yf].is_water: continue
-                if not unitList[self.board.board[xf][yf].unit.index].flying and self.board.board[xi][yi].is_water: continue
-                self.board.board[xi][yi].unit.hasMoved = True
-                self.board.board[xf][yf].unit.hasMoved = True
-                temp = self.board.board[xi][yi].unit
-                self.board.board[xi][yi].remove_unit()
-                self.board.board[xi][yi].add_unit(self.board.board[xf][yf].unit)
+        xi, yi, xf, yf = move_action
+        # make sure from hex has unit that can move
+        if self.board.board[xi][yi].unit == None: return False
+        # only move your own units
+        if self.board.board[xi][yi].unit.color != self.active_player_color: return False
+        # make sure origin and destination are sufficiently close
+        speed = unitList[self.board.board[xi][yi].unit.index].speed
+        attack_range = unitList[self.board.board[xi][yi].unit.index].attack_range
+        distance = dist(xi, yi, xf, yf)
+        # if target hex is empty parse move as movement
+        if self.board.board[xf][yf].unit == None:
+            if distance > speed: return False
+            if self.board.board[xi][yi].unit.hasMoved: return False
+            if not unitList[self.board.board[xi][yi].unit.index].flying and self.board.board[xf][yf].is_water: return False
+            self.board.board[xi][yi].unit.hasMoved = True
+            if unitList[self.board.board[xi][yi].unit.index].lumbering:
+                self.board.board[xi][yi].unit.remainingAttack = 0
+            self.board.board[xf][yf].add_unit(self.board.board[xi][yi].unit)
+            self.board.board[xi][yi].remove_unit()
+        # if target hex is occupied by friendly unit then swap the units
+        elif self.board.board[xf][yf].unit.color == self.active_player_color:
+            if distance > speed: return False
+            if distance > unitList[self.board.board[xf][yf].unit.index].speed: return False
+            if self.board.board[xi][yi].unit.hasMoved: return False
+            if self.board.board[xf][yf].unit.hasMoved: return False
+            if not unitList[self.board.board[xi][yi].unit.index].flying and self.board.board[xf][yf].is_water: return False
+            if not unitList[self.board.board[xf][yf].unit.index].flying and self.board.board[xi][yi].is_water: return False
+            self.board.board[xi][yi].unit.hasMoved = True
+            self.board.board[xf][yf].unit.hasMoved = True
+            if unitList[self.board.board[xi][yi].unit.index].lumbering:
+                self.board.board[xi][yi].unit.remainingAttack = 0
+            if unitList[self.board.board[xf][yf].unit.index].lumbering:
+                self.board.board[xf][yf].unit.remainingAttack = 0
+            temp = self.board.board[xi][yi].unit
+            self.board.board[xi][yi].remove_unit()
+            self.board.board[xi][yi].add_unit(self.board.board[xf][yf].unit)
+            self.board.board[xf][yf].remove_unit()
+            self.board.board[xf][yf].add_unit(temp)
+        # if target hex is occupied by enemy unit, then attack
+        elif self.board.board[xf][yf].unit.color != self.active_player_color:
+            if distance > attack_range: return False
+            # unsummon removes non-persistent unit from board and refunds cost
+            if unitList[self.board.board[xi][yi].unit.index].unsummoner and not unitList[self.board.board[xf][yf].unit.index].persistent:
+                self.money[self.inactive_player_color] += unitList[self.board.board[xf][yf].unit.index].cost
                 self.board.board[xf][yf].remove_unit()
-                self.board.board[xf][yf].add_unit(temp)
-            # if target hex is occupied by enemy unit, then attack
-            elif self.board.board[xf][yf].unit.color != color:
-                if distance > attack_range: continue
-                # unsummon removes non-persistent unit from board and refunds cost
-                if unitList[self.board.board[xi][yi].unit.index].unsummoner and not unitList[self.board.board[xf][yf].unit.index].persistent:
-                    self.money[1 - color] += unitList[self.board.board[xf][yf].unit.index].cost
-                    self.board.board[xf][yf].remove_unit()
-                if self.board.board[xi][yi].unit.remainingAttack == 0: continue
-                # attacking prevents later movement
-                self.board.board[xi][yi].unit.hasMoved = True
-                # flurry deals 1 attack
-                if unitList[self.board.board[xi][yi].unit.index].flurry:
-                    self.board.board[xi][yi].unit.remainingAttack -= 1
-                    attack_outcome = self.board.board[xf][yf].unit.receive_attack(1)
-                # otherwise deal full attack
-                else:
-                    self.board.board[xi][yi].unit.remainingAttack = 0
-                    attack_outcome = self.board.board[xf][yf].unit.receive_attack(unitList[self.board.board[xi][yi].unit.index].attack)
-                # process dead unit, if applicable
-                if attack_outcome >= 0:
-                    # remove unit from board
-                    self.board.board[xf][yf].remove_unit()
-                    # process rebate
-                    self.money[1 - color] += attack_outcome
-        # parse all spawns
+            if self.board.board[xi][yi].unit.remainingAttack == 0: return False
+            # attacking prevents later movement
+            self.board.board[xi][yi].unit.hasMoved = True
+            # flurry deals 1 attack
+            if unitList[self.board.board[xi][yi].unit.index].flurry:
+                self.board.board[xi][yi].unit.remainingAttack -= 1
+                attack_outcome = self.board.board[xf][yf].unit.receive_attack(1)
+            # otherwise deal full attack
+            else:
+                self.board.board[xi][yi].unit.remainingAttack = 0
+                attack_outcome = self.board.board[xf][yf].unit.receive_attack(unitList[self.board.board[xi][yi].unit.index].attack)
+            # process dead unit, if applicable
+            if attack_outcome >= 0:
+                # remove unit from board
+                self.board.board[xf][yf].remove_unit()
+                # process rebate
+                self.money[self.inactive_player_color] += attack_outcome
+            return True
+
+    def process_single_spawn(self, spawn_action) -> bool:
+        # returns true if spawn is legal & succesful, false otherwise
+
+        assert self.phase == Phase.SPAWN, f"Tried to move during phase {self.phase}"
         # TODO: treat reinforcements explicitly (so that one can spawn bounced units without paying dollars)
-        for spawn in spawn_list:
-            index, x, y = spawn
-            # check to see if we have enough money
-            cost = unitList[spawn[0]].cost
-            if cost > self.money[color]: continue
-            # check to make sure hex is unoccupied
-            if self.board.board[x][y].unit != None: continue
-            # purchase unit
-            self.money[color] -= cost
-            # add unit to board
-            self.board.board[x][y].add_unit(Unit(color, index))
+        index, x, y = spawn_action
+        # check to see if we have enough money
+        cost = unitList[index].cost
+        if cost > self.money[self.active_player_color]: return False
+        # check to make sure hex is unoccupied
+        if self.board.board[x][y].unit != None: return False
+        # check to make sure we are adjacent to spawner
+        adjacent_spawner = False
+        for square in adjacent_hexes(x, y):
+            ax, ay = square
+            if self.board.board[ax][ay].unit != None and self.board.board[ax][ay].unit.color == self.active_player_color \
+                    and unitList[self.board.board[ax][ay].unit.index].spawn:
+                adjacent_spawner = True
+        if not adjacent_spawner: return False
+        # purchase unit
+        self.money[self.active_player_color] -= cost
+        # add unit to board
+        self.board.board[x][y].add_unit(Unit(self.active_player_color, index))
+        return True
+
+    def turn(self, color, move_list, spawn_list):
+        self.active_player_color = color
+        # reset move, attack, and health
+        self.turn_start()
+
+        # parse all moves
+        self.phase = Phase.MOVE
+        for move in move_list:
+            self.process_single_move(move)
+        
+        # parse all spawns
+        self.phase = Phase.SPAWN
+        for spawn_action in spawn_list:
+            self.process_single_spawn(spawn_action)
+
+        self.phase = Phase.TURN_END
         # collect money
         income = INCOME_BONUS
         for square in self.graveyard_locs:
