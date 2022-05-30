@@ -36,7 +36,7 @@ CHECKPOINT_EVERY = 2
 
 run_name = 'test'
 # TODO: make this location more reasonable
-checkpoint_dir = f"C:\\Users\Maple\AppData\Local\Temp\MinionsAI\{run_name}"
+checkpoint_dir = f"C:\\Users/Maple/AppData/Local/Temp/MinionsAI/{run_name}"
 # create the directory if it doesn't exist and clear its contents if it does iexist
 if not os.path.exists(checkpoint_dir):
     os.makedirs(checkpoint_dir)

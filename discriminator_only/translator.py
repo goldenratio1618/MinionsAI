@@ -1,7 +1,8 @@
 
 
 from typing import List
-from engine import Game, BOARD_SIZE, unitList
+from engine import Game, BOARD_SIZE
+from unit_type import unitList
 import numpy as np
 
 class ObservationEnum():

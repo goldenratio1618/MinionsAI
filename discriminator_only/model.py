@@ -1,6 +1,7 @@
 from discriminator_only.translator import HEXES
 import torch as th
-from engine import BOARD_SIZE, unitList
+from engine import BOARD_SIZE
+from unit_type import unitList
 
 class MinionsDiscriminator(th.nn.Module):
     def __init__(self, d_model):

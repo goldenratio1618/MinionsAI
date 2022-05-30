@@ -1,6 +1,7 @@
 
 
-from engine import BOARD_SIZE, unitList
+from engine import BOARD_SIZE
+from unit_type import unitList
 import random
 
 class RandomGenerator():
