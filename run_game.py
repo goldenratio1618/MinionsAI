@@ -4,11 +4,12 @@ from agent import Agent, RandomAIAgent
 
 def run_game(game: Game, agents: Tuple[Agent, Agent], verbose=False) -> int:
     while True:
-        print("===================================")
-        game.next_turn()
         if verbose:
+            print("===================================")
             print("Remaining turns:", game.remaining_turns)
             game.pretty_print()
+
+        game.next_turn()
         if game.done:
             break
         active_agent = agents[game.active_player_color]
