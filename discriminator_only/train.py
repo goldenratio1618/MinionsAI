@@ -5,6 +5,7 @@ Reproduce by simply running `train.py`. After setting BOARD_SIZE and graveyard_l
 """
 
 
+from run_game import run_game
 from discriminator_only.agent import TrainedAgent
 from discriminator_only.model import MinionsDiscriminator
 from discriminator_only.translator import Translator
@@ -31,12 +32,16 @@ else:
 print("============================================================================================")
 
 ROLLOUTS_PER_TURN = 4
-EPISODES_PER_ITERATION = 512
+EPISODES_PER_ITERATION = 32
 SAMPLE_REUSE = 3
 BATCH_SIZE = 32
-EVAL_EVERY = 2
-CHECKPOINT_EVERY = 2
+EVAL_EVERY = 5
+CHECKPOINT_EVERY = 1
 EVAL_COMPUTE_BOOST = 4
+LR = 1e-3
+game_kwargs = {}
+eval_game_kwargs = {}
+
 
 run_name = 'test'
 # TODO: make this location more reasonable
@@ -54,7 +59,7 @@ generator = RandomAIAgent()
 
 print("Creating policy...")
 policy = MinionsDiscriminator(d_model=128, device=device)
-print("Policy intiialzied:")
+print("Policy initialized:")
 print(policy)
 
 translator = Translator()
@@ -62,7 +67,9 @@ agent = TrainedAgent(policy, translator, generator, ROLLOUTS_PER_TURN)
 
 # TODO - use run_game instead, with a custom Agent subclass that remembers the states.
 def single_rollout(game_kwargs, agents = (agent, agent)):
+    # Randomize starting money
     game_kwargs["money"] = (random.randint(1, 4), random.randint(1, 4))
+
     game = Game(**game_kwargs)
     state_buffers = [[], []]  # one for each player
     while True:
@@ -94,14 +101,14 @@ def rollouts(game_kwargs):
         labels.extend(labels_)
     return states, labels
 
-optimizer = th.optim.Adam(policy.parameters(), lr=1e-3)
+optimizer = th.optim.Adam(policy.parameters(), lr=LR)
 
 def eval_vs_random():
     wins = 0
     games = 0
     for i in tqdm.tqdm(range(100)):
         null_policy = lambda x: th.Tensor([0]).to(device)
-        random_agent = TrainedAgent(null_policy, translator, generator, 2)
+        random_agent = RandomAIAgent()
         good_agent = TrainedAgent(policy, translator, generator, ROLLOUTS_PER_TURN * EVAL_COMPUTE_BOOST)
         good_idx = i % 2
 
@@ -109,7 +116,8 @@ def eval_vs_random():
         agents[good_idx] = good_agent
         agents[1 - good_idx] = random_agent
 
-        _, _, winner = single_rollout(game_kwargs={}, agents=agents)
+        game = Game(**eval_game_kwargs)
+        winner = run_game(game, agents=agents)
         if winner == good_idx:
             wins += 1
         games += 1
@@ -125,7 +133,7 @@ while True:
         agent.save(os.path.join(checkpoint_dir, f"{iteration}"))
 
     print("Starting rollouts...")
-    states, labels = rollouts({})
+    states, labels = rollouts(game_kwargs)
     print("Starting training...")
     for epoch in range(SAMPLE_REUSE):
         print(f"Epoch {epoch}")
