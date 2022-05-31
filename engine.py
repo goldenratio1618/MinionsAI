@@ -103,6 +103,23 @@ class Game():
         Important API pieces:
             game.full_turn(action_list) - process an action list for the current player
             game.next_turn() - advance to the next player's turn. Should be called once before each call to game.full_turn.
+
+        Instead of doing full_turn, you can do it bit by bit yourself:
+            game.next_turn()
+            if game.done:
+                ...
+
+            # phase = Phase.MOVE
+            game.process_single_action(action1)
+            game.process_single_action(action2)
+            ...
+            game.end_move_phase()
+            # phase = Phase.SPAWN
+            game.process_single_action(action3)
+            game.process_single_action(action4)
+            ...
+            game.end_spawn_phase()
+            # phase = Phase.TURN_END
         """
         if board is None:
             # starting position: captains on opposite corners with one graveyard in center
