@@ -107,7 +107,6 @@ def eval_vs_random():
     wins = 0
     games = 0
     for i in tqdm.tqdm(range(100)):
-        null_policy = lambda x: th.Tensor([0]).to(device)
         random_agent = RandomAIAgent()
         good_agent = TrainedAgent(policy, translator, generator, ROLLOUTS_PER_TURN * EVAL_COMPUTE_BOOST)
         good_idx = i % 2
