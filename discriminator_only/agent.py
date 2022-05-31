@@ -3,12 +3,16 @@ import pickle
 import os
 import numpy as np
 
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))
+
 class TrainedAgent(Agent):
-    def __init__(self, policy, translator, generator, rollouts_per_turn):
+    def __init__(self, policy, translator, generator, rollouts_per_turn, verbose_level=0):
         self.translator = translator
         self.policy = policy
         self.generator = generator
         self.rollouts_per_turn = rollouts_per_turn
+        self.verbose_level = verbose_level
     
     def act(self, game):
         options = []
@@ -21,10 +25,12 @@ class TrainedAgent(Agent):
             disc_logprob = self.policy(obs).detach().cpu().numpy()
             scores.append(disc_logprob)
             options.append(actions)
-            # print(f"Option {i}")
-            # game_copy.pretty_print()
+            if self.verbose_level >= 2:
+                print(f"Option {i}")
+                game_copy.pretty_print()
         best_option_idx = np.argmax(scores)
-        # print(f"Choosing option {best_option_idx}")
+        if self.verbose_level >= 1:
+            print(f"Choosing option {best_option_idx}; win prob = {sigmoid(scores[best_option_idx]).item() * 100:.1f}%")
         best_option = options[best_option_idx]
         return best_option
 
