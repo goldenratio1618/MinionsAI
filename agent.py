@@ -27,7 +27,11 @@ class RandomAIAgent(Agent):
         
         move_actions = []
         for unit, (i, j) in game_copy.units_with_locations(color=game_copy.active_player_color):
-            dest = random.choice(adjacent_hexes(i, j))
+            if random.random() < 0.2:
+                # Don't move this guy
+                dest = (i, j)
+            else:
+                dest = random.choice(adjacent_hexes(i, j))
             move_actions.append(MoveAction((i, j), dest))
             if (i, j) == necromancer_location:
                 necromancer_destination = dest
