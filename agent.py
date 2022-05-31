@@ -1,6 +1,7 @@
 import abc
 import random
 import subprocess
+import sys
 from typing import List
 
 from action import ActionList, SpawnAction, MoveAction
@@ -28,10 +29,20 @@ class CLIAgent(Agent):
 
     def __init__(self, commands):
         self.proc = subprocess.Popen(commands, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1, universal_newlines=True)
+        # send initial board config to process
+        self.original_stdout = sys.stdout
 
     def act(self, game_copy: Game) -> ActionList:
-        self.proc.stdin.write("Your turn\n")
-        self.proc.stdin.flush()
+        # send board state to process and then signal that turn begins
+        sys.stdout = self.proc.stdin
+        game_copy.board.print_board_properties()
+        print()
+        game_copy.board.print_board_state()
+        print()
+        print("Your turn")
+        sys.stdout = self.original_stdout
+
+        # collect input from process
         move_actions = self.parse_input()
         spawn_actions = self.parse_input()
         return ActionList(move_actions, spawn_actions)
