@@ -394,10 +394,10 @@ def test_board_copy():
     # Add some zombies
     b.board[1][1].unit = Unit(0, ZOMBIE)
     b.board[3][3].unit = Unit(0, ZOMBIE)
-    # Damage one - this shouldn't carry over to the copy.
-    b.board[1][1].unit.curr_health = 1
 
     b_copy = b.copy()
+    # Damage one - this shouldn't carry over to the copy.
+    b.board[1][1].unit.curr_health = 1
     for i in range(BOARD_SIZE):
         for j in range(BOARD_SIZE):
             assert b.board[i][j].is_graveyard == b_copy.board[i][j].is_graveyard
@@ -410,8 +410,6 @@ def test_board_copy():
     # Check that the damage didn't carry over.
     assert b_copy.board[1][1].unit.curr_health == ZOMBIE.defense
 
-
-# actual game
 def main(): 
     test_board_copy()
     
