@@ -9,8 +9,8 @@ from action import ActionType, ActionList
 import numpy as np
 
 BOARD_SIZE = 5
-INCOME_BONUS = 0
-MAX_TURNS = 4
+INCOME_BONUS = 1
+MAX_TURNS = 20
 
 # distance function between two hexes
 def dist(xi, yi, xf, yf):
@@ -135,7 +135,7 @@ class Game():
         rectangle_grid_dim = BOARD_SIZE * 2 - 1
         rectangle_grid = np.array([[" " for _ in range(rectangle_grid_dim)] for _ in range(rectangle_grid_dim)], dtype=str)
         for (i, j), hex in self.board.hexes():
-            grid_x, grid_y = (i-j + (rectangle_grid_dim - 1) // 2), i+j
+            grid_y, grid_x = (i-j + (rectangle_grid_dim - 1) // 2), i+j
             if hex.unit is None:
                 if hex.is_water:
                     char = '~'
@@ -299,7 +299,7 @@ class Game():
         # collect money
         income = INCOME_BONUS
         for _, hex in self.board.hexes():
-            if hex.unit != None and hex.unit.color == self.active_player_color:
+            if hex.unit != None and hex.unit.color == self.active_player_color and hex.is_graveyard:
                 income += 1
         self.money[self.active_player_color] += income
 

@@ -5,18 +5,17 @@ Reproduce by simply running `train.py`. After setting BOARD_SIZE and graveyard_l
 """
 
 
-from tabnanny import check
-from action import EndTurnAction
 from discriminator_only.agent import TrainedAgent
 from discriminator_only.model import MinionsDiscriminator
-from discriminator_only.random_generator import RandomGenerator
 from discriminator_only.translator import Translator
 from engine import Game
+from agent import RandomAIAgent
 import torch as th
 import numpy as np
 import os
 import tqdm
 import shutil
+import random
 
 ################################## set device ##################################
 print("============================================================================================")
@@ -31,12 +30,12 @@ else:
 print("============================================================================================")
 
 ROLLOUTS_PER_TURN = 4
-EPISODES_PER_ITERATION = 16
+EPISODES_PER_ITERATION = 512
 SAMPLE_REUSE = 3
 BATCH_SIZE = 32
 EVAL_EVERY = 2
 CHECKPOINT_EVERY = 2
-EVAL_COMPUTE_BOOST = 1
+EVAL_COMPUTE_BOOST = 4
 
 run_name = 'test'
 # TODO: make this location more reasonable
@@ -49,7 +48,7 @@ else:
     shutil.rmtree(checkpoint_dir)
     os.makedirs(checkpoint_dir)
 
-generator = RandomGenerator()
+generator = RandomAIAgent()
 
 print("Creating policy...")
 policy = MinionsDiscriminator(d_model=128, device=device)
@@ -61,15 +60,20 @@ agent = TrainedAgent(policy, translator, generator, ROLLOUTS_PER_TURN)
 
 # TODO - use run_game instead, with a custom Agent subclass that remembers the states.
 def single_rollout(game_kwargs, agents = (agent, agent)):
+    game_kwargs["money"] = (random.randint(1, 4), random.randint(1, 4))
     game = Game(**game_kwargs)
     state_buffers = [[], []]  # one for each player
-    while not game.done:
-        agents[game.active_player_color].act(game)
-        state_buffers[game.active_player_color].append(translator.translate(game))
-        # TODO move this into acent.act once the buffering moves in there.
-        game.process_single_action(EndTurnAction())
-
+    while True:
+        game.next_turn()
+        if game.done:
+            break
+        active_player = game.active_player_color
+        actionlist = agents[active_player].act(game)
+        game.full_turn(actionlist)
+        state_buffers[active_player].append(translator.translate(game))
     winner = game.winner
+    # game.pretty_print()
+    # print(winner)
     winner_states = state_buffers[winner]
     winner_labels = np.ones(len(winner_states))
     loser_states = state_buffers[1 - winner]

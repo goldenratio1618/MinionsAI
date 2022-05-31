@@ -6,19 +6,17 @@ def run_game(game: Game, agents: Tuple[Agent, Agent], verbose=False) -> int:
     while True:
         print("===================================")
         game.next_turn()
+        if verbose:
+            print("Remaining turns:", game.remaining_turns)
+            game.pretty_print()
         if game.done:
             break
         active_agent = agents[game.active_player_color]
-        game.pretty_print()
         game_copy = game.copy()
-        game_copy.pretty_print()
         actionlist = active_agent.act(game_copy)
         if verbose:
             print(actionlist)
         game.full_turn(actionlist)
-        if verbose:
-            print("Remaining turns:", game.remaining_turns)
-            game.board.print_board_state()
     return game.winner
 
 if __name__ == "__main__":
