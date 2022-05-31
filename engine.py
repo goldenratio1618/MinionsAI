@@ -387,16 +387,6 @@ class Unit():
             return self.type.rebate
         return -1
 
-# moves are in the form (xi, yi, xf, yf)
-# move list is terminated by an empty line
-def parse_input(proc):
-    input_list = []
-    line = proc.stdout.readline().strip()
-    while line != "":
-        input_list.append([int(s) for s in line.split(" ") if s != ""])
-        line = proc.stdout.readline().strip()
-    return input_list
-
 def test_board_copy():
     gys = [(2, 3), (1, 1), (1, 0)]
     water = [(1, 2), (2, 2)]
@@ -424,57 +414,6 @@ def test_board_copy():
 # actual game
 def main(): 
     test_board_copy()
-
-    game = Game(money=(0, 6))
-    game.board.print_board_properties()
-    print()
-    game.board.print_board_state()
-    game.pretty_print()
-    print()
-
-    yellow = subprocess.Popen(["python3", "-u", "randomAI.py"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1, universal_newlines=True)
-    blue = subprocess.Popen(["python3", "-u", "randomAI.py"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1, universal_newlines=True)
-
-    # turn loop
-    while not game.done:
-        # yellow turn -- get input from screen
-        yellow.stdin.write("Your turn\n")
-        yellow.stdin.flush()
-        move_list = parse_input(yellow)
-        spawn_list = parse_input(yellow)
-        #xi = random.randrange(0, 5)
-        #yi = random.randrange(0, 5)
-        #xf = random.randrange(0, 5)
-        #yf = random.randrange(0, 5)
-        #move_list = [(xi, yi, xf, yf)]
-        #spawn_list = []
-        game.turn(move_list, spawn_list)
-        game.board.print_board_state()
-        print()
-
-        # blue turn -- pass
-        blue.stdin.write("Your turn\n")
-        blue.stdin.flush()
-        move_list = parse_input(blue)
-        spawn_list = parse_input(blue)
-        game.turn(move_list, spawn_list)
-        game.board.print_board_state()
-        print()
-    # print final-state money
-    print("Game over!")
-    print(game.money[0], game.money[1])
-    # write final board state to file
-    with open("output.txt", "w") as f:
-        original_stdout = sys.stdout
-        sys.stdout = f
-        print(game.money[0], game.money[1])
-        print()
-        game.board.print_board_state()
-        sys.stdout = original_stdout
-    # throw exception if yellow loses (only way to get output to screen)
-    if (game.money[0] < game.money[1]):
-        raise Exception("Yellow loses!  Yellow money = " + str(game.money[0])
-            + " but blue money = " + str(game.money[1]))
     
 if __name__ == "__main__":
   main()
