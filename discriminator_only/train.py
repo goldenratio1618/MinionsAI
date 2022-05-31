@@ -16,6 +16,7 @@ import os
 import tqdm
 import shutil
 import random
+import tempfile
 
 ################################## set device ##################################
 print("============================================================================================")
@@ -39,8 +40,9 @@ EVAL_COMPUTE_BOOST = 4
 
 run_name = 'test'
 # TODO: make this location more reasonable
-checkpoint_dir = f"C:\\Users/Maple/AppData/Local/Temp/MinionsAI/{run_name}"
-# create the directory if it doesn't exist and clear its contents if it does iexist
+tempdir = tempfile.gettempdir()
+checkpoint_dir = os.path.join(tempdir, 'MinionsAI', run_name)
+# create the directory if it doesn't exist and clear its contents if it does exist
 if not os.path.exists(checkpoint_dir):
     os.makedirs(checkpoint_dir)
 else:
