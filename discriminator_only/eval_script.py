@@ -15,7 +15,7 @@ for i in tqdm.tqdm(range(total_games)):
     player0 = i % 2
     agents_shuffled = [agents[player0], agents[1 - player0]]
     game = Game(money=(1, 1))
-    winner = run_game(game, agents=agents_shuffled, verbose=True)
+    winner = run_game(game, agents=agents_shuffled, verbose=total_games==1)
     if winner == 0:
         wins[player0] += 1
     else:

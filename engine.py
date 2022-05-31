@@ -1,16 +1,13 @@
-import copy
 import enum
 import random
 import sys
 import subprocess
-from typing import List
-from unit_type import UnitType, NECROMANCER
-from action import ActionType, ActionList
+from typing import Tuple
+from unit_type import UnitType, NECROMANCER, ZOMBIE
+from action import ActionType, Action, ActionList, MoveAction, SpawnAction
 import numpy as np
 
 BOARD_SIZE = 5
-INCOME_BONUS = 1
-MAX_TURNS = 20
 
 # distance function between two hexes
 def dist(xi, yi, xf, yf):
@@ -34,6 +31,10 @@ class Board():
         self.board = [[Hex((i,j) in water_locs, (i,j) in graveyard_locs) for j in range(BOARD_SIZE)] for i in range(BOARD_SIZE)]
 
     def copy(self) -> "Board":
+        """
+        Returns a copy of the board. 
+        Temporary Unit properties (damage, etc) are NOT copied; only use this at turn start.
+        """
         b = Board([], [])
         for (i, j), hex in self.hexes():
             b.board[i][j].is_water = hex.is_water
@@ -85,18 +86,19 @@ class Hex():
         self.unit = None
 
 class Phase(enum.Enum):
-    MOVE = "move"
-    SPAWN = "spawn"
-    TURN_END = "turn_end"
-    GAME_OVER = "game_over"
+    MOVE = "move"  # Move phase
+    SPAWN = "spawn"  # Spawn Phase
+    TURN_END = "turn_end"  # After spawn phase, but haven't yet run next_turn()
+    GAME_OVER = "game_over"  # Game is done.
 
 class Game():
     def __init__(self, 
                  money=(4, 8),
-                 max_turns=MAX_TURNS, 
+                 max_turns=20, 
                  board=None, 
                  active_player_color=0, 
-                 phase=Phase.TURN_END):
+                 phase=Phase.TURN_END,
+                 income_bonus=1):
         """
         Important API pieces:
             game.full_turn(action_list) - process an action list for the current player
@@ -109,29 +111,37 @@ class Game():
             board = Board(water_locs, graveyard_locs)
             board.board[0][0].add_unit(Unit(0, NECROMANCER)) # yellow captain
             board.board[BOARD_SIZE - 1][ BOARD_SIZE - 1].add_unit(Unit(1, NECROMANCER)) # blue captain
-        self.board = board
+        self.board: Board = board
+
+        self.income_bonus: int = income_bonus
 
         # money for two sides
         self.money = list(money)
         self.active_player_color: int = active_player_color
         self.phase: Phase = phase
 
-        self.remaining_turns = max_turns
+        self.remaining_turns: int = max_turns
 
     @property
-    def done(self):
+    def done(self) -> bool:
         return self.remaining_turns <= 0
 
     @property
-    def winner(self):
+    def winner(self) -> int:
+        """
+        Returns index of winning player (0 or 1)
+        """
         assert self.done
         return 0 if self.money[0] > self.money[1] else 1
 
     @property
-    def inactive_player_color(self):
+    def inactive_player_color(self) -> int:
         return 1 - self.active_player_color
 
     def pretty_print(self):
+        """
+        Prints board in ascii
+        """
         rectangle_grid_dim = BOARD_SIZE * 2 - 1
         rectangle_grid = np.array([[" " for _ in range(rectangle_grid_dim)] for _ in range(rectangle_grid_dim)], dtype=str)
         for (i, j), hex in self.board.hexes():
@@ -162,15 +172,15 @@ class Game():
         else:
             print(f"{phase:>{rectangle_grid_dim}}")
 
-    def units_with_locations(self, color=None):
+    def units_with_locations(self, color=None) -> Tuple[Tuple[int, int], Hex]:
         result = []
         for (i, j), hex in self.board.hexes():
             if hex.unit is not None and (color is None or hex.unit.color == color):
                 result.append([hex.unit, (i, j)])
         return result
 
-    def next_turn(self):
-        assert self.phase == Phase.TURN_END
+    def next_turn(self) -> None:
+        assert self.phase == Phase.TURN_END, f"Can only call game.next_turn() from TURN_END phase; received call in {self.phase.name}. Did you forget to call game.end_spawn_phase()?"
         self.active_player_color = self.inactive_player_color
         self.remaining_turns -= 1
         if self.done:
@@ -185,19 +195,23 @@ class Game():
                     square.unit.curr_health = square.unit.type.defense
         self.phase = Phase.MOVE
 
-    def process_single_action(self, action) -> bool:
+    def process_single_action(self, action: Action) -> bool:
         if self.phase == Phase.MOVE:
             if action.action_type == ActionType.MOVE:
                 return self.process_single_move(action)
             else:
-                raise ValueError(f"Wrong action type ({action.action_type}) for Move Phase.")
+                raise ValueError(f"Wrong action type ({action.action_type}) for Move Phase. Did you forget to call game.end_spawn_phase() before moving on to the spawn_phase?")
         elif self.phase == Phase.SPAWN:
             if action.action_type == ActionType.SPAWN:
                 return self.process_single_spawn(action)
             else:
                 raise ValueError(f"Wrong action type ({action.action_type}) for Spawn Phase.")
+        elif self.phase == Phase.TURN_END:
+            raise ValueError("Tried to process actions during TURN_END phase. Did you forget to call game.next_turn() before the next player's actions?")
+        else:
+            raise ValueError(f"Wrong phase ({self.phase}) for processing actions.")
 
-    def process_single_move(self, move_action) -> bool:
+    def process_single_move(self, move_action: MoveAction) -> bool:
         # returns true if move is legal & succesful, false otherwise
 
         assert self.phase == Phase.MOVE, f"Tried to move during phase {self.phase}"
@@ -267,7 +281,7 @@ class Game():
                 self.money[self.inactive_player_color] += attack_outcome
         return True
 
-    def process_single_spawn(self, spawn_action) -> bool:
+    def process_single_spawn(self, spawn_action: SpawnAction) -> bool:
         # returns true if spawn is legal & succesful, false otherwise
 
         assert self.phase == Phase.SPAWN, f"Tried to spawn during phase {self.phase}"
@@ -297,7 +311,7 @@ class Game():
         assert self.phase == Phase.SPAWN, f"Tried to end spawn phase during phase {self.phase}"
         self.phase = Phase.TURN_END
         # collect money
-        income = INCOME_BONUS
+        income = self.income_bonus
         for _, hex in self.board.hexes():
             if hex.unit != None and hex.unit.color == self.active_player_color and hex.is_graveyard:
                 income += 1
@@ -327,11 +341,16 @@ class Game():
         self.end_spawn_phase()
 
     def copy(self):
+        """
+        Returns a copy of the game, for handing to an Agent to analyze.
+        Temporary Unit properties (damage, etc) are NOT copied; only use this at turn start.
+        """
         return Game(money=self.money.copy(),
                     max_turns=self.remaining_turns, 
                     board=self.board.copy(), 
                     active_player_color=self.active_player_color, 
-                    phase=self.phase)
+                    phase=self.phase,
+                    income_bonus=self.income_bonus)
 
 class Unit():
     def __init__(self, color, unit_type):
@@ -361,20 +380,33 @@ def parse_input(proc):
         line = proc.stdout.readline().strip()
     return input_list
 
-def test_board():
+def test_board_copy():
     gys = [(2, 3), (1, 1), (1, 0)]
-    water = [(1,1), (2, 2)]
+    water = [(1, 2), (2, 2)]
     b = Board(graveyard_locs=gys, water_locs=water)
+    # Add some zombies
+    b.board[1][1].unit = Unit(0, ZOMBIE)
+    b.board[3][3].unit = Unit(0, ZOMBIE)
+    # Damage one - this shouldn't carry over to the copy.
+    b.board[1][1].unit.curr_health = 1
+
     b_copy = b.copy()
     for i in range(BOARD_SIZE):
         for j in range(BOARD_SIZE):
             assert b.board[i][j].is_graveyard == b_copy.board[i][j].is_graveyard
             assert b.board[i][j].is_water == b_copy.board[i][j].is_water
+            if b.board[i][j].unit is None:
+                assert b_copy.board[i][j].unit is None
+    assert b_copy.board[1][1].unit.type.name == ZOMBIE.name
+    assert b_copy.board[3][3].unit.type.name == ZOMBIE.name
+
+    # Check that the damage didn't carry over.
+    assert b_copy.board[1][1].unit.curr_health == ZOMBIE.defense
 
 
 # actual game
 def main(): 
-    test_board()
+    test_board_copy()
 
     game = Game(money=(0, 6))
     game.board.print_board_properties()
