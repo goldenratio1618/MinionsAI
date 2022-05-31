@@ -3,12 +3,19 @@ from run_game import run_game
 from engine import Game
 from discriminator_only.agent import TrainedAgent
 
-agent0_path = f"C:\\Users/Maple/AppData/Local/Temp/MinionsAI/test/0"
-agent1_path = f"C:\\Users/Maple/AppData/Local/Temp/MinionsAI/test/2"
+# Update these to the agents you want to play
+agent0_path = f"C:\\Users/Maple/AppData/Local/Temp/MinionsAI/test/9"
+agent1_path = f"C:\\Users/Maple/AppData/Local/Temp/MinionsAI/test/0"
 
 agents = [TrainedAgent.load(agent0_path), TrainedAgent.load(agent1_path)]
 
 total_games = 1
+
+slow_mode = total_games==1
+if total_games == 1:
+    # Log win probs from agent 0
+    agents[0].verbose_level = 1
+
 wins = [0, 0]
 games = 0
 for i in tqdm.tqdm(range(total_games)):
