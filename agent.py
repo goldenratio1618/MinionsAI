@@ -13,6 +13,13 @@ class Agent(abc.ABC):
     def act(self, game_copy: Game) -> ActionList:
         raise NotImplementedError()
 
+class NullAgent(Agent):
+    """
+    Agent that does nothing.
+    """
+    def act(self, game_copy: Game) -> ActionList:
+        return ActionList([], [])
+
 class CLIAgent(Agent):
     def parse_input(self):
         input_list = []
