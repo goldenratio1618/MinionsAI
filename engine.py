@@ -123,7 +123,7 @@ class Game():
         """
         if board is None:
             # starting position: captains on opposite corners with one graveyard in center
-            graveyard_locs = [(i, j) for i in range(BOARD_SIZE) for j in range(BOARD_SIZE) if random.random() < 0.25 and 1 < i + j and i + j < (2 * BOARD_SIZE - 3)]
+            graveyard_locs = [(i, j) for i in range(BOARD_SIZE) for j in range(BOARD_SIZE) if random.random() < 0.25 and 1 <= i + j and i + j <= (2 * BOARD_SIZE - 3)]
             water_locs = []
             board = Board(water_locs, graveyard_locs)
             board.board[0][0].add_unit(Unit(0, NECROMANCER)) # yellow captain
