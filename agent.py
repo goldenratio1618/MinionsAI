@@ -1,10 +1,11 @@
 import abc
 import random
+import subprocess
 from typing import List
 
 from action import ActionList, SpawnAction, MoveAction
 from engine import Game, adjacent_hexes
-from unit_type import ZOMBIE, NECROMANCER
+from unit_type import ZOMBIE, NECROMANCER, unitList
 
 class Agent(abc.ABC):
     @abc.abstractmethod
@@ -12,9 +13,29 @@ class Agent(abc.ABC):
         raise NotImplementedError()
 
 class CLIAgent(Agent):
+    def parse_input(self):
+        input_list = []
+        line = self.proc.stdout.readline().strip()
+        while line != "":
+            ints = [int(s) for s in line.split(" ") if s != ""]
+            # move actions have length 4
+            if len(ints) == 4:
+                input_list.append(MoveAction((ints[0], ints[1]), (ints[2], ints[3])))
+            elif len(ints) == 3:
+                input_list.append(SpawnAction(unitList[ints[0]], (ints[1], ints[2])))
+            line = self.proc.stdout.readline().strip()
+        return input_list
+
+    def __init__(self, commands):
+        self.proc = subprocess.Popen(commands, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1, universal_newlines=True)
+
     def act(self, game_copy: Game) -> ActionList:
-        # Do stuff with parse_input(yellow)
-        raise NotImplementedError()
+        self.proc.stdin.write("Your turn\n")
+        self.proc.stdin.flush()
+        move_actions = self.parse_input()
+        spawn_actions = self.parse_input()
+        return ActionList(move_actions, spawn_actions)
+
 
 class RandomAIAgent(Agent):
     def act(self, game_copy: Game) -> ActionList:

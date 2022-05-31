@@ -1,6 +1,6 @@
 from typing import Tuple
 from engine import Game
-from agent import Agent, RandomAIAgent
+from agent import Agent, RandomAIAgent, CLIAgent
 
 def run_game(game: Game, agents: Tuple[Agent, Agent], verbose=False) -> int:
     while True:
@@ -22,4 +22,4 @@ def run_game(game: Game, agents: Tuple[Agent, Agent], verbose=False) -> int:
 
 if __name__ == "__main__":
     test_game = Game()
-    run_game(test_game, (RandomAIAgent(), RandomAIAgent()), verbose=True)
+    run_game(test_game, (RandomAIAgent(), CLIAgent(["python3", "-u", "randomAI.py"])), verbose=True)
