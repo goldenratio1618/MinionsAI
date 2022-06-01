@@ -9,6 +9,14 @@ from engine import Game, adjacent_hexes
 from unit_type import ZOMBIE, NECROMANCER, unitList
 
 class Agent(abc.ABC):
+    """
+    Actions:
+        * Agent takes a Game object and returns an ActionList.
+        * The game is a copy of the actual Game, so feel free to destructively do whatever with it.
+            Use game.copy() to get another copy for backup.
+        * You need to ultimately return an ActionList containing your entire turn,
+            but you can use game.process_single_action() to see what happens after each single action within the turn.
+    """
     @abc.abstractmethod
     def act(self, game_copy: Game) -> ActionList:
         raise NotImplementedError()
