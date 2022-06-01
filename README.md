@@ -1,2 +1,86 @@
 # MinionsAI
-Minions of Darkness AI for vacuum tests
+
+## Installation & setup
+Install python stuff with via requirements:
+```
+>pip install -r requirements.txt
+```
+
+Check that it worked by running a game:
+```
+python -m run_game
+```
+
+## Writing an Agent
+To write an agent you'll need a subclass of `Agent`.
+You need to implement the `act()` function for your subclass,
+which should take a `Game` object representing the start of the turn and return an `ActionList` of the actions you want to take on your turn.
+
+Inside the `act()` function you can do whatever you want - regular python logic, call out to C++, feed forward a neural net, etc etc.
+
+## Using the Game object (as an Agent)
+The game object contains various properties like `game.money` and `game.board` that describe the state of the game. 
+
+You can also use `game.process_single_action`, `game.full_turn()`, etc, to see the state the game would have if you tried various actions.
+
+Use `game.copy()` at the start if you want a backup copy, to try out several possible turns.
+
+Nothing you do to your `game` object will affect the actual game you're playing (your object is a copy). All the matters is waht you return in your final `ActionList`
+
+## Using the Game object (as control code)
+You may want to run your own games (e.g. for training).
+Check out `run_game.py` for an example which explains the way to do it.
+
+* Before each turn, call `game.next_turn()`. This causes the game to switch the active player, refresh all units, check for victory, etc.
+* After `game.next_turn()`, you probably want to check `game.done` and do something special if it's True.
+* After that you need to proces the active player's turn. There are two ways to do that: processing an entire turn of actions all at once, or one by one.
+
+Examples:
+```
+# Run a game processing turns all at once
+game = Game()
+while True:
+    game.next_turn()
+    if game.done:
+        break
+    action_list = ...
+    game.full_turn(action_list)
+
+
+# Run a game doing all the steps manually, one action at a time:
+game = Game()
+while True:
+    game.next_turn()
+    if game.done:
+        break
+    
+    # State Move Phase
+    game.proces_single_action(action1)
+    game.proces_single_action(action2)
+    game.proces_single_action(action3)
+
+    game.end_move_phase()
+
+    game.process_single_action(action3)
+    game.process_single_action(action4)
+
+    game.end_spawn_phase()
+```
+
+
+# Agent Serialization
+In order to play agents from different codebases against each other, we need to be able to serialize and load them.
+
+Example lifetime:
+
+```
+agent = ExampleAgent()  # User subclass
+train(agent)  # User training process
+agent.serialize(directory)  # Save the agent.
+
+# Now 3 days go by, codebase changes, but we want to compare this old agent to new one.
+agent = Agent.deserialize(directory)  # Load the agent. Note that this will be an ExampleAgent, even though that class may no longer exist in the codebase.
+run_game(game, agent, newer_agent)
+```
+
+TODO how can we achieve this?
