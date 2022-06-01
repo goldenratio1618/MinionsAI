@@ -20,7 +20,7 @@ class Env(Base):
             from engine.engine import Game
             cls = Game
         elif self.game_python_path == "MinionsAI.evals.test_game.Game":
-            from MinionsAI.evals.test_game import Game
+            from MinionsAI.evals_app.test_game import Game
             cls = Game
         else:
             raise ValueError("I guess the lifetime of this hack has expired.")
