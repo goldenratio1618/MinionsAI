@@ -1,4 +1,4 @@
-from agent import Agent
+from ..agent import Agent
 import pickle
 import os
 import numpy as np

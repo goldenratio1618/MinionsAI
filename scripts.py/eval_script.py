@@ -1,7 +1,7 @@
 import tqdm
-from run_game import run_game
-from engine import Game
-from discriminator_only.agent import TrainedAgent
+from minionsai.run_game import run_game
+from minionsai.engine import Game
+from minionsai.discriminator_only.agent import TrainedAgent
 
 # Update these to the agents you want to play
 agent0_path = f"C:\\Users/Maple/AppData/Local/Temp/MinionsAI/test/9"

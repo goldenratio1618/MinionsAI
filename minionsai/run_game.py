@@ -1,6 +1,6 @@
 from typing import Tuple
-from engine import Game
-from agent import Agent, RandomAIAgent, CLIAgent
+from .engine import Game
+from .agent import Agent
 
 def run_game(game: Game, agents: Tuple[Agent, Agent], verbose=False) -> int:
     while True:
@@ -19,7 +19,3 @@ def run_game(game: Game, agents: Tuple[Agent, Agent], verbose=False) -> int:
             print(actionlist)
         game.full_turn(actionlist)
     return game.winner
-
-if __name__ == "__main__":
-    test_game = Game()
-    run_game(test_game, (RandomAIAgent(), CLIAgent(["python3", "-u", "randomAI.py"])), verbose=True)

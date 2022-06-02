@@ -1,6 +1,6 @@
 import torch as th
-from engine import BOARD_SIZE
-from unit_type import unitList
+from ..engine import BOARD_SIZE
+from ..unit_type import unitList
 
 class MinionsDiscriminator(th.nn.Module):
     def __init__(self, d_model, device):

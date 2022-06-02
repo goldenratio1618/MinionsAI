@@ -2,7 +2,7 @@
 import enum
 from typing import List, Tuple
 
-from unit_type import UnitType
+from .unit_type import UnitType
 
 
 class ActionType(enum.Enum):

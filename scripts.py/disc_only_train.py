@@ -5,12 +5,12 @@ Reproduce by simply running `train.py`. After setting BOARD_SIZE and graveyard_l
 """
 
 
-from run_game import run_game
-from discriminator_only.agent import TrainedAgent
-from discriminator_only.model import MinionsDiscriminator
-from discriminator_only.translator import Translator
-from engine import Game
-from agent import RandomAIAgent
+from minionsai.run_game import run_game
+from minionsai.discriminator_only.agent import TrainedAgent
+from minionsai.discriminator_only.model import MinionsDiscriminator
+from minionsai.discriminator_only.translator import Translator
+from minionsai.engine import Game
+from minionsai.agent import RandomAIAgent
 import torch as th
 import numpy as np
 import os
