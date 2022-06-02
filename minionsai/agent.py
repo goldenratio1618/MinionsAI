@@ -62,7 +62,9 @@ class Agent(abc.ABC):
         """
         print(f"Saving agent into {directory}")
         if os.path.exists(directory):
-            if not exists_ok:
+            if exists_ok:
+                shutil.rmtree(directory)
+            else:
                 raise ValueError(f"Save failed - directory {directory} already exists")
         else:
             os.makedirs(directory)
