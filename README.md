@@ -12,6 +12,11 @@ Check that it worked by running a game:
 python -m run_game
 ```
 
+Check that you can run the tests:
+```
+> python -m pytest tests/
+```
+
 ## On Imports
 Due to our agent serialization, there are a couple rules on imports:
 

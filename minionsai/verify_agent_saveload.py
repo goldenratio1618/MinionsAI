@@ -8,7 +8,7 @@ import os
 import tempfile
 import shutil
 
-def test_agent_saveload(agent, game_fn, num_games=10, mode='full') -> List[ActionList]:
+def verify_agent_saveload(agent, game_fn, num_games=10, mode='full') -> List[ActionList]:
     """
     agent: Agent to test
     game_fn: function that returns a game object playablke by this agent
@@ -49,8 +49,8 @@ def test_agent_saveload(agent, game_fn, num_games=10, mode='full') -> List[Actio
     success = compare_agents(agent0, agent1, game_fn, num_games)
     return success
 
-def test_all_modes(agent, game_fn, num_games=30):
-    success = test_agent_saveload(agent, game_fn, num_games, mode='seed')
+def verify_all_modes(agent, game_fn, num_games=30):
+    success = verify_agent_saveload(agent, game_fn, num_games, mode='seed')
     if success:
         print("Passed seeding test.")
     else:
@@ -59,7 +59,7 @@ def test_all_modes(agent, game_fn, num_games=30):
         print("Aborting saveload test.")
         return False
 
-    success = test_agent_saveload(agent, game_fn, num_games, mode='save')
+    success = verify_agent_saveload(agent, game_fn, num_games, mode='save')
     if success:
         print("Passed save_instance / load_instance test.")
     else:
@@ -68,7 +68,7 @@ def test_all_modes(agent, game_fn, num_games=30):
         print("Aborting saveload test.")
         return False
 
-    success = test_agent_saveload(agent, game_fn, num_games, mode='full')
+    success = verify_agent_saveload(agent, game_fn, num_games, mode='full')
     if success:
         print("SUCCESS!")
         print("All tests passed!")
