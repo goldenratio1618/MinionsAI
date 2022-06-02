@@ -4,12 +4,12 @@ from minionsai.engine import Game
 from minionsai.discriminator_only.agent import TrainedAgent
 
 # Update these to the agents you want to play
-agent0_path = f"C:\\Users/Maple/AppData/Local/Temp/MinionsAI/test/9"
+agent0_path = f"C:\\Users/Maple/AppData/Local/Temp/MinionsAI/test/6"
 agent1_path = f"C:\\Users/Maple/AppData/Local/Temp/MinionsAI/test/0"
 
-agents = [TrainedAgent.load(agent0_path), TrainedAgent.load(agent1_path)]
+agents = [TrainedAgent.deserialize(agent0_path), TrainedAgent.deserialize(agent1_path)]
 
-total_games = 1
+total_games = 100
 
 slow_mode = total_games==1
 if total_games == 1:

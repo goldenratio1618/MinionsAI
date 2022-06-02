@@ -20,7 +20,7 @@ import random
 import tempfile
 
 ################################## set device ##################################
-print("============================================================================================")
+print("=========================")
 # set device to cpu or cuda
 device = th.device('cpu')
 if(th.cuda.is_available()): 
@@ -29,7 +29,7 @@ if(th.cuda.is_available()):
     print("Device set to : " + str(th.cuda.get_device_name(device)))
 else:
     print("Device set to : cpu")
-print("============================================================================================")
+print("=========================")
 
 ROLLOUTS_PER_TURN = 4
 EPISODES_PER_ITERATION = 32
@@ -38,13 +38,12 @@ BATCH_SIZE = 32
 EVAL_EVERY = 5
 CHECKPOINT_EVERY = 1
 EVAL_COMPUTE_BOOST = 4
-LR = 1e-3
+LR = 1e-4
 game_kwargs = {}
 eval_game_kwargs = {}
 
 
 run_name = 'test'
-# TODO: make this location more reasonable
 tempdir = tempfile.gettempdir()
 checkpoint_dir = os.path.join(tempdir, 'MinionsAI', run_name)
 # create the directory if it doesn't exist and clear its contents if it does exist
@@ -58,9 +57,10 @@ else:
 generator = RandomAIAgent()
 
 print("Creating policy...")
-policy = MinionsDiscriminator(d_model=128, device=device)
+policy = MinionsDiscriminator(d_model=128)
 print("Policy initialized:")
 print(policy)
+policy.to(device)
 
 translator = Translator()
 agent = TrainedAgent(policy, translator, generator, ROLLOUTS_PER_TURN)
@@ -129,7 +129,7 @@ while True:
     print("===================================")
     if iteration % CHECKPOINT_EVERY == 0:
         print("Saving checkpoint...")
-        agent.save(os.path.join(checkpoint_dir, f"{iteration}"))
+        agent.serialize(os.path.join(checkpoint_dir, f"{iteration}"))
 
     print("Starting rollouts...")
     states, labels = rollouts(game_kwargs)

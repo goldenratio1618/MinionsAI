@@ -1,7 +1,10 @@
-from ..agent import Agent
-import pickle
+from .model import MinionsDiscriminator
+from ..agent import Agent, RandomAIAgent
 import os
 import numpy as np
+from .translator import Translator
+import torch as th
+import json
 
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
@@ -34,14 +37,26 @@ class TrainedAgent(Agent):
         best_option = options[best_option_idx]
         return best_option
 
-    def save(self, checkpoint_path):
-        os.makedirs(checkpoint_path)
-        self.policy.save(os.path.join(checkpoint_path, "weights.pt"))
-        pickle.dump(self, open(os.path.join(checkpoint_path, "agent.pkl"), "wb"))
+    def serialize(self, directory: str):
+        super().serialize(directory)
+        agent_dir = os.path.join(directory, "agent")
+        os.makedirs(agent_dir)
+        th.save(self.policy.state_dict(), os.path.join(agent_dir, 'weights.pt'))
+        json.dump({
+            'rollouts_per_turn': self.rollouts_per_turn,
+            'd_model': self.policy.d_model,
+        }, open(os.path.join(agent_dir, 'config.json'), 'w'))
 
     @classmethod
-    def load(cls, checkpoint_path):
-        agent = pickle.load(open(os.path.join(checkpoint_path, "agent.pkl"), "rb"))
-        agent.policy.load(os.path.join(checkpoint_path, "weights.pt"))
+    def deserialize(cls, directory: str):
+        agent_dir = os.path.join(directory, "agent")
+        config = json.load(open(os.path.join(agent_dir, 'config.json')))
+        d_model = config['d_model']
+        rollouts_per_turn = config['rollouts_per_turn']
+        model = MinionsDiscriminator(d_model=d_model)
+        model.load_state_dict(th.load(os.path.join(agent_dir, 'weights.pt')))
+        model.to(th.device('cpu'))  # TODO get better device if present.
+
+        agent = TrainedAgent(model, Translator(), RandomAIAgent(), rollouts_per_turn)
         return agent
-    
+

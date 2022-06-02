@@ -3,7 +3,7 @@ from ..engine import BOARD_SIZE
 from ..unit_type import unitList
 
 class MinionsDiscriminator(th.nn.Module):
-    def __init__(self, d_model, device):
+    def __init__(self, d_model):
         super().__init__()
         self.unit_embedding = th.nn.Embedding(len(unitList) * 2 + 1, d_model)
         self.location_embedding = th.nn.Embedding(BOARD_SIZE ** 2, d_model)
@@ -18,9 +18,17 @@ class MinionsDiscriminator(th.nn.Module):
         self.value_linear2 = th.nn.Linear(d_model, 1)
 
         self.d_model = d_model
+        self._device = None
 
-        self.device = device
-        self.to(self.device)
+    def to(self, device):
+        super().to(device)
+        self._device = device
+
+    @property
+    def device(self):
+        if self._device is None:
+            raise ValueError("Didn't tell policy what device to use!")
+        return self._device
 
     def process_input(self, obs: th.Tensor):
         # obs is dict of:
