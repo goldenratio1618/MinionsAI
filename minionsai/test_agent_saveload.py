@@ -8,51 +8,74 @@ import os
 import tempfile
 import shutil
 
-def test_agent_serialization(agent, game_fn, num_games=10, serialize=False) -> List[ActionList]:
+def test_agent_saveload(agent, game_fn, num_games=10, mode='full') -> List[ActionList]:
     """
     agent: Agent to test
     game_fn: function that returns a game object playablke by this agent
-    serialize:
-        * False: just check that the agent is deterministic after seeding.
-        * True: check that the agent can be fully serialized and deserialized.
+    mode:
+        * 'full': Test full save/load cycle including serializing all the code.
+        * 'save': Test only the save_instance() and load_instance() methods.
+        * 'seed': Just check that the agent is deterministic after seeding.
     """
     
     agent0 = agent
-    if not serialize:
+    if mode == 'seed':
         agent1 = agent
-    else:
+    elif mode == 'save':
         dir = tempfile.mkdtemp()
         print("Using temp dir: ", dir)
-        print(os.path.exists(dir))
         try:
-            agent.serialize(dir, exists_ok=True)
-            agent1 = Agent.deserialize(dir)
+            agent.save_instance(dir)
+            agent1 = agent.__class__.load_instance(dir)
         except Exception as e:
             raise e
         finally:
             shutil.rmtree(dir)
 
-        
+    elif mode == 'full':
+        dir = tempfile.mkdtemp()
+        print("Using temp dir: ", dir)
+        print(os.path.exists(dir))
+        try:
+            agent.save(dir, exists_ok=True)
+            agent1 = Agent.load(dir)
+        except Exception as e:
+            raise e
+        finally:
+            shutil.rmtree(dir)
+    else:
+        raise ValueError(f"Unknown mode: {mode}")
+
     success = compare_agents(agent0, agent1, game_fn, num_games)
     return success
 
 def test_all_modes(agent, game_fn, num_games=30):
-    success = test_agent_serialization(agent, game_fn, num_games, serialize=False)
+    success = test_agent_saveload(agent, game_fn, num_games, mode='seed')
     if success:
         print("Passed seeding test.")
     else:
         print("FAILURE!")
         print("Determinism test failed; your agent is not deterministic after seeding.")
-        print("Aborting serialization test.")
+        print("Aborting saveload test.")
         return False
-    success = test_agent_serialization(agent, game_fn, num_games,serialize=True)
+
+    success = test_agent_saveload(agent, game_fn, num_games, mode='save')
+    if success:
+        print("Passed save_instance / load_instance test.")
+    else:
+        print("FAILURE!")
+        print("save_instance & load_instance are not faithful.")
+        print("Aborting saveload test.")
+        return False
+
+    success = test_agent_saveload(agent, game_fn, num_games, mode='full')
     if success:
         print("SUCCESS!")
         print("All tests passed!")
         return True
     else:
         print("FAILURE!")
-        print("Serialization test failed; your agent does not match after serialization & deserialization.")
+        print("Saveload test failed; your agent does not match after full code serialization & deserialization.")
         return False
 
 def _play_game_recording_actions(game: Game, agents: Tuple[Agent, Agent]) -> List[ActionList]:

@@ -19,7 +19,7 @@ Due to our agent serialization, there are a couple rules on imports:
 ```
 from ..engine import game
 ```
-If you try to do `from minionsai.engine` instead, when yur agent is serialized it may look for the system level package ratehr than the serialized one.
+If you try to do `from minionsai.engine` instead, when your agent is serialized it may look for the system level package rather than the serialized one.
 
 1. This means that all our scripts (things you'd run as `__main__`, have to live *outside* the `minionsai` folder, in `scripts/` or `tests/`). 
 
@@ -88,18 +88,27 @@ while True:
 
 
 # Agent Serialization
-In order to play agents from different codebases against each other, we need to be able to serialize and load them.
+In order to play agents from different codebases against each other, we need to be able to save and load them.
 
 Example lifetime:
 
 ```
 agent = ExampleAgent()  # User subclass
 train(agent)  # User training process
-agent.serialize(directory)  # Save the agent.
+agent.save(directory)  # Save the agent.
 
 # Now 3 days go by, codebase changes, but we want to compare this old agent to new one.
-agent = Agent.deserialize(directory)  # Load the agent. Note that this will be an ExampleAgent, even though that class may no longer exist in the codebase.
+agent = Agent.load(directory)  # Load the agent. Note that this will be an ExampleAgent, even though that class may no longer exist in the codebase.
 run_game(game, agent, newer_agent)
 ```
 
-TODO how can we achieve this?
+We achieve this by saving a directory like this:
+
+```
+save_dir/
+    code/
+        <entire snapshot of the codebase>
+    agent/
+        <data necessary to reconstruct the agent instance>
+    __init__.py    <-- contains build_agent() which rebuilds the agent.
+```

@@ -129,7 +129,7 @@ while True:
     print("===================================")
     if iteration % CHECKPOINT_EVERY == 0:
         print("Saving checkpoint...")
-        agent.serialize(os.path.join(checkpoint_dir, f"{iteration}"))
+        agent.save(os.path.join(checkpoint_dir, f"{iteration}"))
 
     print("Starting rollouts...")
     states, labels = rollouts(game_kwargs)

@@ -37,24 +37,20 @@ class TrainedAgent(Agent):
         best_option = options[best_option_idx]
         return best_option
 
-    def serialize(self, directory: str, exists_ok: bool = False):
-        super().serialize(directory, exists_ok = exists_ok)
-        agent_dir = os.path.join(directory, "agent")
-        os.makedirs(agent_dir)
-        th.save(self.policy.state_dict(), os.path.join(agent_dir, 'weights.pt'))
+    def save_instance(self, directory: str):
+        th.save(self.policy.state_dict(), os.path.join(directory, 'weights.pt'))
         json.dump({
             'rollouts_per_turn': self.rollouts_per_turn,
             'd_model': self.policy.d_model,
-        }, open(os.path.join(agent_dir, 'config.json'), 'w'))
+        }, open(os.path.join(directory, 'config.json'), 'w'))
 
     @classmethod
-    def deserialize_build(cls, directory: str):
-        agent_dir = os.path.join(directory, "agent")
-        config = json.load(open(os.path.join(agent_dir, 'config.json')))
+    def load_instance(cls, directory: str):
+        config = json.load(open(os.path.join(directory, 'config.json')))
         d_model = config['d_model']
         rollouts_per_turn = config['rollouts_per_turn']
         model = MinionsDiscriminator(d_model=d_model)
-        model.load_state_dict(th.load(os.path.join(agent_dir, 'weights.pt')))
+        model.load_state_dict(th.load(os.path.join(directory, 'weights.pt')))
         model.to(th.device('cpu'))  # TODO get better device if present.
 
         agent = TrainedAgent(model, Translator(), RandomAIAgent(), rollouts_per_turn)
