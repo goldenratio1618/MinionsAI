@@ -91,7 +91,7 @@ class Phase(enum.Enum):
 
 class Game():
     def __init__(self, 
-                 money=(4, 8),
+                 money=(2, 4),
                  max_turns=20, 
                  board=None, 
                  active_player_color=0, 
@@ -147,7 +147,12 @@ class Game():
         Returns index of winning player (0 or 1)
         """
         assert self.done
-        return 0 if self.money[0] > self.money[1] else 1
+        scores = np.array([0, 0])
+        scores += self.money
+        for unit, _ in self.units_with_locations():
+            if unit.type != NECROMANCER:
+                scores[unit.color] += unit.type.cost
+        return np.argmax(scores)
 
     @property
     def inactive_player_color(self) -> int:
