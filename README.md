@@ -21,7 +21,14 @@ from ..engine import game
 ```
 If you try to do `from minionsai.engine` instead, when yur agent is serialized it may look for the system level package ratehr than the serialized one.
 
-1. This means that all our scripts (things you'd run as `__main__`, have to live *outside* the `minionsai` folder, in `scripts/` or `tests/`)
+1. This means that all our scripts (things you'd run as `__main__`, have to live *outside* the `minionsai` folder, in `scripts/` or `tests/`). 
+
+If you try to run something inside `minionsai` as `__main__`, you'll get:
+```
+ImportError: attempted relative import with no known parent package
+```
+
+I found the first answer [here](https://stackoverflow.com/questions/14132789/relative-imports-for-the-billionth-time) helpful for explaining this stuff
 
 ## Writing an Agent
 To write an agent you'll need a subclass of `Agent`.
