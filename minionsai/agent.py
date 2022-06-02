@@ -38,7 +38,7 @@ class Agent(abc.ABC):
         """
         pass
 
-    def serialize(self, directory: str):
+    def serialize(self, directory: str, exists_ok=False):
         """
         Creates a snapshot of this agent that can be passed around and run on other codebases inside `directory`
         It should expose an API like this:
@@ -58,10 +58,11 @@ class Agent(abc.ABC):
             os.mkdir(agent_dir)
             # Put stuff there.
         """
+        print(f"Serializing agent into {directory}")
         if os.path.exists(directory):
-            raise ValueError(f"Serialization failed - directory {directory} already exists")
+            if not exists_ok:
+                raise ValueError(f"Serialization failed - directory {directory} already exists")
         else:
-            print(f"Serializing agent into {directory}")
             os.makedirs(directory)
 
         ####### 1. Store the codebase #######

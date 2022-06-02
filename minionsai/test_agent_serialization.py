@@ -5,9 +5,10 @@ from .engine import Game
 import numpy as np
 import random
 import os
+import tempfile
 import shutil
 
-def test_agent_serialization(agent, game_fn, num_games=10, serialize=False, temp_dir='temp_serialization_test') -> List[ActionList]:
+def test_agent_serialization(agent, game_fn, num_games=10, serialize=False) -> List[ActionList]:
     """
     agent: Agent to test
     game_fn: function that returns a game object playablke by this agent
@@ -20,17 +21,22 @@ def test_agent_serialization(agent, game_fn, num_games=10, serialize=False, temp
     if not serialize:
         agent1 = agent
     else:
-        dir = os.path.join(os.path.dirname(__file__), temp_dir)
+        dir = tempfile.mkdtemp()
+        print("Using temp dir: ", dir)
+        print(os.path.exists(dir))
         try:
-            agent.serialize(dir)
+            agent.serialize(dir, exists_ok=True)
             agent1 = Agent.deserialize(dir)
+        except Exception as e:
+            raise e
         finally:
             shutil.rmtree(dir)
+
         
     success = compare_agents(agent0, agent1, game_fn, num_games)
     return success
 
-def test_all_modes(agent, game_fn, num_games=30, temp_dir='temp_serialization_test'):
+def test_all_modes(agent, game_fn, num_games=30):
     success = test_agent_serialization(agent, game_fn, num_games, serialize=False)
     if success:
         print("Passed seeding test.")
@@ -39,7 +45,7 @@ def test_all_modes(agent, game_fn, num_games=30, temp_dir='temp_serialization_te
         print("Determinism test failed; your agent is not deterministic after seeding.")
         print("Aborting serialization test.")
         return False
-    success = test_agent_serialization(agent, game_fn, num_games,serialize=True, temp_dir=temp_dir)
+    success = test_agent_serialization(agent, game_fn, num_games,serialize=True)
     if success:
         print("SUCCESS!")
         print("All tests passed!")

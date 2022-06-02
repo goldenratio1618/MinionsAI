@@ -37,8 +37,8 @@ class TrainedAgent(Agent):
         best_option = options[best_option_idx]
         return best_option
 
-    def serialize(self, directory: str):
-        super().serialize(directory)
+    def serialize(self, directory: str, exists_ok: bool = False):
+        super().serialize(directory, exists_ok = exists_ok)
         agent_dir = os.path.join(directory, "agent")
         os.makedirs(agent_dir)
         th.save(self.policy.state_dict(), os.path.join(agent_dir, 'weights.pt'))
@@ -48,7 +48,7 @@ class TrainedAgent(Agent):
         }, open(os.path.join(agent_dir, 'config.json'), 'w'))
 
     @classmethod
-    def deserialize(cls, directory: str):
+    def deserialize_build(cls, directory: str):
         agent_dir = os.path.join(directory, "agent")
         config = json.load(open(os.path.join(agent_dir, 'config.json')))
         d_model = config['d_model']
