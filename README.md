@@ -1,15 +1,27 @@
 # MinionsAI
 
 ## Installation & setup
-Install python stuff with via requirements:
+Install python stuff with via pip:
 ```
->pip install -r requirements.txt
+>cd MinionsAI
+>pip install -e .
 ```
 
 Check that it worked by running a game:
 ```
 python -m run_game
 ```
+
+## On Imports
+Due to our agent serialization, there are a couple rules on imports:
+
+1. Within any library code that will be run in an agent, only use *relative* imports, such as:
+```
+from ..engine import game
+```
+If you try to do `from minionsai.engine` instead, when yur agent is serialized it may look for the system level package ratehr than the serialized one.
+
+1. This means that all our scripts (things you'd run as `__main__`, have to live *outside* the `minionsai` folder, in `scripts/` or `tests/`)
 
 ## Writing an Agent
 To write an agent you'll need a subclass of `Agent`.

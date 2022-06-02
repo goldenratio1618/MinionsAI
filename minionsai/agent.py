@@ -4,9 +4,9 @@ import subprocess
 import sys
 from typing import List
 
-from action import ActionList, SpawnAction, MoveAction
-from engine import Game, adjacent_hexes
-from unit_type import ZOMBIE, NECROMANCER, unitList
+from .action import ActionList, SpawnAction, MoveAction
+from .engine import Game, adjacent_hexes
+from .unit_type import ZOMBIE, NECROMANCER, unitList
 
 class Agent(abc.ABC):
     """
