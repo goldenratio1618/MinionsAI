@@ -212,12 +212,15 @@ class Game():
 
     def process_single_action(self, action: Action) -> bool:
         if self.phase == Phase.MOVE:
-            if action.action_type == ActionType.MOVE:
+            # Note: We need to compare the names not the enum types,
+            # in case the agent submitted an action from their local copy of teh codebase
+            # which is technically a different enum type.
+            if action.action_type.name == ActionType.MOVE.name:
                 return self.process_single_move(action)
             else:
                 raise ValueError(f"Wrong action type ({action.action_type}) for Move Phase. Did you forget to call game.end_spawn_phase() before moving on to the spawn_phase?")
         elif self.phase == Phase.SPAWN:
-            if action.action_type == ActionType.SPAWN:
+            if action.action_type.name == ActionType.SPAWN.name:
                 return self.process_single_spawn(action)
             else:
                 raise ValueError(f"Wrong action type ({action.action_type}) for Spawn Phase.")

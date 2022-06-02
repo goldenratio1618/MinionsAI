@@ -1,5 +1,5 @@
+from minionsai.engine import BOARD_SIZE, Board, Unit
 from minionsai.unit_type import ZOMBIE
-from minionsai.engine import Board, Unit, BOARD_SIZE
 
 
 def test_board_copy():
