@@ -1,6 +1,7 @@
 
 from typing import Callable
 import random
+from sqlalchemy import true
 import tqdm
 import trueskill
 import os
@@ -16,13 +17,15 @@ class TrueskillWorker():
     Runs a trueskill environment for all agents in a directory.
     Watches the directory for new agents.
     """
-    def __init__(self, directory: str, game_fn: Callable[[], Game], ratings: dict = {}, num_games: dict = {}):
+    def __init__(self, directory: str, game_fn: Callable[[], Game], batch_size: int=1, ratings: dict = {}, num_games: dict = {}):
         self.directory = directory
         self.game_fn = game_fn
         self.agent_names = [] if ratings is None else list(ratings.keys())
         self.ratings = ratings or {}
         self.num_games = num_games or {}
         self.choose_underevaluated_agents_prob = 0.5
+        self.batch_size = batch_size
+        self.env = trueskill.TrueSkill(tau=0, draw_probability=0.0)
 
     def run(self):
         while True:
@@ -85,9 +88,8 @@ class TrueskillWorker():
             print(e)
             return
 
-        num_to_play = 100 # TODO make this dynamic based on ts
         wins = {name: 0 for name in agent_names}
-        for i in tqdm.tqdm(range(num_to_play)):
+        for i in tqdm.tqdm(range(self.batch_size)):
             game = self.game_fn()
             player0 = i % 2
             agents_shuffled = [agents[player0], agents[1 - player0]]
@@ -97,14 +99,13 @@ class TrueskillWorker():
             loser_name = agent_names_shuffled[1 - winner]
             winner_rating = self.ratings[winner_name]
             loser_rating = self.ratings[loser_name]
-            new_winner_rating, new_loser_rating = trueskill.rate_1vs1(winner_rating, loser_rating)
+            new_winner_rating, new_loser_rating = trueskill.rate_1vs1(winner_rating, loser_rating, env=self.env)
             self.ratings[winner_name] = new_winner_rating
             self.ratings[loser_name] = new_loser_rating
             self.num_games[winner_name] += 1
             self.num_games[loser_name] += 1
             wins[winner_name] += 1
         for name in agent_names:
-            print(f"{name} wins {wins[name]/num_to_play:.1%}")
-            print(f"{name}: {self.ratings[name].mu:.1f} +/- {self.ratings[name].sigma:.1f}    num_games={self.num_games[name]}")
+            print(f"{name} wins {wins[name]/self.batch_size:.1%}; new rating {self.ratings[name].mu:.1f} +/- {self.ratings[name].sigma:.1f}    num_games={self.num_games[name]}")
 
         print(self.print_ratings())
