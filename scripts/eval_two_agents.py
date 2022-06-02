@@ -4,8 +4,8 @@ from minionsai.engine import Game
 from minionsai.agent import Agent
 
 # Update these to the agents you want to play
-agent0_path = f"C:\\Users/Maple/AppData/Local/Temp/MinionsAI/test/2"
-agent1_path = f"C:\\Users/Maple/AppData/Local/Temp/MinionsAI/test/0"
+agent0_path = f"C:\\Users/Maple/AppData/Local/Temp/MinionsAI/test/iter_6"
+agent1_path = f"C:\\Users/Maple/AppData/Local/Temp/MinionsAI/test/iter_2"
 
 agents = [Agent.load(agent0_path), Agent.load(agent1_path)]
 

@@ -31,13 +31,13 @@ else:
     print("Device set to : cpu")
 print("=========================")
 
-ROLLOUTS_PER_TURN = 4
+ROLLOUTS_PER_TURN = 64
 EPISODES_PER_ITERATION = 32
 SAMPLE_REUSE = 3
 BATCH_SIZE = 32
-EVAL_EVERY = 5
-CHECKPOINT_EVERY = 1
-EVAL_COMPUTE_BOOST = 4
+EVAL_EVERY = 4
+CHECKPOINT_EVERY = 2
+EVAL_COMPUTE_BOOST = 1
 LR = 1e-4
 game_kwargs = {}
 eval_game_kwargs = {}
