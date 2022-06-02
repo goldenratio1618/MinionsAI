@@ -9,7 +9,7 @@ Install python stuff with via pip:
 
 Check that it worked by running a game:
 ```
-python -m run_game
+python scripts/run_game.py
 ```
 
 Check that you can run the tests:
