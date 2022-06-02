@@ -24,5 +24,3 @@ def test_board_copy():
 
     # Check that the damage didn't carry over.
     assert b_copy.board[1][1].unit.curr_health == ZOMBIE.defense
-
-test_board_copy()
