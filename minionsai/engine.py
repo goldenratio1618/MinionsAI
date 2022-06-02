@@ -177,15 +177,20 @@ class Game():
                 # TODO units on graveyards / water?
 
             rectangle_grid[grid_x, grid_y] = char
-        print("\n".join("".join(row) for row in rectangle_grid))
-        # print the two money numbers, one left aligned and one right aligned in the same row
-        money_width = (rectangle_grid_dim - 1 - 2) // 2 # -1 for space in middle, -2 for $s
-        print(f"${self.money[0]:<{money_width}} {self.money[1]:>{money_width}}$")
+        row_strs = ["".join(row) for row in rectangle_grid]
+
+        # Add a margin for displaying extra info on the side
+        row_strs = [row + "  " for row in row_strs]
+        row_strs[0] += f"${self.money[0]}"
+        row_strs[-1] += f"${self.money[1]}"
         phase = self.phase.name.capitalize()
         if self.active_player_color == 0:
-            print(f"{phase:<{rectangle_grid_dim}}")
+            row_strs[1] += phase
         else:
-            print(f"{phase:>{rectangle_grid_dim}}")
+            row_strs[-2] += phase
+
+        print("\n".join(row_strs))
+
 
     def units_with_locations(self, color=None) -> Tuple[Tuple[int, int], Hex]:
         result = []
