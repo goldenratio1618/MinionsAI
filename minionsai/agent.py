@@ -24,12 +24,20 @@ class Agent(abc.ABC):
     def act(self, game_copy: Game) -> ActionList:
         raise NotImplementedError()
 
+    def save_instance(self, directory):
+        """
+        Save any extra data into `directory` needed to build this agent instance.
+        You should override `save` and `load` so that this is a noop:
+
+        example_agent = ExampleAgent()
+        example_agent.save(dir)
+        example_agent = ExampleAgent.load(dir)
+        """
+        pass
+
     @classmethod
-    def deserialize_build(cls, directory: str) -> "Agent":
-        """
-        Override this if you need to do any special processing to load any extra data you saved in your override of serialize()
-        """
-        print("Deserializing agent", cls)
+    def load_instance(cls, directory: str) -> "Agent":
+        print(f"Loading instance of agent {cls.__name__}")
         return cls()
 
     def seed(self, seed: int):
@@ -38,7 +46,7 @@ class Agent(abc.ABC):
         """
         pass
 
-    def serialize(self, directory: str, exists_ok=False):
+    def save(self, directory: str, exists_ok=False):
         """
         Creates a snapshot of this agent that can be passed around and run on other codebases inside `directory`
         It should expose an API like this:
@@ -48,20 +56,14 @@ class Agent(abc.ABC):
 
         To do that we need to store 3 things:
         1. The current codebase
-        2. A __init__.py file with build_agent()
-        3. Your subclass may need to store other stuff as well; you should do that by overriding this method
-        and doing whatever want after the super() call, e.g.:
-
-        def serialize(self, directory: str):
-            super().serialize(directory)
-            agent_dir = os.path.join(directory, 'agent')
-            os.mkdir(agent_dir)
-            # Put stuff there.
+        2. A __init__.py file with build_agent() entry point
+        3. Your subclass may need to store other stuff as well to reproduce an instance;
+            you should do that by overriding save_instance():
         """
-        print(f"Serializing agent into {directory}")
+        print(f"Saving agent into {directory}")
         if os.path.exists(directory):
             if not exists_ok:
-                raise ValueError(f"Serialization failed - directory {directory} already exists")
+                raise ValueError(f"Save failed - directory {directory} already exists")
         else:
             os.makedirs(directory)
 
@@ -84,8 +86,13 @@ class Agent(abc.ABC):
             init_contents = build_agent_init(module, class_name)
             f.write(init_contents)
 
+        ####### 3. Save extra data #######
+        agent_dir = os.path.join(directory, 'agent')
+        os.makedirs(agent_dir)
+        self.save_instance(agent_dir)
+
     @staticmethod
-    def deserialize(directory: str):
+    def load(directory: str):
             print(f"Loading from directory...")
             print(f"  Temporarily adding to sys.path: {os.path.dirname(directory)}")
             sys.path.append(os.path.dirname(directory))
@@ -182,5 +189,5 @@ import os
 import json
 
 def build_agent():
-    return {class_name}.deserialize_build(os.path.dirname(__file__))
+    return {class_name}.load_instance(os.path.join(os.path.dirname(__file__), 'agent'))
 """

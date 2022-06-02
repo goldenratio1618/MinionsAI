@@ -1,13 +1,13 @@
 import tqdm
 from minionsai.run_game import run_game
 from minionsai.engine import Game
-from minionsai.discriminator_only.agent import TrainedAgent
+from minionsai.agent import Agent
 
 # Update these to the agents you want to play
-agent0_path = f"C:\\Users/Maple/AppData/Local/Temp/MinionsAI/test/6"
+agent0_path = f"C:\\Users/Maple/AppData/Local/Temp/MinionsAI/test/2"
 agent1_path = f"C:\\Users/Maple/AppData/Local/Temp/MinionsAI/test/0"
 
-agents = [TrainedAgent.deserialize(agent0_path), TrainedAgent.deserialize(agent1_path)]
+agents = [Agent.load(agent0_path), Agent.load(agent1_path)]
 
 total_games = 100
 
