@@ -1,10 +1,3 @@
-"""
-Work in progress, but as of this commit I get to 95% winrate vs random bot in 5x5 world with 25% randomly graveyards.
-
-Reproduce by simply running `train.py`. After setting BOARD_SIZE and graveyard_locs in engine.py
-"""
-
-
 from minionsai.run_game import run_game
 from minionsai.discriminator_only.agent import TrainedAgent
 from minionsai.discriminator_only.model import MinionsDiscriminator
@@ -31,28 +24,44 @@ else:
     print("Device set to : cpu")
 print("=========================")
 
+# How many rollouts do we run of each turn before picking the best
 ROLLOUTS_PER_TURN = 64
+
+# How many episodes of data do we collect each iteration, before running a few epochs of optimization?
 EPISODES_PER_ITERATION = 32
+
+# Once we've collected the data, how many times do we go over it for optimization (within one iteration)?
 SAMPLE_REUSE = 3
-BATCH_SIZE = 32
+
+# Frequency of running evals vs random agent
 EVAL_EVERY = 4
+
+# Frequency of storing a saved agent
 CHECKPOINT_EVERY = 2
+
+# During evals, run this many times extra rollouts compared to during rollout generation
 EVAL_COMPUTE_BOOST = 1
+
+# Optimizer hparams
+BATCH_SIZE = 32
 LR = 1e-4
+
+# kwargs to create a game (passed to Game)
 game_kwargs = {}
 eval_game_kwargs = {}
 
 
-run_name = 'test'
+run_name = 'test'  # TODO get from command line input
 tempdir = tempfile.gettempdir()
 checkpoint_dir = os.path.join(tempdir, 'MinionsAI', run_name)
-# create the directory if it doesn't exist and clear its contents if it does exist
-if not os.path.exists(checkpoint_dir):
-    os.makedirs(checkpoint_dir)
-else:
-    print(f"Duplicate run name {run_name}; clearing checkpoint directory f{checkpoint_dir}")
+# If the directory already exists, warn the user and check if it's ok to overwrite it.
+if os.path.exists(checkpoint_dir):
+    print(f"Checkpoint directory already exists at {checkpoint_dir}")
+    ok = input("OK to overwrite? (y/n) ")
+    if ok != "y":
+        exit()
     shutil.rmtree(checkpoint_dir)
-    os.makedirs(checkpoint_dir)
+os.makedirs(checkpoint_dir)
 
 generator = RandomAIAgent()
 
@@ -129,7 +138,7 @@ while True:
     print("===================================")
     if iteration % CHECKPOINT_EVERY == 0:
         print("Saving checkpoint...")
-        agent.save(os.path.join(checkpoint_dir, f"{iteration}"))
+        agent.save(os.path.join(checkpoint_dir, f"iter_{iteration}"))
 
     print("Starting rollouts...")
     states, labels = rollouts(game_kwargs)
