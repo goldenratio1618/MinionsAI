@@ -4,6 +4,6 @@ from minionsai.run_game import run_game
 
 def test_cli_agent_game():
     test_game = Game()
-    run_game(test_game, (RandomAIAgent(), CLIAgent(["python3", "u", "minionsai/scripts/randomAI.py"])), verbose=True)
+    run_game(test_game, (RandomAIAgent(), CLIAgent(["python3", "-u", "scripts/randomAI.py"])), verbose=True)
 
 test_cli_agent_game()
