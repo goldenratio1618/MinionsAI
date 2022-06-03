@@ -1,7 +1,6 @@
 
 from typing import Callable
 import random
-from sqlalchemy import true
 import tqdm
 import trueskill
 import os

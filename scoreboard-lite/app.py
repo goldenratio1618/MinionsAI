@@ -33,7 +33,7 @@ def read_scores(env):
     # If the file doesn't exist, return an empty list
     if not os.path.isfile(scores_file):
         print(f"No scores file found at {scores_file}")
-        return []
+        return [], None
     with open(scores_file, 'r') as f:
         reader = csv.reader(f)
         # first line is header; check that it matches our expectations
@@ -43,7 +43,9 @@ def read_scores(env):
         scores = list(reader)
     # reformat to {'name': name, 'trueskill': trueskill, 'trueskill_sigma': trueskill_sigma, 'games_played': games_played}
     scores = [{'name': s[0], 'trueskill': float(s[1]), 'trueskill_sigma': float(s[2]), 'games_played': int(s[3])} for s in scores]
-    return scores
+    last_update = datetime.datetime.fromtimestamp(os.path.getmtime(scores_file))
+
+    return scores, last_update
 
 @app.route('/')
 def render():
@@ -53,7 +55,7 @@ def render():
 def env_view(env_name):
     agents = os.listdir(env_dir(env_name))
     agents = [a for a in agents if os.path.isdir(os.path.join(env_dir(env_name), a))]
-    scores = read_scores(env_name)
+    scores, last_update = read_scores(env_name)
     agent_names = [a['name'] for a in scores]
     agents = [[agent['name'], f"{agent['trueskill']:.1f}", agent['games_played']] for agent in sorted(scores, key = lambda x: x['trueskill'], reverse=True)]
     for agent in list_agents(env_name):
@@ -61,8 +63,10 @@ def env_view(env_name):
             agents.append([agent, "N/A", 0])
 
     # Calculate last updaet time of the file
-    last_update = datetime.datetime.fromtimestamp(os.path.getmtime(os.path.join(env_dir(env_name), 'scores.csv')))
-    time_since_last_update = format_timedelta(datetime.datetime.now() - last_update)
+    if last_update is not None:
+        time_since_last_update = format_timedelta(datetime.datetime.now() - last_update)
+    else:
+        time_since_last_update = "N/A"
 
     return render_template('env.html', env_name=env_name, agents=agents, last_update=last_update, time_since_last_update=time_since_last_update)
 
