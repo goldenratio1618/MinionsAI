@@ -6,6 +6,7 @@ import tqdm
 import trueskill
 import os
 from tabulate import tabulate
+import csv
 
 from .agent import Agent
 from .run_game import run_game
@@ -53,8 +54,12 @@ class TrueskillWorker():
         return Agent.load(os.path.join(self.directory, agent_name))
 
     def save_ratings(self):
-        # TODO
-        pass
+        # Save a csv with columns ['name', 'trueskill', 'trueskill_sigma', 'games_played']
+        with open(os.path.join(self.directory, "scores.csv"), "w", newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(["name", "trueskill", "trueskill_sigma", "games_played"])
+            for name in self.agent_names:
+                writer.writerow([name, self.ratings[name].mu, self.ratings[name].sigma, self.num_games[name]])
 
     def print_ratings(self):
         table = []
