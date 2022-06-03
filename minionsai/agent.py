@@ -71,7 +71,7 @@ class Agent(abc.ABC):
 
         ####### 1. Store the codebase #######
         # No recursive copying
-        ignore_patterns = [".git", "__pycache__"]
+        ignore_patterns = [".git", "__pycache__", "scoreboard*", "tests", "scripts"]
         ignore_patterns.append("*" + os.path.split(directory)[-1]+"*")
 
         # Copy all of MinionsAI/ into directory, ignoring files that match ignore_patterns
