@@ -1,12 +1,14 @@
 from flask import Flask, redirect, render_template, request, url_for
-import os
-from scoreboard_envs import ENVS
 from util import list_agents, list_envs, env_dir, format_timedelta
 import zipfile
 import tempfile
-import csv
-from minionsai.agent import RandomAIAgent, NullAgent
 import datetime
+import os
+
+from minionsai.trueskill_worker import read_scores
+from minionsai.agent import RandomAIAgent, NullAgent
+
+from scoreboard_envs import ENVS
 
 app = Flask(__name__)
 
@@ -26,27 +28,6 @@ def verify_envs_setup():
         else:
             print(f"  {env_name} ... exists")
 
-def read_scores(env):
-    # scores are stored in scores.csv
-    # With columns 'name', 'trueskill', 'trueskill_sigma', 'games_played'
-    scores_file = os.path.join(env_dir(env), 'scores.csv')
-    # If the file doesn't exist, return an empty list
-    if not os.path.isfile(scores_file):
-        print(f"No scores file found at {scores_file}")
-        return [], None
-    with open(scores_file, 'r') as f:
-        reader = csv.reader(f)
-        # first line is header; check that it matches our expectations
-        header = next(reader)
-        if header != ['name', 'trueskill', 'trueskill_sigma', 'games_played']:
-            raise Exception(f"Unexpected header in {scores_file}: {header}")
-        scores = list(reader)
-    # reformat to {'name': name, 'trueskill': trueskill, 'trueskill_sigma': trueskill_sigma, 'games_played': games_played}
-    scores = [{'name': s[0], 'trueskill': float(s[1]), 'trueskill_sigma': float(s[2]), 'games_played': int(s[3])} for s in scores]
-    last_update = datetime.datetime.fromtimestamp(os.path.getmtime(scores_file))
-
-    return scores, last_update
-
 @app.route('/')
 def render():
     return render_template('home.html', envs = list_envs() )
@@ -55,7 +36,7 @@ def render():
 def env_view(env_name):
     agents = os.listdir(env_dir(env_name))
     agents = [a for a in agents if os.path.isdir(os.path.join(env_dir(env_name), a))]
-    scores, last_update = read_scores(env_name)
+    scores, last_update = read_scores(env_dir(env_name))
     agent_names = [a['name'] for a in scores]
     agents = [[agent['name'], f"{agent['trueskill']:.1f}", agent['games_played']] for agent in sorted(scores, key = lambda x: x['trueskill'], reverse=True)]
     for agent in list_agents(env_name):

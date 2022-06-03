@@ -1,6 +1,8 @@
 
+import datetime
 from typing import Callable
 import random
+from xml.sax.handler import property_encoding
 import tqdm
 import trueskill
 import os
@@ -11,21 +13,53 @@ from .agent import Agent
 from .run_game import run_game
 from .engine import Game
 
+def get_scores_file(directory):
+    return os.path.join(directory, "scores.csv")
+
+def read_scores(env_dir):
+    # scores are stored in scores.csv
+    # With columns 'name', 'trueskill', 'trueskill_sigma', 'games_played'
+    scores_file = get_scores_file(env_dir)
+    # If the file doesn't exist, return an empty list
+    if not os.path.isfile(scores_file):
+        print(f"No scores file found at {scores_file}")
+        return [], None
+    with open(scores_file, 'r') as f:
+        reader = csv.reader(f)
+        # first line is header; check that it matches our expectations
+        header = next(reader)
+        if header != ['name', 'trueskill', 'trueskill_sigma', 'games_played']:
+            raise Exception(f"Unexpected header in {scores_file}: {header}")
+        scores = list(reader)
+    # reformat to {'name': name, 'trueskill': trueskill, 'trueskill_sigma': trueskill_sigma, 'games_played': games_played}
+    scores = [{'name': s[0], 'trueskill': float(s[1]), 'trueskill_sigma': float(s[2]), 'games_played': int(s[3])} for s in scores]
+    last_update = datetime.datetime.fromtimestamp(os.path.getmtime(scores_file))
+    return scores, last_update
 
 class TrueskillWorker():
     """
     Runs a trueskill environment for all agents in a directory.
     Watches the directory for new agents.
     """
-    def __init__(self, directory: str, game_fn: Callable[[], Game], batch_size: int=1, ratings: dict = {}, num_games: dict = {}):
+    def __init__(self, directory: str, game_fn: Callable[[], Game], batch_size: int=1, restart=False):
         self.directory = directory
         self.game_fn = game_fn
-        self.agent_names = [] if ratings is None else list(ratings.keys())
-        self.ratings = ratings or {}
-        self.num_games = num_games or {}
         self.choose_underevaluated_agents_prob = 0.5
         self.batch_size = batch_size
         self.env = trueskill.TrueSkill(tau=0, draw_probability=0.0)
+
+        # Restart from from where the last thread stopped if possible.
+        prev_scores, _ = read_scores(directory)
+        if restart:
+            # Restart even if there was previously data
+             prev_scores == []
+
+        if len(prev_scores) > 0:
+            print(f"Restarting from previous scores found at {self.scores_file}")
+        self.agent_names = [agent_dict['name'] for agent_dict in prev_scores]
+        self.ratings = {agent_dict['name']: trueskill.Rating(agent_dict['trueskill'], agent_dict['trueskill_sigma']) 
+                        for agent_dict in prev_scores}
+        self.num_games = {agent_dict['name']: agent_dict['games_played'] for agent_dict in prev_scores}
 
     def run(self):
         while True:
@@ -52,9 +86,13 @@ class TrueskillWorker():
     def load_agent(self, agent_name: str) -> Agent:
         return Agent.load(os.path.join(self.directory, agent_name))
 
+    @property
+    def scores_file(self):
+        return get_scores_file(self.directory)
+
     def save_ratings(self):
         # Save a csv with columns ['name', 'trueskill', 'trueskill_sigma', 'games_played']
-        with open(os.path.join(self.directory, "scores.csv"), "w", newline='') as f:
+        with open(self.scores_file, "w", newline='') as f:
             writer = csv.writer(f)
             writer.writerow(["name", "trueskill", "trueskill_sigma", "games_played"])
             for name in self.agent_names:
