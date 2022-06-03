@@ -50,7 +50,7 @@ class TrainedAgent(Agent):
         d_model = config['d_model']
         rollouts_per_turn = config['rollouts_per_turn']
         model = MinionsDiscriminator(d_model=d_model)
-        model.load_state_dict(th.load(os.path.join(directory, 'weights.pt')))
+        model.load_state_dict(th.load(os.path.join(directory, 'weights.pt'), map_location=th.device('cpu')))
         model.to(th.device('cpu'))  # TODO get better device if present.
 
         agent = TrainedAgent(model, Translator(), RandomAIAgent(), rollouts_per_turn)

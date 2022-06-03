@@ -13,17 +13,20 @@ cd MinionsAI
 pip install -e .
 
 cd scoreboard-lite
-pip install -r extra_requirements.txt
+pip3 install -r extra_requirements.txt
+pip3 install torch --no-cache-dir
 mkdir data
 tmux
 ```
 
 # tmux commands
 ```
->tmux     -- make a new tmux
->tmux a   -- connect to already-running tmux
-ctrl-b d  -- disconnect from the tmux
+>tmux           -- make a new tmux
+>tmux a         -- connect to already-running tmux
+ctrl-b d        -- disconnect from the tmux
+ctrl-b <arrow>  -- move around the panes
 ```
+https://tmuxcheatsheet.com/
 
 # Run threads
 Run each of these from their own tmux
