@@ -17,6 +17,12 @@ Check that you can run the tests:
 > python -m pytest tests/
 ```
 
+## Available scripts
+* `run_game.py`: Play a game between two random agents. Mostly just for testing.
+* `play_vs_agent.py`: Let's you play on the command line against a random agent (or any other agent if you have one).
+* `ts_worker.py`: Evaluates all agents in a directory against one another
+* `eval_two_agents.py`: Runs two agents against each other once or many times.
+
 ## On Imports
 Due to our agent serialization, there are a couple rules on imports:
 
@@ -26,7 +32,7 @@ from ..engine import game
 ```
 If you try to do `from minionsai.engine` instead, when your agent is serialized it may look for the system level package rather than the serialized one.
 
-1. This means that all our scripts (things you'd run as `__main__`, have to live *outside* the `minionsai` folder, in `scripts/` or `tests/`). 
+2. This means that all our scripts (things you'd run as `__main__`, have to live *outside* the `minionsai` folder, in `scripts/` or `tests/`). 
 
 If you try to run something inside `minionsai` as `__main__`, you'll get:
 ```

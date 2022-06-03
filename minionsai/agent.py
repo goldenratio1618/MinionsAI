@@ -4,8 +4,8 @@ import subprocess
 import sys
 
 from .action import ActionList, SpawnAction, MoveAction
-from .engine import Game, adjacent_hexes
-from .unit_type import ZOMBIE, NECROMANCER, unitList
+from .engine import Game, Phase, adjacent_hexes
+from .unit_type import ZOMBIE, NECROMANCER, unitList, unit_type_from_name
 
 import os
 import shutil
@@ -119,6 +119,76 @@ class NullAgent(Agent):
     """
     def act(self, game_copy: Game) -> ActionList:
         return ActionList([], [])
+
+class HumanCLIAgent(Agent):
+    """
+    Agent that uses the command line to interact with the user.
+    """
+    def act(self, game_copy: Game) -> ActionList:
+        print("========= NEW TURN =========")
+        active_game_copy = game_copy.copy()
+        move_actions = []
+        spawn_actions = []
+        while True:
+            print("---> Your turn")
+            print("Actions so far:")
+            print(f"  Move phase: {move_actions}")
+            print(f"  Spawn phase: {spawn_actions}")
+            print("Type h for help")
+            active_game_copy.pretty_print()
+            input = sys.stdin.readline().strip()
+            if input == "":
+                continue
+            elif input in ["e", "end"]:
+                break
+            elif input in ["h", "help"]:
+                print("""
+                (h)elp - show this help
+                (e)nd - end the turn
+                (m)ove i j k l - move a unit from (i, j) to (k, l)
+                (s)pawn X i j - spawn a unit of type X at (i, j)
+                (u)ndo - undo the turn
+                """)
+                continue
+            elif input in ["u", "undo"]:
+                active_game_copy = game_copy.copy()
+                move_actions = []
+                spawn_actions = []
+                continue
+            input_list = input.split()
+            if input_list[0] in ["m", "move"]:
+                if len(spawn_actions) > 0:
+                    print("You cannot move a unit after entering the spawn phase.")
+                    continue
+                try:
+                    i, j, k, l = [int(x) for x in input_list[1:]]
+                except ValueError:
+                    print("Invalid move command; should be `(m)ove i j k l`")
+                    continue
+                action = MoveAction((i, j), (k, l))
+                move_actions.append(action)
+                active_game_copy.process_single_action(action)
+            if input_list[0] in ["s", "spawn"]:
+                try:
+                    unit_type_str = input_list[1]
+                    # if it's an int, use it as an index; if it's one letter, look for one with that first letter
+                    if unit_type_str.isdigit():
+                        unit_type = unitList[int(unit_type_str)]
+                    elif len(unit_type_str) == 1:
+                        unit_type = next(unit for unit in unitList if unit.name[0].lower() == unit_type_str.lower())
+                    else:
+                        unit_type = unit_type_from_name(unit_type_str)
+                    (i, j) = [int(x) for x in input_list[2:]]
+                except ValueError:
+                    print("Invalid spawn command; should be `(s)pawn type i j`")
+                    continue
+                action = SpawnAction(unit_type, (i, j))
+                spawn_actions.append(action)
+                if active_game_copy.phase == Phase.MOVE:
+                    active_game_copy.end_move_phase()
+                active_game_copy.process_single_action(action)
+        return ActionList(move_actions, spawn_actions)
+
 
 class CLIAgent(Agent):
     def parse_input(self):

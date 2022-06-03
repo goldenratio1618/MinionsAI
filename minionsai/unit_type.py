@@ -23,3 +23,9 @@ NECROMANCER = UnitType("Necromancer", 255, 0, 0, 7, persistent=True, immune=True
 ZOMBIE = UnitType("Zombie", 2, 0, 1, 2, lumbering=True)
 
 unitList = [NECROMANCER, ZOMBIE]
+
+def unit_type_from_name(unit_name):
+    for unit in unitList:
+        if unit.name.lower() == unit_name.lower():
+            return unit
+    return None
