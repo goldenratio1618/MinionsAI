@@ -42,6 +42,9 @@ CHECKPOINT_EVERY = 2
 # During evals, run this many times extra rollouts compared to during rollout generation
 EVAL_COMPUTE_BOOST = 1
 
+# Model Size
+D_MODEL = 64
+
 # Optimizer hparams
 BATCH_SIZE = 32
 LR = 1e-4
@@ -66,9 +69,10 @@ os.makedirs(checkpoint_dir)
 generator = RandomAIAgent()
 
 print("Creating policy...")
-policy = MinionsDiscriminator(d_model=128)
+policy = MinionsDiscriminator(d_model=D_MODEL)
 print("Policy initialized:")
 print(policy)
+print(f"Policy total parameter count: {sum(p.numel() for p in policy.parameters() if p.requires_grad):,}")
 policy.to(device)
 
 translator = Translator()
