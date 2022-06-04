@@ -10,6 +10,8 @@ from minionsai.agent import RandomAIAgent, NullAgent
 
 from scoreboard_envs import ENVS
 
+UPLOAD_PASSWORD = 'shadowL0rd'
+
 app = Flask(__name__)
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
@@ -55,9 +57,10 @@ def zip_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() == 'zip'
 
 @app.route('/env/<env_name>/upload', methods=['GET', 'POST'])
-def upload(env_name):
-    # TODO - better error message displaying.
-    if request.method == 'POST':
+def upload(env_name, error=''):
+    if error == '' and request.method == 'POST':
+        if request.values['password'] != UPLOAD_PASSWORD:
+            return upload(env_name, error='Wrong password (ask David for password)')
         # check if the post request has the file part
         if 'file' not in request.files:
             return upload(env_name, error='No file part')
@@ -65,14 +68,13 @@ def upload(env_name):
         # If the user does not select a file, the browser submits an
         # empty file without a filename.
         if file.filename == '':
-            return redirect(request.url)
+            return upload(env_name, error='No file selected')
         if not zip_file(file.filename):
-            return redirect(request.url)
+            return upload(env_name, error='Please submit a zip file (filename.zip)')
         agent_name = file.filename.rsplit('.', 1)[0]
         print(f"Uploading {agent_name} ({file.filename})")
         if os.path.exists(os.path.join(env_dir(env_name), agent_name)):
-            print(f"Agent {agent_name} already exists")
-            return redirect(request.url)
+            return upload(env_name, error=f"Agent {agent_name} already exists")
         if file:
             temp_location = tempfile.gettempdir()
             file.save(os.path.join(temp_location, file.filename))
@@ -82,7 +84,7 @@ def upload(env_name):
                 zip_ref.extractall(final_dest)
             os.remove(os.path.join(temp_location, file.filename))
             return redirect(url_for('env_view', env_name=env_name))
-    return render_template('agent_upload.html')
+    return render_template('agent_upload.html', error=error)
 
 if __name__ == '__main__':
     verify_envs_setup()
