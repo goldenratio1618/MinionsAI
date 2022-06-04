@@ -3,5 +3,10 @@
 <h1>Upload new File</h1>
 <form method=post enctype=multipart/form-data>
   <input type=file name=file>
+  <br>
+  Password = <input type=text name=password>
+  <br>
   <input type=submit value=Upload>
+  <br>
+  {{ error }}
 </form>

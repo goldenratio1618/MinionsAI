@@ -123,3 +123,10 @@ save_dir/
         <data necessary to reconstruct the agent instance>
     __init__.py    <-- contains build_agent() which rebuilds the agent.
 ```
+
+## Submitting to scoreboard
+Once you have a good agent, you can submit it to the scoreboard at `minions-scoreboard.com`
+
+[Note: the scoreboard is incredibly janky, and if it's down poke David to fix it.]
+
+To submit an agent, run `agent.save(directory)`. Then zip directory into `agent_name.zip` and upload it to the scoreboard.
