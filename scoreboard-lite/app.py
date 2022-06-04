@@ -40,16 +40,18 @@ def env_view(env_name):
     agents = [a for a in agents if os.path.isdir(os.path.join(env_dir(env_name), a))]
     scores, last_update = read_scores(env_dir(env_name))
     agent_names = [a['name'] for a in scores]
-    agents = [[agent['name'], f"{agent['trueskill']:.1f}", agent['games_played']] for agent in sorted(scores, key = lambda x: x['trueskill'], reverse=True)]
+    agents = [[agent['name'], f"{agent['trueskill']:.1f}", agent['games_played'], agent['ok'], agent['crashes']] for agent in sorted(scores, key = lambda x: x['trueskill'], reverse=True)]
     for agent in list_agents(env_name):
         if agent not in agent_names:
-            agents.append([agent, "N/A", 0])
+            agents.append([agent, "N/A", 0, "N/A", "N/A"])
 
     # Calculate last updaet time of the file
     if last_update is not None:
         time_since_last_update = format_timedelta(datetime.datetime.now() - last_update)
+        last_update = last_update.strftime("%Y-%m-%d %H:%M:%S")
     else:
         time_since_last_update = "N/A"
+        last_update = "N/A"
 
     return render_template('env.html', env_name=env_name, agents=agents, last_update=last_update, time_since_last_update=time_since_last_update)
 
@@ -85,6 +87,14 @@ def upload(env_name, error=''):
             os.remove(os.path.join(temp_location, file.filename))
             return redirect(url_for('env_view', env_name=env_name))
     return render_template('agent_upload.html', error=error)
+
+@app.route("/env/<env_name>/agent/<agent_name>/crashes")
+def agent_crashes(env_name, agent_name):
+    all_files = os.listdir(os.path.join(env_dir(env_name), agent_name))
+    crashes = [f for f in all_files if 'stacktrace' in f]
+    crashes.sort(key = lambda x: x.rsplit('_', 1)[1], reverse=True)
+    latest_3_with_contents = [(f, open(os.path.join(env_dir(env_name), agent_name, f)).read()) for f in crashes[:3]]
+    return render_template('agent_crashes.html', env_name=env_name, agent_name=agent_name, crashes=latest_3_with_contents, num_crashes=len(crashes))
 
 if __name__ == '__main__':
     verify_envs_setup()

@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang = "en">
+   <head></head>
+   <body>
+      
+      <h3>
+      Agent Crashes: {{ agent_name}} ({{ num_crashes }} total crashes)
+      </h3>
+      <h3>
+      Env: <a href="/env/{{env_name}}/view">{{env_name}}</a>
+      </h3>
+      
+      {% for time, msg in crashes %}
+      <h4>{{ time }}</h4>
+      <pre>{{ msg }}</pre>
+      {% endfor %}
+   </body>
+</html>

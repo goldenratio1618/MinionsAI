@@ -31,7 +31,7 @@ def read_scores(env_dir):
         if header != ['name', 'trueskill', 'trueskill_sigma', 'games_played', 'ok', 'crashes']:
             raise Exception(f"Unexpected header in {scores_file}: {header}")
         scores = list(reader)
-    scores = [{'name': s[0], 'trueskill': float(s[1]), 'trueskill_sigma': float(s[2]), 'games_played': int(s[3]), 'load_ok': s[4], 'crashes': int(s[5])} for s in scores]
+    scores = [{'name': s[0], 'trueskill': float(s[1]), 'trueskill_sigma': float(s[2]), 'games_played': int(s[3]), 'ok': s[4], 'crashes': int(s[5])} for s in scores]
     last_update = datetime.datetime.fromtimestamp(os.path.getmtime(scores_file))
     return scores, last_update
 
