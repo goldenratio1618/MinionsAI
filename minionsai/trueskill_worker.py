@@ -100,6 +100,7 @@ class TrueskillWorker():
                 traceback.print_exc(file=f)
             print("I'm going to stop worrying about that agent.")
             self.drop_agent(agent_name)
+            self.num_crashes[agent_name] += 1
             return None
 
     def drop_agent(self, agent_name: str):

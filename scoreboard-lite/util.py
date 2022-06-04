@@ -31,3 +31,5 @@ def format_timedelta(td: timedelta):
         if seconds > period_seconds:
             number = seconds / period_seconds
             return f"{number:.1f}{period_name[0]}"
+
+    return "0s"
