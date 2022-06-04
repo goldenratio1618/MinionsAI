@@ -41,3 +41,6 @@ python3 scoreboard_ts_worker.py ENV_NAME
 
 # Security
 Hahahaha
+
+# Envs
+Envs are defined in `scoreboard_envs.ENVS`. We should add new envs rarely, so for now it's a pretty manual process. To do it, you need to add a new one there, then ssh to the server and restart the runner.
