@@ -129,4 +129,5 @@ Once you have a good agent, you can submit it to the scoreboard at `minions-scor
 
 [Note: the scoreboard is incredibly janky, and if it's down poke David to fix it.]
 
-To submit an agent, run `agent.save(directory)`. Then zip directory into `agent_name.zip` and upload it to the scoreboard.
+To submit an agent, run `agent.save(directory)`. Then zip directory into `agent_name.zip` and upload it to the scoreboard. 
+Make sure to give it a very unique name - recommend putting your name and the date in there at the very least.
