@@ -1,7 +1,3 @@
-TODO
-* connect ports to external world
-* better logging
-  
 # Launching from scratch on new machine:
 ```
 mkdir code
@@ -34,7 +30,7 @@ Run each of these from their own tmux
 Launch webserver
 ```
 cd scoreboard-lite
-python3 -m flask run --host=0.0.0.0
+python3 -m flask run --host=0.0.0.0 --port=80
 ```
 
 Launch env runner
@@ -43,3 +39,5 @@ cd scoreboard-lite
 python3 scoreboard_ts_worker.py ENV_NAME
 ```
 
+# Security
+Hahahaha
