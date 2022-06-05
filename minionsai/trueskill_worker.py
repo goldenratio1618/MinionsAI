@@ -53,7 +53,7 @@ class TrueskillWorker():
         prev_scores, _ = read_scores(directory)
         if restart:
             # Restart even if there was previously data
-             prev_scores == []
+            prev_scores = []
 
         if len(prev_scores) > 0:
             print(f"Restarting from previous scores found at {self.scores_file}")
