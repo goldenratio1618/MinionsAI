@@ -23,6 +23,7 @@ class MinionsDiscriminator(th.nn.Module):
         self.value_linear2 = th.nn.Linear(d_model, 1)
 
         self.d_model = d_model
+        self.depth = depth
         self._device = None
 
     def to(self, device):
