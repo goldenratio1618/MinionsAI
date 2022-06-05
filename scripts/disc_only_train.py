@@ -1,3 +1,11 @@
+"""
+Run with a name for the folder to keep agents in:
+
+> python3 train.py --name my_run
+
+Then agent checkpoints & logs are saved in <your temp dir>/MinionsAI/my_run
+"""
+
 import argparse
 from tkinter import Y
 from minionsai.run_game import run_game

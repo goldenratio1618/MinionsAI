@@ -1,3 +1,7 @@
+"""
+Play against an agent with
+> python play_vs_agent.py path/to/agent
+"""
 import sys
 from minionsai.agent import Agent, HumanCLIAgent, RandomAIAgent
 from minionsai.run_game import run_game
