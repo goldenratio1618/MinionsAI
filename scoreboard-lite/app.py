@@ -1,5 +1,5 @@
 from flask import Flask, redirect, render_template, request, url_for
-from util import list_agents, list_envs, env_dir, format_timedelta, env_agents_dir, env_deleted_agents_dir
+from util import list_agents, list_envs, env_dir, format_timedelta, env_agents_dir, env_deleted_agents_dir, env_scores_file
 import zipfile
 import tempfile
 import datetime
@@ -39,7 +39,7 @@ def render():
 
 @app.route('/env/<env_name>/view')
 def env_view(env_name):
-    scores, last_update = read_scores(env_dir(env_name))
+    scores, last_update = read_scores(env_scores_file(env_name))
     agent_names = [a['name'] for a in scores]
     agents = [[agent['name'], f"{agent['trueskill']:.1f}", agent['games_played'], agent['ok'], agent['crashes']] for agent in sorted(scores, key = lambda x: x['trueskill'], reverse=True)]
     for agent in list_agents(env_name):
@@ -99,7 +99,7 @@ def agent_crashes(env_name, agent_name):
 
 @app.route("/env/<env_name>/agent/<agent_name>/view")
 def agent_view(env_name, agent_name):
-    scores, _ = read_scores(env_dir(env_name))
+    scores, _ = read_scores(env_scores_file(env_name))
     matching_agents = [a for a in scores if a['name'] == agent_name]
     if len(matching_agents) == 0:
         all_agents = list_agents(env_name)

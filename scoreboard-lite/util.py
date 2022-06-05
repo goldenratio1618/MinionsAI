@@ -22,6 +22,9 @@ def env_agents_dir(env_name):
 def env_deleted_agents_dir(env_name):
     return os.path.join(env_dir(env_name), 'deleted_agents')
 
+def env_scores_file(env_name):
+    return os.path.join(env_dir(env_name), 'scores.csv')
+
 def format_timedelta(td: timedelta):
     seconds = int(td.total_seconds())
     periods = [
