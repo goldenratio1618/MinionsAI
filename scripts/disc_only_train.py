@@ -7,6 +7,7 @@ Then agent checkpoints & logs are saved in <your temp dir>/MinionsAI/my_run
 """
 
 import argparse
+from collections import defaultdict
 from tkinter import Y
 from minionsai.run_game import run_game
 from minionsai.discriminator_only.agent import TrainedAgent
@@ -40,7 +41,7 @@ SAMPLE_REUSE = 3
 EVAL_EVERY = 4
 
 # Frequency of storing a saved agent
-CHECKPOINT_EVERY = 2
+CHECKPOINT_EVERY = 4
 
 # During evals, run this many times extra rollouts compared to during rollout generation
 EVAL_COMPUTE_BOOST = 1
@@ -50,7 +51,7 @@ D_MODEL = 64
 
 # Optimizer hparams
 BATCH_SIZE = 32
-LR = 1e-4
+LR = 3e-5
 
 # kwargs to create a game (passed to Game)
 game_kwargs = {}
@@ -136,11 +137,18 @@ def rollouts(game_kwargs, agents):
     states = []
     labels = []
 
+    games = 0
+    first_player_wins = 0
     for _ in tqdm.tqdm(range(EPISODES_PER_ITERATION)):
-        states_, labels_, _ = single_rollout(game_kwargs, agents)
+        states_, labels_, winning_color = single_rollout(game_kwargs, agents)
         states.extend(states_)
         labels.extend(labels_)
-    return states, labels
+        games += 1
+        if winning_color == 0:
+            first_player_wins += 1
+    # Log instantaneous metrics here, and send cumulative out to the main control flow to integrate
+    metrics_logger.log_metrics({'first_player_winrate': first_player_wins / games})
+    return states, labels, {'rollout_games': games, 'rollout_states': len(states)}
 
 def eval_vs_random(agent):
     wins = 0
@@ -173,8 +181,8 @@ def main(run_name):
     optimizer = th.optim.Adam(policy.parameters(), lr=LR)
 
     iteration = 0
-    turns_unique = 0
     turns_optimized = 0
+    rollout_stats = defaultdict(int)
     while True:
         metrics_logger.log_metrics({'iteration': iteration})
         print()
@@ -189,9 +197,10 @@ def main(run_name):
             agent.rollouts_per_turn = ROLLOUTS_PER_TURN
 
         logger.info("Starting rollouts...")
-        states, labels = rollouts(game_kwargs, [agent, agent])
-        turns_unique += len(states)
-        metrics_logger.log_metrics({'turns_unique': turns_unique})
+        states, labels, rollout_info = rollouts(game_kwargs, [agent, agent])
+        for k, v in rollout_info.items():
+            rollout_stats[k] += v
+        metrics_logger.log_metrics(rollout_stats)
         logger.info("Starting training...")
         for epoch in range(SAMPLE_REUSE):
             logger.info(f"  Epoch {epoch}/{SAMPLE_REUSE}...")
@@ -215,7 +224,6 @@ def main(run_name):
                     final_loss = loss.item()
                 turns_optimized += len(batch_idxes)
         logger.info(f"Iteration {iteration} complete.")
-        # Calculate the total l2 norm of the policy parameters
         param_norm = sum([th.norm(param, p=2) for param in policy.parameters()]).item()
         metrics_logger.log_metrics({"loss": final_loss, 'turns_optimized': turns_optimized, 'param_norm': param_norm})
         metrics_logger.flush()
