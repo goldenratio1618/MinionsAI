@@ -9,7 +9,8 @@ def main(agent_dir=None):
     else:
         agent = Agent.load(agent_dir)
     game = Game()
-    run_game(game, (HumanCLIAgent(), agent))
+    winner = run_game(game, (HumanCLIAgent(), agent))
+    print("Game over.\nWinner:", winner)
 
 if __name__ == "__main__":
     arg = sys.argv[1] if len(sys.argv) >= 2 else None
