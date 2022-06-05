@@ -12,6 +12,8 @@ class UnitType():
         self.blink = blink
         self.unsummoner = unsummoner
         self.deadly = deadly
+        if unsummoner or deadly:
+            self.attack = 1
         self.flurry = flurry
         self.flying = flying
         self.lumbering = lumbering

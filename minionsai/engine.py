@@ -319,15 +319,16 @@ class Game():
             self.board.board[xf][yf].add_unit(temp)
         # if target hex is occupied by enemy unit, then attack
         elif self.board.board[xf][yf].unit.color != self.active_player_color:
+            if self.board.board[xi][yi].unit.remainingAttack == 0: return False
             if distance > attack_range: return False
+            # attacking prevents later movement
+            self.board.board[xi][yi].unit.hasMoved = True
             # unsummon removes non-persistent unit from board and refunds cost
             if self.board.board[xi][yi].unit.type.unsummoner and not self.board.board[xf][yf].unit.type.persistent:
                 self.money[self.inactive_player_color] += self.board.board[xf][yf].unit.type.cost
                 self.board.board[xf][yf].remove_unit()
+                self.board.board[xi][yi].unit.remainingAttack = 0
                 return True
-            if self.board.board[xi][yi].unit.remainingAttack == 0: return False
-            # attacking prevents later movement
-            self.board.board[xi][yi].unit.hasMoved = True
             # flurry deals 1 attack
             if self.board.board[xi][yi].unit.type.flurry:
                 self.board.board[xi][yi].unit.remainingAttack -= 1
