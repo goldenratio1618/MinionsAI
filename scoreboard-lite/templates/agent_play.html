@@ -8,6 +8,7 @@
       </h3>
       
       <pre>{{game.pretty_print(do_print=False)}}</pre>
+      {% if not game.done %}
       <form method="post">
          <input type="hidden" name="game_state" value="{{game_json}}">
          <input type="hidden" name="game_reset_state" value="{{game_reset_json}}">
@@ -18,7 +19,7 @@
          <table>
             <tr>
                <td>
-                  <input type="submit" name="move" value="Move">
+                  <input type="submit" name="move" value="Move" {% if game.phase.value == "spawn" %} disabled {% endif %}>
                </td>
                <td>
                   (<input type="text" name="move_from_i" style="width:10px">,
@@ -47,5 +48,10 @@
       <br>
       End of your last turn:
       <pre>{{game_prev_turn_str}}</pre>
+      {% else %}
+      GAME OVER
+      <br>
+      Winner is player {{game.winner}}
+      {% endif %}
    </body>
 </html>
