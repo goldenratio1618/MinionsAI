@@ -1,4 +1,10 @@
+import json
+from re import I
 from flask import Flask, redirect, render_template, request, url_for
+from minionsai.action import MoveAction, SpawnAction
+from minionsai.engine import Game, Phase
+from minionsai.unit_type import flexible_unit_type
+from numpy import isin
 from util import list_agents, list_envs, env_dir, format_timedelta, env_agents_dir, env_deleted_agents_dir, env_scores_file
 import zipfile
 import tempfile
@@ -7,9 +13,8 @@ import os
 import shutil
 
 from minionsai.trueskill_worker import read_scores
-from minionsai.agent import RandomAIAgent, NullAgent
-
-from scoreboard_envs import ENVS
+from minionsai.agent import Agent, RandomAIAgent, NullAgent
+from minionsai.scoreboard_envs import ENVS
 
 UPLOAD_PASSWORD = 'shadowL0rd'
 
@@ -121,6 +126,76 @@ def agent_view(env_name, agent_name):
 def agent_delete(env_name, agent_name):
     shutil.move(os.path.join(env_agents_dir(env_name), agent_name), os.path.join(env_deleted_agents_dir(env_name)))
     return redirect(url_for('env_view', env_name=env_name))
+
+# TODO better UI!
+@app.route("/env/<env_name>/agent/<agent_name>/play", methods=['GET', 'POST'])
+def agent_play(env_name, agent_name):
+    if request.method == 'GET':
+        game = ENVS[env_name]()
+        game.next_turn()
+        game_reset = game
+        game_reset_json = game.encode_json()
+        game_prev_turn_str = ""
+        agent_actions_str = ""
+    elif request.method == 'POST':
+        game_json_str = request.values['game_state']
+        game_reset_json_str = request.values['game_reset_state']
+        game_prev_turn_str = request.values['game_prev_turn_str']
+        agent_actions_str = request.values['agent_actions_str']
+        # Turn them into json objects
+        game_json = json.loads(game_json_str)
+        game_reset_json = json.loads(game_reset_json_str)
+        game = Game.decode_json(game_json)
+        game_reset = Game.decode_json(game_reset_json)
+        if "undo" in request.values:
+            game = game_reset
+
+        if "end" in request.values:
+            if game.phase == Phase.MOVE:
+                game.end_move_phase()
+            if game.phase == Phase.SPAWN:
+                game.end_spawn_phase()
+            game_prev_turn_str = game.pretty_print(do_print=False)
+            game.next_turn()
+            agent = Agent.load(os.path.join(env_agents_dir(env_name), agent_name))
+            agent_actions = agent.act(game.copy())
+            game.full_turn(agent_actions)
+            game.next_turn()
+            game_reset = game
+            game_reset_json = game.encode_json()
+            agent_actions_str = "".join(str(a) for a in agent_actions.move_phase + agent_actions.spawn_phase)
+        elif "move" in request.values:
+            if game.phase == Phase.SPAWN:
+                pass
+            elif game.phase == Phase.MOVE:
+                from_i = int(request.values['move_from_i'])
+                from_j = int(request.values['move_from_j'])
+                to_i = int(request.values['move_to_i'])
+                to_j = int(request.values['move_to_j'])
+                action = MoveAction((from_i, from_j), (to_i, to_j))
+                game.process_single_action(action)
+        elif "spawn" in request.values:
+            if game.phase == Phase.MOVE:
+                game.end_move_phase()
+            unit_type = flexible_unit_type(request.values['spawn_unit_type'])
+            to_i = int(request.values['spawn_to_i'])
+            to_j = int(request.values['spawn_to_j'])
+            action = SpawnAction(unit_type, (to_i, to_j))
+            game.process_single_action(action)
+    game_json = game.encode_json()
+    print(game_prev_turn_str)
+    return render_template(
+        'agent_play.html', 
+        env_name=env_name, 
+        agent_name=agent_name, 
+        game=game,
+        game_reset=game_reset,
+        game_json=json.dumps(game_json), 
+        game_reset_json=json.dumps(game_reset_json),
+        game_prev_turn_str=game_prev_turn_str,
+        agent_actions_str=agent_actions_str
+        )
+
 
 if __name__ == '__main__':
     verify_envs_setup()

@@ -3,7 +3,7 @@ Run this to evaluate all the agents in a directory against each other.
 """
 
 from minionsai.trueskill_worker import TrueskillWorker
-from scoreboard_envs import ENVS
+from minionsai.scoreboard_envs import ENVS
 from util import env_agents_dir, env_scores_file
 import sys
 import os

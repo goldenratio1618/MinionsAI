@@ -5,7 +5,7 @@ import sys
 
 from .action import ActionList, SpawnAction, MoveAction
 from .engine import Game, Phase, adjacent_hexes
-from .unit_type import ZOMBIE, NECROMANCER, unitList, unit_type_from_name
+from .unit_type import ZOMBIE, NECROMANCER, flexible_unit_type, unitList, unit_type_from_name
 
 import os
 import shutil
@@ -172,13 +172,7 @@ class HumanCLIAgent(Agent):
             if input_list[0] in ["s", "spawn"]:
                 try:
                     unit_type_str = input_list[1]
-                    # if it's an int, use it as an index; if it's one letter, look for one with that first letter
-                    if unit_type_str.isdigit():
-                        unit_type = unitList[int(unit_type_str)]
-                    elif len(unit_type_str) == 1:
-                        unit_type = next(unit for unit in unitList if unit.name[0].lower() == unit_type_str.lower())
-                    else:
-                        unit_type = unit_type_from_name(unit_type_str)
+                    unit_type = flexible_unit_type(unit_type_str)
                     (i, j) = [int(x) for x in input_list[2:]]
                 except ValueError:
                     print("Invalid spawn command; should be `(s)pawn type i j`")

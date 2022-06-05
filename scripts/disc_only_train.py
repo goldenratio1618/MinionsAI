@@ -15,6 +15,7 @@ from minionsai.discriminator_only.model import MinionsDiscriminator
 from minionsai.discriminator_only.translator import Translator
 from minionsai.engine import Game
 from minionsai.agent import RandomAIAgent
+from minionsai.scoreboard_envs import ENVS
 import torch as th
 import numpy as np
 import os
@@ -55,8 +56,9 @@ BATCH_SIZE = 32
 LR = 3e-5
 
 # kwargs to create a game (passed to Game)
-game_kwargs = {}
-eval_game_kwargs = {}
+game_kwargs = {'symmetrize': False}
+# Eval env registered in scoreboard_envs.py
+EVAL_ENV_NAME = 'zombies5x5'
 
 def find_device():
     logger.info("=========================")
@@ -163,7 +165,7 @@ def eval_vs_random(agent):
         agents[good_idx] = good_agent
         agents[1 - good_idx] = random_agent
 
-        game = Game(**eval_game_kwargs)
+        game = ENVS[EVAL_ENV_NAME]()
         winner = run_game(game, agents=agents)
         if winner == good_idx:
             wins += 1
