@@ -18,23 +18,24 @@ class TrainedAgent(Agent):
         self.verbose_level = verbose_level
     
     def act(self, game):
-        options = []
-        scores = []
+        options_action_list = []
+        options_obs = []
         for i in range(self.rollouts_per_turn):
             game_copy = game.copy()
             actions = self.generator.act(game_copy)
             game_copy.full_turn(actions)
-            obs = self.translator.translate(game_copy)
-            disc_logprob = self.policy(obs).detach().cpu().numpy()
-            scores.append(disc_logprob)
-            options.append(actions)
+            options_obs.append(self.translator.translate(game_copy))
+            options_action_list.append(actions)
+
             if self.verbose_level >= 2:
                 print(f"Option {i}")
                 game_copy.pretty_print()
-        best_option_idx = np.argmax(scores)
+        obs_flat = {k: np.concatenate([o[k] for o in options_obs]) for k in options_obs[0]}
+        disc_logprobs = self.policy(obs_flat).detach().cpu().numpy()  # [num_options]
+        best_option_idx = np.argmax(disc_logprobs)
         if self.verbose_level >= 1:
-            print(f"Choosing option {best_option_idx}; win prob = {sigmoid(scores[best_option_idx]).item() * 100:.1f}%")
-        best_option = options[best_option_idx]
+            print(f"Choosing option {best_option_idx}; win prob = {sigmoid(disc_logprobs[best_option_idx]).item() * 100:.1f}%")
+        best_option = options_action_list[best_option_idx]
         return best_option
 
     def save_instance(self, directory: str):
