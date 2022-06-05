@@ -213,6 +213,8 @@ class CLIAgent(Agent):
     def act(self, game_copy: Game) -> ActionList:
         # send board state to process and then signal that turn begins
         sys.stdout = self.proc.stdin
+        print("Your color")
+        print(game_copy.active_player_color)
         game_copy.board.print_board_properties()
         print()
         game_copy.board.print_board_state()
