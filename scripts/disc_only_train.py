@@ -22,7 +22,8 @@ logger = logging.getLogger(__name__)
 ROLLOUTS_PER_TURN = 64
 
 # How many episodes of data do we collect each iteration, before running a few epochs of optimization?
-EPISODES_PER_ITERATION = 32
+# Potentially good to use a few times bigger EPISODES_PER_ITERATION than BATCH_SIZE, to minimize correlation within batches
+EPISODES_PER_ITERATION = 128  
 
 # Once we've collected the data, how many times do we go over it for optimization (within one iteration)?
 SAMPLE_REUSE = 3
@@ -168,9 +169,10 @@ def main(run_name):
     turns_optimized = 0
     while True:
         metrics_logger.log_metrics({'iteration': iteration})
-        logger.info("====================================")
+        print()
+        print("====================================")
         logger.info(f"=========== Iteration: {iteration} ===========")
-        logger.info("====================================")
+        print("====================================")
         if iteration % CHECKPOINT_EVERY == 0:
             logger.info("Saving checkpoint...")
             agent.save(os.path.join(checkpoint_dir, f"iter_{iteration}"))
@@ -181,11 +183,11 @@ def main(run_name):
         metrics_logger.log_metrics({'turns_unique': turns_unique})
         logger.info("Starting training...")
         for epoch in range(SAMPLE_REUSE):
-            logger.info(f"Epoch {epoch}")
+            logger.info(f"  Epoch {epoch}/{SAMPLE_REUSE}...")
             all_idxes = np.random.permutation(len(states))
             n_batches = len(all_idxes) // BATCH_SIZE
             final_loss = None
-            for idx in tqdm.tqdm(range(n_batches)):
+            for idx in range(n_batches):
                 batch_idxes = all_idxes[idx * BATCH_SIZE: (idx + 1) * BATCH_SIZE]
                 batch_obs = {}
                 for key in states[0]:
@@ -201,20 +203,20 @@ def main(run_name):
                 if idx == n_batches - 1:
                     final_loss = loss.item()
                 turns_optimized += len(batch_idxes)
+        logger.info(f"Iteration {iteration} complete.")
         # Calculate the total l2 norm of the policy parameters
         param_norm = sum([th.norm(param, p=2) for param in policy.parameters()]).item()
         metrics_logger.log_metrics({"loss": final_loss, 'turns_optimized': turns_optimized, 'param_norm': param_norm})
         metrics_logger.flush()
 
-        if (iteration + 1) % EVAL_EVERY == 0:
-            # do it on -1 mod EVAL_EVERY as oppsoed to 0 mode EVAL_EVERY
-            # to avoid wasting time on step 0.
+        iteration += 1
+
+        if iteration % EVAL_EVERY == 0:
             logger.info("Evaluating...")
             eval_winrate = eval_vs_random(agent)
             metrics_logger.log_metrics({"eval_winrate": eval_winrate})
             logger.info(f"Win rate vs random = {eval_winrate}")
 
-        iteration += 1
 
 
 if __name__ == "__main__":
