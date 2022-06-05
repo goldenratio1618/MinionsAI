@@ -29,3 +29,11 @@ def unit_type_from_name(unit_name):
         if unit.name.lower() == unit_name.lower():
             return unit
     return None
+
+def flexible_unit_type(unit_type_str: str):
+    if unit_type_str.isdigit():
+        return unitList[int(unit_type_str)]
+    elif len(unit_type_str) == 1:
+        return next(unit for unit in unitList if unit.name[0].lower() == unit_type_str.lower())
+    else:
+        return unit_type_from_name(unit_type_str)

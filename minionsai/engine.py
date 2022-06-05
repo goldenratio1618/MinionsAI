@@ -101,7 +101,9 @@ class Hex():
     def remove_unit(self):
         self.unit = None
 
-class Phase(enum.Enum):
+# This multiple inheritance is a bit horrifying,
+# but according to SO it's the way to get enum's to be json-able.
+class Phase(str, enum.Enum):
     MOVE = "move"  # Move phase
     SPAWN = "spawn"  # Spawn Phase
     TURN_END = "turn_end"  # After spawn phase, but haven't yet run next_turn()
@@ -210,7 +212,7 @@ class Game():
     def inactive_player_color(self) -> int:
         return 1 - self.active_player_color
 
-    def pretty_print(self):
+    def pretty_print(self, do_print=True):
         """
         Prints board in ascii
         """
@@ -245,9 +247,9 @@ class Game():
             row_strs[1] += phase
         else:
             row_strs[-2] += phase
-
-        print("\n".join(row_strs))
-
+        result = "\n".join(row_strs)
+        if do_print: print(result)
+        return result
 
     def units_with_locations(self, color=None) -> Tuple[Tuple[int, int], Hex]:
         result = []
