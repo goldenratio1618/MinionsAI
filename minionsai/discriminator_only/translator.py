@@ -28,6 +28,9 @@ class Translator():
 
     TERRAIN_TYPES = ObservationEnum(['none', 'water', 'graveyard'])
 
+    MAX_REMAINING_TURNS = 20
+    REMAINING_TURNS = ObservationEnum(list(range(MAX_REMAINING_TURNS + 1)))
+
     def translate(self, game: Game):
         board_obs = [] # [num_hexes, 3 (location, terrain, unit_type)]
         for (i, j), hex in game.board.hexes():
@@ -43,6 +46,11 @@ class Translator():
                 self.UNIT_TYPES.encode(unit_type)
             ])
 
+        remaining_turns = game.remaining_turns
+        # Clip the obs to be within bounds
+        remaining_turns = min(remaining_turns, self.MAX_REMAINING_TURNS)
+        # TODO: Should the translator be in charge of calling ObservationEnum.encode()?
         return {
             'board': np.array([board_obs]),
+            'remaining_turns': np.array([[remaining_turns]])  # shape is [batch, num_items]
         }
