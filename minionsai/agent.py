@@ -207,6 +207,7 @@ class CLIAgent(Agent):
 
     def __init__(self, commands):
         self.proc = subprocess.Popen(commands, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1, universal_newlines=True)
+        self.commands = commands
         # send initial board config to process
         self.original_stdout = sys.stdout
 
@@ -226,6 +227,24 @@ class CLIAgent(Agent):
         move_actions = self.parse_input()
         spawn_actions = self.parse_input()
         return ActionList(move_actions, spawn_actions)
+
+    def save_instance(self, directory: str):
+        f = open(os.path.join(directory, "commands.txt"), "w")
+        for i in self.commands: f.write(i)
+        f.close()
+
+    @classmethod
+    def load_instance(cls, directory: str):
+        f = open(os.path.join(directory, "commands.txt"), "r")
+        commands = []
+        for i in f: commands.append(i)
+        os.chdir(directory)
+        os.chdir("../code")
+        # set execution bit
+        # we don't know which word of commands is file, so try all of them
+        for i in commands: os.system("chmod +x " + i)
+        agent = CLIAgent(commands)
+        return agent
 
 
 class RandomAIAgent(Agent):
