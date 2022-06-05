@@ -247,12 +247,12 @@ class RandomAIAgent(Agent):
                 necromancer_destination = dest
             if unit.type == NECROMANCER:
                 # Attack if possible
-                attack_targets = adjacent_hexes(i, j)
+                attack_targets = adjacent_hexes(*dest)
                 random.shuffle(attack_targets)
                 for (k, l) in attack_targets:
                     unit_there = game_copy.board.board[k][l].unit
                     if unit_there is not None and unit_there.color != game_copy.active_player_color:
-                        move_actions.append(MoveAction((i, j), (k, l)))
+                        move_actions.append(MoveAction(dest, (k, l)))
                         break
 
         if necromancer_location is None:
