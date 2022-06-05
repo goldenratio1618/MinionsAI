@@ -5,10 +5,12 @@ from ..unit_type import unitList
 class MinionsDiscriminator(th.nn.Module):
     def __init__(self, d_model):
         super().__init__()
+        # TODO - get dimension from ObservationEnum objects
         self.unit_embedding = th.nn.Embedding(len(unitList) * 2 + 1, d_model)
         self.location_embedding = th.nn.Embedding(BOARD_SIZE ** 2, d_model)
         self.hex_embedding = th.nn.Embedding(BOARD_SIZE ** 2, d_model)
         self.terrain_embedding = th.nn.Embedding(3, d_model)
+        self.remaining_turns_embedding = th.nn.Embedding(21, d_model)
         self.input_linear1 = th.nn.Linear(d_model, d_model)
         self.input_linear2 = th.nn.Linear(d_model, d_model)
         # self.money_embedding = th.nn.Embedding(max_money_emb, d_model)
@@ -32,7 +34,9 @@ class MinionsDiscriminator(th.nn.Module):
 
     def process_input(self, obs: th.Tensor):
         # obs is dict of:
-        # board: [batch, num_hexes, 3]
+        #   board: [batch, num_hexes, 3]
+        #   remaining_turns: [batch, 1]
+        #
         # Extract these tensors, keeping the int type
         obs = {k: th.Tensor(v).int().to(self.device) for k, v in obs.items()}
 
@@ -43,6 +47,8 @@ class MinionsDiscriminator(th.nn.Module):
         unit_type_embs = self.unit_embedding(board_obs[:, :, 2])  # [batch, num_hexes, d_model]
         embs = th.cat([hex_embs + terrain_emb + unit_type_embs], dim=1)
         assert tuple(embs.shape[1:]) == (BOARD_SIZE ** 2, self.d_model), embs.shape
+        remaining_turns_emb = self.remaining_turns_embedding(obs['remaining_turns'])
+        embs = th.cat([embs, remaining_turns_emb], dim=1)
         return embs
 
     def process_output_into_action_logits(self, state, trunk_out):
@@ -67,7 +73,7 @@ class MinionsDiscriminator(th.nn.Module):
         obs = self.input_linear2(obs)  # [batch, num_things, d_model]
         # Can skip the transformer entirely at first for simplicity.
         trunk_out = self.transformer(obs)  # [batch, num_things, d_model]
-        output = self.process_output_into_scalar(trunk_out)  # [batch, num_units, num_hexes]
+        output = self.process_output_into_scalar(trunk_out)  # [batch, 1]
         return output
 
     def save(self, checkpoint_path):
