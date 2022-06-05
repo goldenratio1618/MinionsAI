@@ -14,8 +14,7 @@ import shutil
 
 from minionsai.trueskill_worker import read_scores
 from minionsai.agent import Agent, RandomAIAgent, NullAgent
-
-from scoreboard_envs import ENVS
+from minionsai.scoreboard_envs import ENVS
 
 UPLOAD_PASSWORD = 'shadowL0rd'
 
