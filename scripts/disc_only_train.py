@@ -175,7 +175,10 @@ def main(run_name):
         print("====================================")
         if iteration % CHECKPOINT_EVERY == 0:
             logger.info("Saving checkpoint...")
+            # Save with more rollouts_per_turn. TODO - clean up this hack.
+            agent.rollouts_per_turn = ROLLOUTS_PER_TURN * EVAL_COMPUTE_BOOST
             agent.save(os.path.join(checkpoint_dir, f"iter_{iteration}"))
+            agent.rollouts_per_turn = ROLLOUTS_PER_TURN
 
         logger.info("Starting rollouts...")
         states, labels = rollouts(game_kwargs, [agent, agent])
