@@ -9,7 +9,7 @@ BOARD_SIZE = 5
 
 # distance function between two hexes
 def dist(xi, yi, xf, yf):
-    return max(abs(yf - yi), abs(xf - xi) + (abs(yf - yi) if xi > xf == yi > yf else 0))
+    return max(abs(yf - yi), abs(xf - xi) + (abs(yf - yi) if (xi > xf) == (yi > yf) else 0))
 
 # return an array of tuples of adjacent hexes
 def adjacent_hexes(x, y):
