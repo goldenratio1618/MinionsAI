@@ -54,8 +54,8 @@ class Translator():
         # Clip the obs to be within bounds
         remaining_turns = min(remaining_turns, self.MAX_REMAINING_TURNS)
         
-        money = min(all_money[0], self.MAX_MONEY)
-        opp_money = min(all_money[1], self.MAX_MONEY)
+        money = min(all_money[game.active_player_color], self.MAX_MONEY)
+        opp_money = min(all_money[1 - game.active_player_color], self.MAX_MONEY)
         score_diff = max(min(scores[game.active_player_color] - scores[game.inactive_player_color], self.MAX_SCORE_DIFF), -self.MAX_SCORE_DIFF) + self.MAX_SCORE_DIFF
         # TODO: Should the translator be in charge of calling ObservationEnum.encode()?
         return {
