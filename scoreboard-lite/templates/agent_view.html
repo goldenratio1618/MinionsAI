@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang = "en">
+   <head></head>
+   <body>
+      
+      <h3>
+        Agent: {{agent['name']}} (Env: <a href="/env/{{env_name}}/view">{{env_name}}</a>)
+      </h3>
+      
+
+      <table border="1px solid black">
+         <tbody>
+            <tr>
+               <td>Name</td>
+               <td>{{agent['name']}}</td>
+            </tr>
+            <tr>
+               <td>Trueskill</td>
+               <td>{{ '{:.2f}'.format(agent['trueskill']) }} +/- {{'{:.2f}'.format(agent['trueskill_sigma'])}} </td>
+            </tr>
+            <tr>
+               <td>Games</td>
+               <td>{{agent['games_played']}}</td>
+            </tr>
+            <tr>
+               <td>OK?</td>
+               <td>{{agent['ok']}}</td>
+            </tr>
+            <tr>
+               <td>Crashes</td>
+               <td><a href="crashes">{{agent['crashes']}}</a></td>
+            </tr>
+         </tbody>
+      </table>
+      <a href="delete">Delete Agent</a>
+   </body>
+</html>
