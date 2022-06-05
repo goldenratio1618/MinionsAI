@@ -92,11 +92,12 @@ class Phase(enum.Enum):
 class Game():
     def __init__(self, 
                  money=(2, 4),
-                 max_turns=20, 
                  board=None, 
-                 active_player_color=0, 
-                 phase=Phase.TURN_END,
-                 income_bonus=1):
+                 income_bonus=1,
+                 # In a fresh game we start by calling "next turn", so we start at the "end of turn negative one". 
+                 active_player_color=1,
+                 max_turns=20 + 1, 
+                 phase=Phase.TURN_END):
         """
         Important API pieces:
             game.full_turn(action_list) - process an action list for the current player
@@ -286,11 +287,12 @@ class Game():
         # if target hex is occupied by enemy unit, then attack
         elif self.board.board[xf][yf].unit.color != self.active_player_color:
             if distance > attack_range: return False
-            if self.board.board[xi][yi].unit.remainingAttack == 0: return False
             # unsummon removes non-persistent unit from board and refunds cost
             if self.board.board[xi][yi].unit.type.unsummoner and not self.board.board[xf][yf].unit.type.persistent:
                 self.money[self.inactive_player_color] += self.board.board[xf][yf].unit.type.cost
                 self.board.board[xf][yf].remove_unit()
+                return True
+            if self.board.board[xi][yi].unit.remainingAttack == 0: return False
             # attacking prevents later movement
             self.board.board[xi][yi].unit.hasMoved = True
             # flurry deals 1 attack
