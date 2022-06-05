@@ -134,28 +134,29 @@ class HumanCLIAgent(Agent):
             print("Actions so far:")
             print(f"  Move phase: {move_actions}")
             print(f"  Spawn phase: {spawn_actions}")
-            print("Type h for help")
             active_game_copy.pretty_print()
-            input = sys.stdin.readline().strip()
-            if input == "":
+            # Read user input
+            inpt = input("Enter action (h for help): ")
+            inpt = inpt.strip()
+            if inpt == "":
                 continue
-            elif input in ["e", "end"]:
+            elif inpt in ["e", "end"]:
                 break
-            elif input in ["h", "help"]:
+            elif inpt in ["h", "help"]:
                 print("""
-                (h)elp - show this help
-                (e)nd - end the turn
-                (m)ove i j k l - move a unit from (i, j) to (k, l)
-                (s)pawn X i j - spawn a unit of type X at (i, j)
+     00         (h)elp - show this help
+   01  10       (e)nd - end the turn
+ 02  11  20     (m)ove i j k l - move a unit from (i, j) to (k, l)
+     ...        (s)pawn X i j - spawn a unit of type X at (i, j)
                 (u)ndo - undo the turn
                 """)
                 continue
-            elif input in ["u", "undo"]:
+            elif inpt in ["u", "undo"]:
                 active_game_copy = game_copy.copy()
                 move_actions = []
                 spawn_actions = []
                 continue
-            input_list = input.split()
+            input_list = inpt.split()
             if input_list[0] in ["m", "move"]:
                 if len(spawn_actions) > 0:
                     print("You cannot move a unit after entering the spawn phase.")
