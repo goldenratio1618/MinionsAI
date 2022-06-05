@@ -13,13 +13,10 @@ from .agent import Agent
 from .run_game import AgentException, run_game
 from .engine import Game
 
-def get_scores_file(directory):
-    return os.path.join(directory, "scores.csv")
-
-def read_scores(env_dir):
+def read_scores(scores_file):
     # scores are stored in scores.csv
     # With columns 'name', 'trueskill', 'trueskill_sigma', 'games_played'
-    scores_file = get_scores_file(env_dir)
+
     # If the file doesn't exist, return an empty list
     if not os.path.isfile(scores_file):
         print(f"No scores file found at {scores_file}")
@@ -40,7 +37,7 @@ class TrueskillWorker():
     Runs a trueskill environment for all agents in a directory.
     Watches the directory for new agents.
     """
-    def __init__(self, directory: str, game_fn: Callable[[], Game], batch_size: int=1, restart=False):
+    def __init__(self, directory: str, game_fn: Callable[[], Game], batch_size: int=1, restart=False, scores_file=None):
         self.directory = directory
         self.game_fn = game_fn
         self.choose_underevaluated_agents_prob = 0.5
@@ -48,9 +45,10 @@ class TrueskillWorker():
         self.env = trueskill.TrueSkill(tau=0, draw_probability=0.0)
         self.dropped_agents = []
         self.max_crash_rate = 0.5
+        self.scores_file = scores_file or os.path.join(directory, "scores.csv")
 
         # Restart from from where the last thread stopped if possible.
-        prev_scores, _ = read_scores(directory)
+        prev_scores, _ = read_scores(self.scores_file)
         if restart:
             # Restart even if there was previously data
             prev_scores = []
@@ -106,10 +104,6 @@ class TrueskillWorker():
     def drop_agent(self, agent_name: str):
         self.dropped_agents.append(agent_name)
         self.agent_names.remove(agent_name)
-
-    @property
-    def scores_file(self):
-        return get_scores_file(self.directory)
 
     def save_ratings(self):
         # Save a csv with columns ['name', 'trueskill', 'trueskill_sigma', 'games_played']

@@ -43,14 +43,16 @@ class TrainedAgent(Agent):
         json.dump({
             'rollouts_per_turn': self.rollouts_per_turn,
             'd_model': self.policy.d_model,
+            'depth': self.policy.depth,
         }, open(os.path.join(directory, 'config.json'), 'w'))
 
     @classmethod
     def load_instance(cls, directory: str):
         config = json.load(open(os.path.join(directory, 'config.json')))
         d_model = config['d_model']
+        depth = config['depth']
         rollouts_per_turn = config['rollouts_per_turn']
-        model = MinionsDiscriminator(d_model=d_model)
+        model = MinionsDiscriminator(d_model=d_model, depth=depth)
         model.load_state_dict(th.load(os.path.join(directory, 'weights.pt'), map_location=th.device('cpu')))
         model.to(th.device('cpu'))  # TODO get better device if present.
 

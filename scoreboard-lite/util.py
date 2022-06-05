@@ -9,12 +9,21 @@ def list_envs():
     return envs
 
 def list_agents(env):
-    agents = os.listdir(env_dir(env))
-    agents = [a for a in agents if os.path.isdir(os.path.join(env_dir(env), a))]
+    agents = os.listdir(env_agents_dir(env))
+    agents = [a for a in agents if os.path.isdir(os.path.join(env_agents_dir(env), a))]
     return agents
 
 def env_dir(env_name):
     return os.path.join(DATA_DIR, env_name)
+
+def env_agents_dir(env_name):
+    return os.path.join(env_dir(env_name), 'active_agents')
+
+def env_deleted_agents_dir(env_name):
+    return os.path.join(env_dir(env_name), 'deleted_agents')
+
+def env_scores_file(env_name):
+    return os.path.join(env_dir(env_name), 'scores.csv')
 
 def format_timedelta(td: timedelta):
     seconds = int(td.total_seconds())
