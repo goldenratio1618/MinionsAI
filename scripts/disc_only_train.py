@@ -47,7 +47,8 @@ CHECKPOINT_EVERY = 4
 EVAL_COMPUTE_BOOST = 1
 
 # Model Size
-D_MODEL = 64
+DEPTH = 2
+D_MODEL = 64 * DEPTH
 
 # Optimizer hparams
 BATCH_SIZE = 32
@@ -98,7 +99,7 @@ def build_agent():
     generator = RandomAIAgent()
 
     logger.info("Creating policy...")
-    policy = MinionsDiscriminator(d_model=D_MODEL)
+    policy = MinionsDiscriminator(d_model=D_MODEL, depth=DEPTH)
     logger.info("Policy initialized:")
     logger.info(policy)
     logger.info(f"Policy total parameter count: {sum(p.numel() for p in policy.parameters() if p.requires_grad):,}")

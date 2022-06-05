@@ -3,7 +3,7 @@ from ..engine import BOARD_SIZE
 from ..unit_type import unitList
 
 class MinionsDiscriminator(th.nn.Module):
-    def __init__(self, d_model):
+    def __init__(self, d_model, depth):
         super().__init__()
         # TODO - get dimension from ObservationEnum objects
         self.unit_embedding = th.nn.Embedding(len(unitList) * 2 + 1, d_model)
@@ -15,7 +15,10 @@ class MinionsDiscriminator(th.nn.Module):
         self.input_linear2 = th.nn.Linear(d_model, d_model)
         # self.money_embedding = th.nn.Embedding(max_money_emb, d_model)
         # self.opponent_money_embedding = th.nn.Embedding(max_money_emb, d_model)
-        self.transformer = th.nn.Identity() # For now.
+        self.transformer = th.nn.TransformerEncoder(
+            th.nn.TransformerEncoderLayer(d_model, 8, dim_feedforward=d_model, batch_first=True),
+            num_layers=depth,
+        )
         self.value_linear1 = th.nn.Linear(d_model, d_model)
         self.value_linear2 = th.nn.Linear(d_model, 1)
 
@@ -71,7 +74,6 @@ class MinionsDiscriminator(th.nn.Module):
         obs = self.input_linear1(obs)  # [batch, num_things, d_model]
         obs = th.nn.ReLU()(obs)  # [batch, num_things, d_model]
         obs = self.input_linear2(obs)  # [batch, num_things, d_model]
-        # Can skip the transformer entirely at first for simplicity.
         trunk_out = self.transformer(obs)  # [batch, num_things, d_model]
         output = self.process_output_into_scalar(trunk_out)  # [batch, 1]
         return output
