@@ -1,4 +1,5 @@
 import argparse
+from tkinter import Y
 from minionsai.run_game import run_game
 from minionsai.discriminator_only.agent import TrainedAgent
 from minionsai.discriminator_only.model import MinionsDiscriminator
@@ -12,6 +13,10 @@ import tqdm
 import shutil
 import random
 import tempfile
+import logging
+from minionsai.metrics_logger import metrics_logger
+
+logger = logging.getLogger(__name__)
 
 # How many rollouts do we run of each turn before picking the best
 ROLLOUTS_PER_TURN = 64
@@ -43,39 +48,50 @@ game_kwargs = {}
 eval_game_kwargs = {}
 
 def find_device():
-    print("=========================")
+    logger.info("=========================")
     # set device to cpu or cuda
     if(th.cuda.is_available()): 
         device = th.device('cuda:0') 
         th.cuda.empty_cache()
-        print("Device set to : " + str(th.cuda.get_device_name(device)))
+        logger.info("Device set to : " + str(th.cuda.get_device_name(device)))
     else:
         device = th.device('cpu')
-        print("Device set to : cpu")
-    print("=========================")
+        logger.info("Device set to : cpu")
+    logger.info("=========================")
     return device
 
 def setup_directory(run_name):
+    """
+    Set up logging and checkpoint directories for a run.
+    Returns the subdirectory for checkpoints.
+    """
     tempdir = tempfile.gettempdir()
-    checkpoint_dir = os.path.join(tempdir, 'MinionsAI', run_name)
+    run_directory = os.path.join(tempdir, 'MinionsAI', run_name)
+    checkpoint_dir = os.path.join(run_directory, 'checkpoints')
     # If the directory already exists, warn the user and check if it's ok to overwrite it.
-    if os.path.exists(checkpoint_dir):
-        print(f"Checkpoint directory already exists at {checkpoint_dir}")
+    if os.path.exists(run_directory):
+        print(f"Run directory already exists at {run_directory}")
         ok = input("OK to overwrite? (y/n) ")
         if ok != "y":
             exit()
-        shutil.rmtree(checkpoint_dir)
+        shutil.rmtree(run_directory)
     os.makedirs(checkpoint_dir)
+
+    logging.basicConfig(filename=os.path.join(run_directory, 'logs.txt'), level=logging.DEBUG, 
+                        format='[%(levelname)s %(asctime)s] %(name)s: %(message)s')
+    logging.getLogger().addHandler(logging.StreamHandler())
+
+    metrics_logger.configure(os.path.join(run_directory, 'metrics.csv'))
     return checkpoint_dir
 
 def build_agent():
     generator = RandomAIAgent()
 
-    print("Creating policy...")
+    logger.info("Creating policy...")
     policy = MinionsDiscriminator(d_model=D_MODEL)
-    print("Policy initialized:")
-    print(policy)
-    print(f"Policy total parameter count: {sum(p.numel() for p in policy.parameters() if p.requires_grad):,}")
+    logger.info("Policy initialized:")
+    logger.info(policy)
+    logger.info(f"Policy total parameter count: {sum(p.numel() for p in policy.parameters() if p.requires_grad):,}")
 
     translator = Translator()
     agent = TrainedAgent(policy, translator, generator, ROLLOUTS_PER_TURN)
@@ -138,6 +154,8 @@ def eval_vs_random(agent):
 
 def main(run_name):
     checkpoint_dir = setup_directory(run_name)
+    logger.info(f"Starting run {run_name}")
+
     device = find_device()
 
     agent = build_agent()
@@ -146,20 +164,24 @@ def main(run_name):
     optimizer = th.optim.Adam(policy.parameters(), lr=LR)
 
     iteration = 0
+    turns_unique = 0
+    turns_optimized = 0
     while True:
-        
-        print("====================================")
-        print(f"=========== Iteration: {iteration} ===========")
-        print("====================================")
+        metrics_logger.log_metrics({'iteration': iteration})
+        logger.info("====================================")
+        logger.info(f"=========== Iteration: {iteration} ===========")
+        logger.info("====================================")
         if iteration % CHECKPOINT_EVERY == 0:
-            print("Saving checkpoint...")
+            logger.info("Saving checkpoint...")
             agent.save(os.path.join(checkpoint_dir, f"iter_{iteration}"))
 
-        print("Starting rollouts...")
+        logger.info("Starting rollouts...")
         states, labels = rollouts(game_kwargs, [agent, agent])
-        print("Starting training...")
+        turns_unique += len(states)
+        metrics_logger.log_metrics({'turns_unique': turns_unique})
+        logger.info("Starting training...")
         for epoch in range(SAMPLE_REUSE):
-            print(f"Epoch {epoch}")
+            logger.info(f"Epoch {epoch}")
             all_idxes = np.random.permutation(len(states))
             n_batches = len(all_idxes) // BATCH_SIZE
             final_loss = None
@@ -178,14 +200,22 @@ def main(run_name):
                 optimizer.step()
                 if idx == n_batches - 1:
                     final_loss = loss.item()
-            print(f"Loss: {final_loss}")
+                turns_optimized += len(batch_idxes)
+        # Calculate the total l2 norm of the policy parameters
+        param_norm = sum([th.norm(param, p=2) for param in policy.parameters()]).item()
+        metrics_logger.log_metrics({"loss": final_loss, 'turns_optimized': turns_optimized, 'param_norm': param_norm})
+        metrics_logger.flush()
+
+        if (iteration + 1) % EVAL_EVERY == 0:
+            # do it on -1 mod EVAL_EVERY as oppsoed to 0 mode EVAL_EVERY
+            # to avoid wasting time on step 0.
+            logger.info("Evaluating...")
+            eval_winrate = eval_vs_random(agent)
+            metrics_logger.log_metrics({"eval_winrate": eval_winrate})
+            logger.info(f"Win rate vs random = {eval_winrate}")
 
         iteration += 1
 
-        if iteration % EVAL_EVERY == 0:
-            print("Evaluating...")
-            eval_winrate = eval_vs_random()
-            print(f"Win rate vs random = {eval_winrate}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
