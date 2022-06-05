@@ -97,6 +97,9 @@ class Game():
                  new_game=True,
                  active_player_color=0,
                  max_turns=20, 
+                 symmetrize=True,
+                 min_graveyards=3,
+                 max_graveyards=8,
                  phase=Phase.TURN_END):
         """
         Important API pieces:
@@ -122,9 +125,24 @@ class Game():
         """
         if board is None:
             # starting position: captains on opposite corners with one graveyard in center
-            graveyard_locs = [(i, j) for i in range(BOARD_SIZE) for j in range(BOARD_SIZE) if random.random() < 0.25 and 1 <= i + j and i + j <= (2 * BOARD_SIZE - 3)]
+            new_graveyards = []
+            while (len(new_graveyards) < min_graveyards or len(new_graveyards) > max_graveyards):
+                graveyard_locs = [(i, j) for i in range(BOARD_SIZE) for j in range(BOARD_SIZE) if random.random() < 0.25 and 1 <= i + j and i + j <= (2 * BOARD_SIZE - 3)]
+                # symmetrize: remove graveyards with 50% probability and otherwise mirror reflect them
+                if symmetrize:
+                    new_graveyards = []
+                    for loc in graveyard_locs:
+                        i, j = loc
+                        if (i + j == BOARD_SIZE - 1):
+                            new_graveyards.append(loc)
+                        else:
+                            if random.random() < 0.5:
+                                new_graveyards.append(loc)
+                                new_graveyards.append((BOARD_SIZE - 1 - i, BOARD_SIZE - 1 - j))
+                else:
+                    new_graveyards = graveyard_locs
             water_locs = []
-            board = Board(water_locs, graveyard_locs)
+            board = Board(water_locs, new_graveyards)
             board.board[0][0].add_unit(Unit(0, NECROMANCER)) # yellow captain
             board.board[BOARD_SIZE - 1][ BOARD_SIZE - 1].add_unit(Unit(1, NECROMANCER)) # blue captain
         self.board: Board = board
