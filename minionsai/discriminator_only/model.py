@@ -47,7 +47,7 @@ class MinionsDiscriminator(th.nn.Module):
         board_obs = obs['board']
         assert tuple(board_obs.shape[1:]) == (BOARD_SIZE ** 2, 3), board_obs.shape
         hex_embs = self.hex_embedding(board_obs[:, :, 0])  # [batch, num_hexes, d_model]
-        terrain_emb = self.hex_embedding(board_obs[:, :, 1])  # [batch, num_hexes, d_model]
+        terrain_emb = self.terrain_embedding(board_obs[:, :, 1])  # [batch, num_hexes, d_model]
         unit_type_embs = self.unit_embedding(board_obs[:, :, 2])  # [batch, num_hexes, d_model]
         embs = th.cat([hex_embs + terrain_emb + unit_type_embs], dim=1)
         assert tuple(embs.shape[1:]) == (BOARD_SIZE ** 2, self.d_model), embs.shape
