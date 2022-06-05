@@ -46,6 +46,7 @@ def env_view(env_name):
         if agent not in agent_names:
             agents.append([agent, "N/A", 0, "N/A", "N/A"])
 
+
     # Calculate last updaet time of the file
     if last_update is not None:
         time_since_last_update = format_timedelta(datetime.datetime.now() - last_update)
@@ -116,10 +117,10 @@ def agent_view(env_name, agent_name):
     agent = matching_agents[0]
     return render_template('agent_view.html', env_name=env_name, agent=agent)
 
-@app.route("/env/<env_name>/agent/<agent_name>/delete")
+@app.route("/env/<env_name>/agent/<agent_name>/delete", methods=['POST'])
 def agent_delete(env_name, agent_name):
     shutil.move(os.path.join(env_agents_dir(env_name), agent_name), os.path.join(env_deleted_agents_dir(env_name)))
-    return env_view(env_name)
+    return redirect(url_for('env_view', env_name=env_name))
 
 if __name__ == '__main__':
     verify_envs_setup()
