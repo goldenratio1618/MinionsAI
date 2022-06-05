@@ -94,9 +94,9 @@ class Game():
                  money=(2, 4),
                  board=None, 
                  income_bonus=1,
-                 # In a fresh game we start by calling "next turn", so we start at the "end of turn negative one". 
-                 active_player_color=1,
-                 max_turns=20 + 1, 
+                 new_game=True,
+                 active_player_color=0,
+                 max_turns=20, 
                  phase=Phase.TURN_END):
         """
         Important API pieces:
@@ -137,6 +137,13 @@ class Game():
         self.phase: Phase = phase
 
         self.remaining_turns: int = max_turns
+
+        if new_game:
+            # Because we are going to call "next_turn()" before the start of the first turn,
+            # The game really starts at the end of turn negative 1.
+            self.remaining_turns += 1
+            self.active_player_color = 1 - self.active_player_color
+            assert self.phase == Phase.TURN_END, "New game should start with TURN_END phase."
 
     @property
     def done(self) -> bool:
@@ -224,7 +231,7 @@ class Game():
     def process_single_action(self, action: Action) -> bool:
         if self.phase == Phase.MOVE:
             # Note: We need to compare the names not the enum types,
-            # in case the agent submitted an action from their local copy of teh codebase
+            # in case the agent submitted an action from their local copy of the codebase
             # which is technically a different enum type.
             if action.action_type.name == ActionType.MOVE.name:
                 return self.process_single_move(action)
@@ -380,7 +387,8 @@ class Game():
                     board=self.board.copy(), 
                     active_player_color=self.active_player_color, 
                     phase=self.phase,
-                    income_bonus=self.income_bonus)
+                    income_bonus=self.income_bonus,
+                    new_game=False)
 
 class Unit():
     def __init__(self, color, unit_type):
