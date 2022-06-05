@@ -61,7 +61,7 @@ eval_game_kwargs = {}
 def find_device():
     logger.info("=========================")
     # set device to cpu or cuda
-    if(th.cuda.is_available()): 
+    if (th.cuda.is_available()): 
         device = th.device('cuda:0') 
         th.cuda.empty_cache()
         logger.info("Device set to : " + str(th.cuda.get_device_name(device)))

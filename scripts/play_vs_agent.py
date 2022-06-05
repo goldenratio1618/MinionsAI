@@ -12,6 +12,7 @@ def main(agent_dir=None):
         agent = RandomAIAgent()
     else:
         agent = Agent.load(agent_dir)
+        agent.verbose_level = 1
     game = Game()
     winner = run_game(game, (HumanCLIAgent(), agent))
     print("Game over.\nWinner:", winner)
