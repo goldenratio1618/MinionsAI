@@ -150,17 +150,25 @@ class Game():
         return self.remaining_turns <= 0
 
     @property
-    def winner(self) -> int:
+    def get_scores(self):
         """
-        Returns index of winning player (0 or 1)
+        Returns scores of both players.
         """
-        assert self.done
         scores = np.array([0, 0])
         scores += self.money
         for unit, _ in self.units_with_locations():
             if unit.type != NECROMANCER:
                 scores[unit.color] += unit.type.cost
-        return np.argmax(scores)
+        return scores
+        
+
+    @property
+    def winner(self) -> int:
+        """
+        Returns index of winning player (0 or 1)
+        """
+        assert self.done
+        return np.argmax(self.get_scores)
 
     @property
     def inactive_player_color(self) -> int:

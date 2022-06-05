@@ -11,6 +11,9 @@ class MinionsDiscriminator(th.nn.Module):
         self.hex_embedding = th.nn.Embedding(BOARD_SIZE ** 2, d_model)
         self.terrain_embedding = th.nn.Embedding(3, d_model)
         self.remaining_turns_embedding = th.nn.Embedding(21, d_model)
+        self.money_embedding = th.nn.Embedding(21, d_model)
+        self.opp_money_embedding = th.nn.Embedding(21, d_model)
+        self.score_diff_embedding = th.nn.Embedding(41, d_model)
         self.input_linear1 = th.nn.Linear(d_model, d_model)
         self.input_linear2 = th.nn.Linear(d_model, d_model)
         # self.money_embedding = th.nn.Embedding(max_money_emb, d_model)
@@ -52,7 +55,10 @@ class MinionsDiscriminator(th.nn.Module):
         embs = th.cat([hex_embs + terrain_emb + unit_type_embs], dim=1)
         assert tuple(embs.shape[1:]) == (BOARD_SIZE ** 2, self.d_model), embs.shape
         remaining_turns_emb = self.remaining_turns_embedding(obs['remaining_turns'])
-        embs = th.cat([embs, remaining_turns_emb], dim=1)
+        money_emb = self.money_embedding(obs['money'])
+        opp_money_emb = self.opp_money_embedding(obs['opp_money'])
+        score_diff_emb = self.score_diff_embedding(obs['score_diff'])
+        embs = th.cat([embs, remaining_turns_emb, money_emb, opp_money_emb, score_diff_emb], dim=1)
         return embs
 
     def process_output_into_action_logits(self, state, trunk_out):

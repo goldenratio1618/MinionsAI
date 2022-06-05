@@ -29,6 +29,8 @@ class Translator():
     TERRAIN_TYPES = ObservationEnum(['none', 'water', 'graveyard'])
 
     MAX_REMAINING_TURNS = 20
+    MAX_MONEY = 20
+    MAX_SCORE_DIFF = 20
     REMAINING_TURNS = ObservationEnum(list(range(MAX_REMAINING_TURNS + 1)))
 
     def translate(self, game: Game):
@@ -47,10 +49,19 @@ class Translator():
             ])
 
         remaining_turns = game.remaining_turns
+        all_money = game.money
+        scores = game.get_scores
         # Clip the obs to be within bounds
         remaining_turns = min(remaining_turns, self.MAX_REMAINING_TURNS)
+        
+        money = min(all_money[0], self.MAX_MONEY)
+        opp_money = min(all_money[1], self.MAX_MONEY)
+        score_diff = max(min(scores[game.active_player_color] - scores[game.inactive_player_color], self.MAX_SCORE_DIFF), -self.MAX_SCORE_DIFF) + self.MAX_SCORE_DIFF
         # TODO: Should the translator be in charge of calling ObservationEnum.encode()?
         return {
             'board': np.array([board_obs]),
-            'remaining_turns': np.array([[remaining_turns]])  # shape is [batch, num_items]
+            'remaining_turns': np.array([[remaining_turns]]),  # shape is [batch, num_items]
+            'money': np.array([[money]]),
+            'opp_money': np.array([[opp_money]]),
+            'score_diff': np.array([[score_diff]])
         }
