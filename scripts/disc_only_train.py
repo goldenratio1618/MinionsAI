@@ -29,7 +29,12 @@ from minionsai.metrics_logger import metrics_logger
 logger = logging.getLogger(__name__)
 
 # How many rollouts do we run of each turn before picking the best
-ROLLOUTS_PER_TURN = 64
+ROLLOUTS_PER_TURN_FINAL = 4096
+
+ROLLOUTS_PER_TURN_INITIAL = 1
+
+ROLLOUT_DOUBLE_INTERVALS = [128, 96, 64, 48, 32, 24, 16, 12, 8, 6, 4, 3, 2]
+ROLLOUT_DOUBLE_TIMES = np.cumsum(ROLLOUT_DOUBLE_INTERVALS)
 
 # How many episodes of data do we collect each iteration, before running a few epochs of optimization?
 # Potentially good to use a few times bigger EPISODES_PER_ITERATION than BATCH_SIZE, to minimize correlation within batches
@@ -38,14 +43,10 @@ EPISODES_PER_ITERATION = 128
 # Once we've collected the data, how many times do we go over it for optimization (within one iteration)?
 SAMPLE_REUSE = 3
 
-# Frequency of running evals vs random agent
-EVAL_EVERY = 4
-
-# Frequency of storing a saved agent
-CHECKPOINT_EVERY = 4
+SAVES_PER_INTERVAL = 2
 
 # During evals, run this many times extra rollouts compared to during rollout generation
-EVAL_COMPUTE_BOOST = 1
+EVAL_COMPUTE = 4096
 
 # Model Size
 DEPTH = 2
@@ -107,7 +108,7 @@ def build_agent():
     logger.info(f"Policy total parameter count: {sum(p.numel() for p in policy.parameters() if p.requires_grad):,}")
 
     translator = Translator()
-    agent = TrainedAgent(policy, translator, generator, ROLLOUTS_PER_TURN)
+    agent = TrainedAgent(policy, translator, generator, ROLLOUTS_PER_TURN_FINAL)
     return agent
 
 # TODO - use run_game instead, with a custom Agent subclass that remembers the states.
@@ -117,6 +118,7 @@ def single_rollout(game_kwargs, agents):
 
     game = Game(**game_kwargs)
     state_buffers = [[], []]  # one for each player
+    t = 0
     while True:
         game.next_turn()
         if game.done:
@@ -158,7 +160,7 @@ def eval_vs_random(agent):
     games = 0
     for i in tqdm.tqdm(range(100)):
         random_agent = RandomAIAgent()
-        good_agent = TrainedAgent(agent.policy, agent.translator, agent.generator, ROLLOUTS_PER_TURN * EVAL_COMPUTE_BOOST)
+        good_agent = TrainedAgent(agent.policy, agent.translator, agent.generator, EVAL_COMPUTE)
         good_idx = i % 2
 
         agents = [None, None]
@@ -186,18 +188,19 @@ def main(run_name):
     iteration = 0
     turns_optimized = 0
     rollout_stats = defaultdict(int)
-    while True:
+    while iteration < ROLLOUT_DOUBLE_TIMES[-1]:
         metrics_logger.log_metrics({'iteration': iteration})
         print()
         print("====================================")
         logger.info(f"=========== Iteration: {iteration} ===========")
         print("====================================")
-        if iteration % CHECKPOINT_EVERY == 0:
+        if iteration in ROLLOUT_DOUBLE_TIMES or iteration in ROLLOUT_DOUBLE_TIMES//SAVES_PER_INTERVAL:
             logger.info("Saving checkpoint...")
             # Save with more rollouts_per_turn. TODO - clean up this hack.
-            agent.rollouts_per_turn = ROLLOUTS_PER_TURN * EVAL_COMPUTE_BOOST
+            agent.rollouts_per_turn = EVAL_COMPUTE
             agent.save(os.path.join(checkpoint_dir, f"iter_{iteration}"))
-            agent.rollouts_per_turn = ROLLOUTS_PER_TURN
+
+        agent.rollouts_per_turn = 2**np.argmin(iteration > ROLLOUT_DOUBLE_TIMES)
 
         logger.info("Starting rollouts...")
         states, labels, rollout_info = rollouts(game_kwargs, [agent, agent])
@@ -233,7 +236,7 @@ def main(run_name):
 
         iteration += 1
 
-        if iteration % EVAL_EVERY == 0:
+        if iteration in ROLLOUT_DOUBLE_TIMES or iteration in ROLLOUT_DOUBLE_TIMES//SAVES_PER_INTERVAL:
             logger.info("Evaluating...")
             eval_winrate = eval_vs_random(agent)
             metrics_logger.log_metrics({"eval_winrate": eval_winrate})
