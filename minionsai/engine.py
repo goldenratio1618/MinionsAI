@@ -1,3 +1,4 @@
+import copy
 import enum
 import random
 from typing import Tuple
@@ -38,7 +39,9 @@ class Board():
             b.board[i][j].is_water = hex.is_water
             b.board[i][j].is_graveyard = hex.is_graveyard
             if hex.unit is not None:
-                b.board[i][j].add_unit(Unit(color=hex.unit.color, unit_type=hex.unit.type))
+                copied_unit = copy.deepcopy(hex.unit)
+                print(copied_unit.curr_health)
+                b.board[i][j].add_unit(copied_unit)
         return b
 
     def board_properties(self):

@@ -49,6 +49,8 @@ if __name__ == "__main__":
             print(f"Using specified iter: {args.iter}")
             iter = args.iter
         path = os.path.join(agents_dir, f"iter_{iter}")
+    else:
+        path = None
     print(f"Getting agent from: {path}")
 
     main(path)
