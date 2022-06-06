@@ -81,7 +81,7 @@ int main() {
 
     line[0] = '\0';
     while (strcmp(line, "Your turn\n") != 0) {
-      usleep(100); // sleep for 0.1 ms
+      usleep(10); // sleep for 0.1 ms
       char * captain = " N ";
       char * zombie = " Z ";
       char * graveyard = " True\n";
@@ -170,7 +170,7 @@ int main() {
           int y = adjacent_hexes[i].y;
           if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
           if (zombies [x * BOARD_SIZE + y] == 1 - color) {
-            printf("%d %d %d %d\n", xf, yf, x, y);
+            printf("%d %d %d %d\n", xi, yi, x, y);
             goto ZOMBIE_END;
           }
         }
@@ -184,7 +184,7 @@ int main() {
               && zombies[x * BOARD_SIZE + y] == -1 
               && (enemy_captain.x != x || enemy_captain.y != y)
               && (own_captain.x != x || own_captain.y != y)) {
-            printf("%d %d %d %d\n", xi, xf, x, y);
+            printf("%d %d %d %d\n", xi, yi, x, y);
             goto ZOMBIE_END;
           }
         }
