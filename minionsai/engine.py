@@ -40,7 +40,6 @@ class Board():
             b.board[i][j].is_graveyard = hex.is_graveyard
             if hex.unit is not None:
                 copied_unit = copy.deepcopy(hex.unit)
-                print(copied_unit.curr_health)
                 b.board[i][j].add_unit(copied_unit)
         return b
 
