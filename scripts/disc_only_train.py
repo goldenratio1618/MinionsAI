@@ -32,8 +32,9 @@ logger = logging.getLogger(__name__)
 ROLLOUTS_PER_TURN = 64
 
 # How many episodes of data do we collect each iteration, before running a few epochs of optimization?
-# Potentially good to use a few times bigger EPISODES_PER_ITERATION than BATCH_SIZE, to minimize correlation within batches
-EPISODES_PER_ITERATION = 128  
+# Potentially good to use a few times bigger EPISODES_PER_ITERATION * DATA_AUG_FACTOR than BATCH_SIZE, to minimize correlation within batches
+# (DATA_AUG_FACTOR = 4)
+EPISODES_PER_ITERATION = 64
 
 # Once we've collected the data, how many times do we go over it for optimization (within one iteration)?
 SAMPLE_REUSE = 3
@@ -154,12 +155,11 @@ def rollouts(game_kwargs, agents):
     states = {k: np.concatenate([s[k] for s in states], axis=0) for k in states[0]}
     
     # Add symmetries
-    # symmetrized_states = Translator.symmetries(states)
-    symmetrized_states = [states]
+    symmetrized_states = Translator.symmetries(states)
 
     # Now combine them into one big states dict
     states = {k: np.concatenate([s[k] for s in symmetrized_states], axis=0) for k in states}
-    labels = np.repeat(labels, len(symmetrized_states))
+    labels = np.concatenate([labels]*len(symmetrized_states), axis=0)
     # Log instantaneous metrics here, and send cumulative out to the main control flow to integrate
     metrics_logger.log_metrics({'first_player_winrate': first_player_wins / games})
     return states, labels, {'rollout_games': games, 'rollout_states': rollout_states}

@@ -70,11 +70,13 @@ class Translator():
     def symmetries(obs):
         # Takes an obs that came out of translator.translate()
         # and returns a list of symmetric observations
+        # TODO(david) - this function really should be tested.
         board = obs['board']
         num = board.shape[0]
         board = np.reshape(board, [num, BOARD_SIZE, BOARD_SIZE, 3])
-        flipped_boards = [board, np.transpose(board, axes=[0, 2, 1, 3])]
-        all_boards = [np.flip(np.flip(b, axis=1), axis=2) for b in flipped_boards]
+        all_boards = [board, np.transpose(board, axes=[0, 2, 1, 3])]
+        rotated_boards = [np.flip(np.flip(b, axis=1), axis=2) for b in all_boards]
+        all_boards = all_boards + rotated_boards
         all_boards = [np.reshape(b, [num, BOARD_SIZE ** 2, 3]) for b in all_boards]
         return [{
             'board': b,
