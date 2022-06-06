@@ -211,7 +211,9 @@ def main(run_name):
             agent.rollouts_per_turn = ROLLOUTS_PER_TURN
 
         logger.info("Starting rollouts...")
+        policy.eval()  # Set policy to non-training mode
         states, labels, rollout_info = rollouts(game_kwargs, [agent, agent])
+        policy.train()  # Set policy back to training mode
         for k, v in rollout_info.items():
             rollout_stats[k] += v
         metrics_logger.log_metrics(rollout_stats)
@@ -221,7 +223,6 @@ def main(run_name):
             logger.info(f"  Epoch {epoch}/{SAMPLE_REUSE}...")
             all_idxes = np.random.permutation(num_states)
             n_batches = num_states // BATCH_SIZE
-            final_loss = None
             for idx in range(n_batches):
                 batch_idxes = all_idxes[idx * BATCH_SIZE: (idx + 1) * BATCH_SIZE]
                 batch_obs = {}
@@ -235,19 +236,22 @@ def main(run_name):
                 loss = th.nn.BCEWithLogitsLoss()(disc_logprob, batch_labels)
                 loss.backward()
                 optimizer.step()
-                if idx == n_batches - 1:
-                    final_loss = loss.item()
+                if idx in [0, n_batches // 2, n_batches - 1]:
+                    max_batch_digits = len(str(n_batches))
+                    metrics_logger.log_metrics({f"loss/epoch_{epoch}/batch_{idx:0>{max_batch_digits}}": loss.item()})
                 turns_optimized += len(batch_idxes)
         logger.info(f"Iteration {iteration} complete.")
         param_norm = sum([th.norm(param, p=2) for param in policy.parameters()]).item()
-        metrics_logger.log_metrics({"loss": final_loss, 'turns_optimized': turns_optimized, 'param_norm': param_norm})
+        metrics_logger.log_metrics({'turns_optimized': turns_optimized, 'param_norm': param_norm})
         metrics_logger.flush()
 
         iteration += 1
 
         if iteration % EVAL_EVERY == 0:
             logger.info("Evaluating...")
+            policy.eval()  # Set policy back to training mode
             eval_winrate = eval_vs_random(agent)
+            policy.train()  # Set policy back to training mode
             metrics_logger.log_metrics({"eval_winrate": eval_winrate})
             logger.info(f"Win rate vs random = {eval_winrate}")
 

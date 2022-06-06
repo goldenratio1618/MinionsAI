@@ -55,6 +55,7 @@ class TrainedAgent(Agent):
         model = MinionsDiscriminator(d_model=d_model, depth=depth)
         model.load_state_dict(th.load(os.path.join(directory, 'weights.pt'), map_location=th.device('cpu')))
         model.to(th.device('cpu'))  # TODO get better device if present.
+        model.eval()  # Set to eval mode to disable dropout, etc.
 
         agent = TrainedAgent(model, Translator(), RandomAIAgent(), rollouts_per_turn)
         return agent
