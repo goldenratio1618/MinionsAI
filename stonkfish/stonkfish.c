@@ -164,17 +164,6 @@ int main() {
         zombie_loc.y = yi;
         get_adjacent_hexes(adjacent_hexes, &zombie_loc);
 
-        // attack enemy zombies with other zombies
-        for (int i = 0; i < 6; i ++) {
-          int x = adjacent_hexes[i].x;
-          int y = adjacent_hexes[i].y;
-          if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
-          if (zombies [x * BOARD_SIZE + y] == 1 - color) {
-            printf("%d %d %d %d\n", xi, yi, x, y);
-            goto ZOMBIE_END;
-          }
-        }
-
         // move zombies onto graveyards (if not there already)
         for (int i = 0; i < 6; i ++) {
           int x = adjacent_hexes[i].x;
@@ -184,6 +173,17 @@ int main() {
               && zombies[x * BOARD_SIZE + y] == -1 
               && (enemy_captain.x != x || enemy_captain.y != y)
               && (own_captain.x != x || own_captain.y != y)) {
+            printf("%d %d %d %d\n", xi, yi, x, y);
+            goto ZOMBIE_END;
+          }
+        }
+
+        // attack enemy zombies with other zombies
+        for (int i = 0; i < 6; i ++) {
+          int x = adjacent_hexes[i].x;
+          int y = adjacent_hexes[i].y;
+          if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
+          if (zombies [x * BOARD_SIZE + y] == 1 - color) {
             printf("%d %d %d %d\n", xi, yi, x, y);
             goto ZOMBIE_END;
           }
