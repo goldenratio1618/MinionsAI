@@ -47,7 +47,7 @@ SAMPLE_REUSE = 3
 SAVES_PER_INTERVAL = 2
 
 # During evals, run this many times extra rollouts compared to during rollout generation
-EVAL_COMPUTE = 4096
+EVAL_COMPUTE = 1024
 
 # Model Size
 DEPTH = 2
