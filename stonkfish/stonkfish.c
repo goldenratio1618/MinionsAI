@@ -189,6 +189,10 @@ int main() {
           }
         }
 
+        // stay still if on a graveyard already
+        if (graveyards[xi * BOARD_SIZE + yi])
+          goto ZOMBIE_END;
+
         // move zombies randomly
         for (int i = 0; i < 6; i ++) {
           int x = adjacent_hexes[i].x;
