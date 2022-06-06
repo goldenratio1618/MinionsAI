@@ -44,14 +44,9 @@ void get_adjacent_hexes(location * adjacent, location * my_loc) {
   adjacent[5].y ++;
 }
 
-void clear_zombies(int * board) {
+void set_value(int * board, int value) {
   for (int i = 0; i < BOARD_SIZE * BOARD_SIZE; i ++)
-    board[i] = -1;
-}
-
-void clear_graveyards(int * board) {
-  for (int i = 0; i < BOARD_SIZE * BOARD_SIZE; i ++)
-    board[i] = 0;
+    board[i] = value;
 }
 
 int main() {
@@ -65,6 +60,8 @@ int main() {
 
   // zombies on board (-1 for empty, 0/1 for color)
   int zombies [BOARD_SIZE * BOARD_SIZE];
+  // damaged zombies (1 for damaged, 0 for absent or full health)
+  int damaged_zombies [BOARD_SIZE * BOARD_SIZE];
 
   // timer (to determine when Python parent function has died)
   signal(SIGALRM, sig_handler);
@@ -76,8 +73,9 @@ int main() {
     alarm(TIMEOUT);
 
     // reset graveyards and zombies
-    clear_graveyards(graveyards);
-    clear_zombies(zombies);
+    set_value(graveyards, 0);
+    set_value(zombies, -1);
+    set_value(damaged_zombies, 0);
 
     line[0] = '\0';
     while (strcmp(line, "Your turn\n") != 0) {
@@ -133,6 +131,18 @@ int main() {
         zombie_loc.y = yi;
         get_adjacent_hexes(adjacent_hexes, &zombie_loc);
 
+        // attack damaged enemy zombies
+        for (int i = 0; i < 6; i ++) {
+          int x = adjacent_hexes[i].x;
+          int y = adjacent_hexes[i].y;
+          if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
+          if (damaged_zombies [x * BOARD_SIZE + y]) {
+            printf("%d %d %d %d\n", xi, yi, x, y);
+            damaged_zombies[x * BOARD_SIZE + y] = 0;
+            goto ZOMBIE_END;
+          }
+        }
+
         // move zombies onto graveyards (if not there already)
         for (int i = 0; i < 6; i ++) {
           int x = adjacent_hexes[i].x;
@@ -154,6 +164,7 @@ int main() {
           if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
           if (zombies [x * BOARD_SIZE + y] == 1 - color) {
             printf("%d %d %d %d\n", xi, yi, x, y);
+            damaged_zombies[x * BOARD_SIZE + y] = 1;
             goto ZOMBIE_END;
           }
         }
