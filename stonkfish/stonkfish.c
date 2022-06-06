@@ -44,14 +44,9 @@ void get_adjacent_hexes(location * adjacent, location * my_loc) {
   adjacent[5].y ++;
 }
 
-void clear_zombies(int * board) {
+void set_value(int * board, int value) {
   for (int i = 0; i < BOARD_SIZE * BOARD_SIZE; i ++)
-    board[i] = -1;
-}
-
-void clear_graveyards(int * board) {
-  for (int i = 0; i < BOARD_SIZE * BOARD_SIZE; i ++)
-    board[i] = 0;
+    board[i] = value;
 }
 
 int main() {
@@ -65,6 +60,8 @@ int main() {
 
   // zombies on board (-1 for empty, 0/1 for color)
   int zombies [BOARD_SIZE * BOARD_SIZE];
+  // damaged zombies (1 for damaged, 0 for absent or full health)
+  int damaged_zombies [BOARD_SIZE * BOARD_SIZE];
 
   // timer (to determine when Python parent function has died)
   signal(SIGALRM, sig_handler);
@@ -76,12 +73,13 @@ int main() {
     alarm(TIMEOUT);
 
     // reset graveyards and zombies
-    clear_graveyards(graveyards);
-    clear_zombies(zombies);
+    set_value(graveyards, 0);
+    set_value(zombies, -1);
+    set_value(damaged_zombies, 0);
 
     line[0] = '\0';
     while (strcmp(line, "Your turn\n") != 0) {
-      usleep(100); // sleep for 0.1 ms
+      usleep(10); // sleep for 0.1 ms
       char * captain = " N ";
       char * zombie = " Z ";
       char * graveyard = " True\n";
@@ -122,6 +120,77 @@ int main() {
         return 0;
       }
     }
+    
+    // zombie movement
+    for (int xi = 0; xi < BOARD_SIZE; xi ++) {
+      for (int yi = 0; yi < BOARD_SIZE; yi ++) {
+        // see if you have a zombie
+        if (zombies [xi * BOARD_SIZE + yi] != color) continue;
+        location zombie_loc;
+        zombie_loc.x = xi;
+        zombie_loc.y = yi;
+        get_adjacent_hexes(adjacent_hexes, &zombie_loc);
+
+        // attack damaged enemy zombies
+        for (int i = 0; i < 6; i ++) {
+          int x = adjacent_hexes[i].x;
+          int y = adjacent_hexes[i].y;
+          if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
+          if (damaged_zombies [x * BOARD_SIZE + y]) {
+            printf("%d %d %d %d\n", xi, yi, x, y);
+            damaged_zombies[x * BOARD_SIZE + y] = 0;
+            goto ZOMBIE_END;
+          }
+        }
+
+        // move zombies onto graveyards (if not there already)
+        for (int i = 0; i < 6; i ++) {
+          int x = adjacent_hexes[i].x;
+          int y = adjacent_hexes[i].y;
+          if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
+          if (graveyards[x * BOARD_SIZE + y] 
+              && zombies[x * BOARD_SIZE + y] == -1 
+              && (enemy_captain.x != x || enemy_captain.y != y)
+              && (own_captain.x != x || own_captain.y != y)) {
+            printf("%d %d %d %d\n", xi, yi, x, y);
+            goto ZOMBIE_END;
+          }
+        }
+
+        // attack enemy zombies with other zombies
+        for (int i = 0; i < 6; i ++) {
+          int x = adjacent_hexes[i].x;
+          int y = adjacent_hexes[i].y;
+          if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
+          if (zombies [x * BOARD_SIZE + y] == 1 - color) {
+            printf("%d %d %d %d\n", xi, yi, x, y);
+            damaged_zombies[x * BOARD_SIZE + y] = 1;
+            goto ZOMBIE_END;
+          }
+        }
+
+        // stay still if on a graveyard already
+        if (graveyards[xi * BOARD_SIZE + yi])
+          goto ZOMBIE_END;
+
+        // move zombies randomly
+        for (int i = 0; i < 6; i ++) {
+          int x = adjacent_hexes[i].x;
+          int y = adjacent_hexes[i].y;
+          if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
+          if (zombies[x * BOARD_SIZE + y] == -1 
+              && (enemy_captain.x != x || enemy_captain.y != y)
+              && (own_captain.x != x || own_captain.y != y)) {
+            printf("%d %d %d %d\n", xi, yi, x, y);
+            goto ZOMBIE_END;
+          }
+        }
+
+        ZOMBIE_END:
+          continue;
+      }
+    }
+
     // movement: charge enemy captain
     int xi, yi, xf, yf;
     xi = own_captain.x;
@@ -153,60 +222,6 @@ int main() {
         break;
       }
     }
-    
-    // zombie movement
-    for (int xi = 0; xi < BOARD_SIZE; xi ++) {
-      for (int yi = 0; yi < BOARD_SIZE; yi ++) {
-        // see if you have a zombie
-        if (zombies [xi * BOARD_SIZE + yi] != color) continue;
-        location zombie_loc;
-        zombie_loc.x = xi;
-        zombie_loc.y = yi;
-        get_adjacent_hexes(adjacent_hexes, &zombie_loc);
-
-        // attack enemy zombies with other zombies
-        for (int i = 0; i < 6; i ++) {
-          int x = adjacent_hexes[i].x;
-          int y = adjacent_hexes[i].y;
-          if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
-          if (zombies [x * BOARD_SIZE + y] == 1 - color) {
-            printf("%d %d %d %d\n", xf, yf, x, y);
-            goto ZOMBIE_END;
-          }
-        }
-
-        // move zombies onto graveyards (if not there already)
-        for (int i = 0; i < 6; i ++) {
-          int x = adjacent_hexes[i].x;
-          int y = adjacent_hexes[i].y;
-          if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
-          if (graveyards[x * BOARD_SIZE + y] 
-              && zombies[x * BOARD_SIZE + y] == -1 
-              && (enemy_captain.x != x || enemy_captain.y != y)
-              && (own_captain.x != x || own_captain.y != y)) {
-            printf("%d %d %d %d\n", xi, xf, x, y);
-            goto ZOMBIE_END;
-          }
-        }
-
-        // move zombies randomly
-        for (int i = 0; i < 6; i ++) {
-          int x = adjacent_hexes[i].x;
-          int y = adjacent_hexes[i].y;
-          if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
-          if (zombies[x * BOARD_SIZE + y] == -1 
-              && (enemy_captain.x != x || enemy_captain.y != y)
-              && (own_captain.x != x || own_captain.y != y)) {
-            printf("%d %d %d %d\n", xi, xf, x, y);
-            goto ZOMBIE_END;
-          }
-        }
-
-        ZOMBIE_END:
-          continue;
-      }
-    }
-
 
     // end move phase
     printf("\n");

@@ -37,8 +37,9 @@ ROLLOUT_DOUBLE_INTERVALS = [128, 96, 64, 48, 32, 24, 16, 12, 8, 6, 4, 3, 2]
 ROLLOUT_DOUBLE_TIMES = np.cumsum(ROLLOUT_DOUBLE_INTERVALS)
 
 # How many episodes of data do we collect each iteration, before running a few epochs of optimization?
-# Potentially good to use a few times bigger EPISODES_PER_ITERATION than BATCH_SIZE, to minimize correlation within batches
-EPISODES_PER_ITERATION = 128  
+# Potentially good to use a few times bigger EPISODES_PER_ITERATION * DATA_AUG_FACTOR than BATCH_SIZE, to minimize correlation within batches
+# (DATA_AUG_FACTOR = 4)
+EPISODES_PER_ITERATION = 64
 
 # Once we've collected the data, how many times do we go over it for optimization (within one iteration)?
 SAMPLE_REUSE = 3
@@ -151,9 +152,19 @@ def rollouts(game_kwargs, agents):
         games += 1
         if winning_color == 0:
             first_player_wins += 1
+    rollout_states = len(states)
+    # convert from list of dicts of arrays to a single dict of arrays with large batch dimension
+    states = {k: np.concatenate([s[k] for s in states], axis=0) for k in states[0]}
+    
+    # Add symmetries
+    symmetrized_states = Translator.symmetries(states)
+
+    # Now combine them into one big states dict
+    states = {k: np.concatenate([s[k] for s in symmetrized_states], axis=0) for k in states}
+    labels = np.concatenate([labels]*len(symmetrized_states), axis=0)
     # Log instantaneous metrics here, and send cumulative out to the main control flow to integrate
     metrics_logger.log_metrics({'first_player_winrate': first_player_wins / games})
-    return states, labels, {'rollout_games': games, 'rollout_states': len(states)}
+    return states, labels, {'rollout_games': games, 'rollout_states': rollout_states}
 
 def eval_vs_random(agent):
     wins = 0
@@ -208,16 +219,17 @@ def main(run_name):
             rollout_stats[k] += v
         metrics_logger.log_metrics(rollout_stats)
         logger.info("Starting training...")
+        num_states = states['board'].shape[0]
         for epoch in range(SAMPLE_REUSE):
             logger.info(f"  Epoch {epoch}/{SAMPLE_REUSE}...")
-            all_idxes = np.random.permutation(len(states))
-            n_batches = len(all_idxes) // BATCH_SIZE
+            all_idxes = np.random.permutation(num_states)
+            n_batches = num_states // BATCH_SIZE
             final_loss = None
             for idx in range(n_batches):
                 batch_idxes = all_idxes[idx * BATCH_SIZE: (idx + 1) * BATCH_SIZE]
                 batch_obs = {}
-                for key in states[0]:
-                    batch_obs[key] = np.concatenate([states[i][key] for i in batch_idxes], axis=0)
+                for key in states:
+                    batch_obs[key] = states[key][batch_idxes]
                 batch_labels = np.array(labels)[batch_idxes]
                 batch_labels = th.from_numpy(batch_labels).to(device)
                 optimizer.zero_grad()
