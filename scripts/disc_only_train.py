@@ -40,7 +40,7 @@ EPISODES_PER_ITERATION = 64
 SAMPLE_REUSE = 3
 
 # Frequency of running evals vs random agent
-EVAL_EVERY = 2
+EVAL_EVERY = 4
 
 # Frequency of storing a saved agent
 CHECKPOINT_EVERY = 4
