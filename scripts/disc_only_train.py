@@ -249,7 +249,7 @@ def main(run_name):
 
         if iteration % EVAL_EVERY == 0:
             logger.info("Evaluating...")
-            policy.eval()  # Set policy back to training mode
+            policy.eval()  # Set policy to non-training mode
             eval_winrate = eval_vs_random(agent)
             policy.train()  # Set policy back to training mode
             metrics_logger.log_metrics({"eval_winrate": eval_winrate})
