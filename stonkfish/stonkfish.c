@@ -122,37 +122,6 @@ int main() {
         return 0;
       }
     }
-    // movement: charge enemy captain
-    int xi, yi, xf, yf;
-    xi = own_captain.x;
-    yi = own_captain.y;
-    xf = xi;
-    yf = yi;
-    if (abs(yf - enemy_captain.y) >= abs(xf - enemy_captain.x))
-      yf -= sign(own_captain.y - enemy_captain.y);
-    else
-      xf -= sign(own_captain.x - enemy_captain.x);
-    location new_loc;
-    if (zombies[xf * BOARD_SIZE + yf] != (1-color) && (enemy_captain.x != xf || enemy_captain.y != yf)) {
-      printf("%d %d %d %d\n", xi, yi, xf, yf);
-    } else {
-      xf = xi;
-      yf = yi;
-    }
-    new_loc.x = xf;
-    new_loc.y = yf;
-
-    // attack enemy zombies with captain
-    get_adjacent_hexes(adjacent_hexes, &new_loc);
-    for (int i = 0; i < 6; i ++) {
-      int x = adjacent_hexes[i].x;
-      int y = adjacent_hexes[i].y;
-      if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
-      if (zombies [x * BOARD_SIZE + y] == 1 - color) {
-        printf("%d %d %d %d\n", xf, yf, x, y);
-        break;
-      }
-    }
     
     // zombie movement
     for (int xi = 0; xi < BOARD_SIZE; xi ++) {
@@ -211,6 +180,37 @@ int main() {
       }
     }
 
+    // movement: charge enemy captain
+    int xi, yi, xf, yf;
+    xi = own_captain.x;
+    yi = own_captain.y;
+    xf = xi;
+    yf = yi;
+    if (abs(yf - enemy_captain.y) >= abs(xf - enemy_captain.x))
+      yf -= sign(own_captain.y - enemy_captain.y);
+    else
+      xf -= sign(own_captain.x - enemy_captain.x);
+    location new_loc;
+    if (zombies[xf * BOARD_SIZE + yf] != (1-color) && (enemy_captain.x != xf || enemy_captain.y != yf)) {
+      printf("%d %d %d %d\n", xi, yi, xf, yf);
+    } else {
+      xf = xi;
+      yf = yi;
+    }
+    new_loc.x = xf;
+    new_loc.y = yf;
+
+    // attack enemy zombies with captain
+    get_adjacent_hexes(adjacent_hexes, &new_loc);
+    for (int i = 0; i < 6; i ++) {
+      int x = adjacent_hexes[i].x;
+      int y = adjacent_hexes[i].y;
+      if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
+      if (zombies [x * BOARD_SIZE + y] == 1 - color) {
+        printf("%d %d %d %d\n", xf, yf, x, y);
+        break;
+      }
+    }
 
     // end move phase
     printf("\n");
