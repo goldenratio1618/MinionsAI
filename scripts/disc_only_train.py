@@ -39,7 +39,7 @@ EPISODES_PER_ITERATION = 128
 SAMPLE_REUSE = 3
 
 # Frequency of running evals vs random agent
-EVAL_EVERY = 4
+EVAL_EVERY = 2
 
 # Frequency of storing a saved agent
 CHECKPOINT_EVERY = 4
@@ -149,9 +149,20 @@ def rollouts(game_kwargs, agents):
         games += 1
         if winning_color == 0:
             first_player_wins += 1
+    rollout_states = len(states)
+    # convert from list of dicts of arrays to a single dict of arrays with large batch dimension
+    states = {k: np.concatenate([s[k] for s in states], axis=0) for k in states[0]}
+    
+    # Add symmetries
+    # symmetrized_states = Translator.symmetries(states)
+    symmetrized_states = [states]
+
+    # Now combine them into one big states dict
+    states = {k: np.concatenate([s[k] for s in symmetrized_states], axis=0) for k in states}
+    labels = np.repeat(labels, len(symmetrized_states))
     # Log instantaneous metrics here, and send cumulative out to the main control flow to integrate
     metrics_logger.log_metrics({'first_player_winrate': first_player_wins / games})
-    return states, labels, {'rollout_games': games, 'rollout_states': len(states)}
+    return states, labels, {'rollout_games': games, 'rollout_states': rollout_states}
 
 def eval_vs_random(agent):
     wins = 0
@@ -205,16 +216,17 @@ def main(run_name):
             rollout_stats[k] += v
         metrics_logger.log_metrics(rollout_stats)
         logger.info("Starting training...")
+        num_states = states['board'].shape[0]
         for epoch in range(SAMPLE_REUSE):
             logger.info(f"  Epoch {epoch}/{SAMPLE_REUSE}...")
-            all_idxes = np.random.permutation(len(states))
-            n_batches = len(all_idxes) // BATCH_SIZE
+            all_idxes = np.random.permutation(num_states)
+            n_batches = num_states // BATCH_SIZE
             final_loss = None
             for idx in range(n_batches):
                 batch_idxes = all_idxes[idx * BATCH_SIZE: (idx + 1) * BATCH_SIZE]
                 batch_obs = {}
-                for key in states[0]:
-                    batch_obs[key] = np.concatenate([states[i][key] for i in batch_idxes], axis=0)
+                for key in states:
+                    batch_obs[key] = states[key][batch_idxes]
                 batch_labels = np.array(labels)[batch_idxes]
                 batch_labels = th.from_numpy(batch_labels).to(device)
                 optimizer.zero_grad()
