@@ -201,7 +201,7 @@ int main() {
           if (zombies[x * BOARD_SIZE + y] == -1 
               && (enemy_captain.x != x || enemy_captain.y != y)
               && (own_captain.x != x || own_captain.y != y)) {
-            printf("%d %d %d %d\n", xi, xf, x, y);
+            printf("%d %d %d %d\n", xi, yi, x, y);
             goto ZOMBIE_END;
           }
         }
