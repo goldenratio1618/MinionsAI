@@ -130,6 +130,7 @@ def agent_delete(env_name, agent_name):
 # TODO better UI!
 @app.route("/env/<env_name>/agent/<agent_name>/play", methods=['GET', 'POST'])
 def agent_play(env_name, agent_name):
+    _, error_msg = True, ""
     if request.method == 'GET':
         game = ENVS[env_name]()
         game.next_turn()
@@ -173,7 +174,7 @@ def agent_play(env_name, agent_name):
                 to_i = int(request.values['move_to_i'])
                 to_j = int(request.values['move_to_j'])
                 action = MoveAction((from_i, from_j), (to_i, to_j))
-                game.process_single_action(action)
+                _, error_msg = game.process_single_action(action)
         elif "spawn" in request.values:
             if game.phase == Phase.MOVE:
                 game.end_move_phase()
@@ -181,7 +182,7 @@ def agent_play(env_name, agent_name):
             to_i = int(request.values['spawn_to_i'])
             to_j = int(request.values['spawn_to_j'])
             action = SpawnAction(unit_type, (to_i, to_j))
-            game.process_single_action(action)
+            _, error_msg = game.process_single_action(action)
     game_json = game.encode_json()
     print(game_prev_turn_str)
     return render_template(
@@ -193,7 +194,8 @@ def agent_play(env_name, agent_name):
         game_json=json.dumps(game_json), 
         game_reset_json=json.dumps(game_reset_json),
         game_prev_turn_str=game_prev_turn_str,
-        agent_actions_str=agent_actions_str
+        agent_actions_str=agent_actions_str,
+        error_msg=error_msg,
         )
 
 

@@ -168,7 +168,7 @@ class HumanCLIAgent(Agent):
                     continue
                 action = MoveAction((i, j), (k, l))
                 move_actions.append(action)
-                active_game_copy.process_single_action(action)
+                success, error_msg = active_game_copy.process_single_action(action)
             if input_list[0] in ["s", "spawn"]:
                 try:
                     unit_type_str = input_list[1]
@@ -181,7 +181,9 @@ class HumanCLIAgent(Agent):
                 spawn_actions.append(action)
                 if active_game_copy.phase == Phase.MOVE:
                     active_game_copy.end_move_phase()
-                active_game_copy.process_single_action(action)
+                success, error_msg = active_game_copy.process_single_action(action)
+            if not success:
+                print(f"Error: {error_msg}")
         return ActionList(move_actions, spawn_actions)
 
 

@@ -17,7 +17,7 @@ def main(agent_dir=None):
         agent = Agent.load(agent_dir)
         agent.verbose_level = 1
     game = Game()
-    winner = run_game(game, (HumanCLIAgent(), agent))
+    winner = run_game(game, (HumanCLIAgent(), agent), verbose=True)
     print("Game over.\nWinner:", winner)
 
 if __name__ == "__main__":
