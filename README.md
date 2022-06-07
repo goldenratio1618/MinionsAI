@@ -145,3 +145,10 @@ It's got two panes, which you can navigate between with `ctrl-b <uparrow>` and `
 One pane is the web server and the other is the trueskill evaluator.
 Both should be produing logs.
 If either is not, you should be able to use `<uparrow>` in the appropriate pane to rerun the latest command.
+
+## Profiling
+```
+python -m cProfile -o train.prof scripts/disc_only_train.py
+python -m tuna train.prof
+```
+(After `pip install tuna`)
