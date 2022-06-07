@@ -146,7 +146,8 @@ def rollouts(game_kwargs, agents):
     games = 0
     first_player_wins = 0
     for _ in tqdm.tqdm(range(EPISODES_PER_ITERATION)):
-        states_, labels_, winning_color = single_rollout(game_kwargs, agents)
+        with metrics_logger.timing('single_episode'):
+           states_, labels_, winning_color = single_rollout(game_kwargs, agents)
         states.extend(states_)
         labels.extend(labels_)
         games += 1
@@ -206,56 +207,60 @@ def main(run_name):
         logger.info(f"=========== Iteration: {iteration} ===========")
         print("====================================")
         if iteration % CHECKPOINT_EVERY == 0:
-            logger.info("Saving checkpoint...")
-            # Save with more rollouts_per_turn. TODO - clean up this hack.
-            agent.rollouts_per_turn = ROLLOUTS_PER_TURN * EVAL_COMPUTE_BOOST
-            agent.save(os.path.join(checkpoint_dir, f"iter_{iteration}"))
-            agent.rollouts_per_turn = ROLLOUTS_PER_TURN
-
-        logger.info("Starting rollouts...")
-        policy.eval()  # Set policy to non-training mode
-        states, labels, rollout_info = rollouts(game_kwargs, [agent, agent])
-        policy.train()  # Set policy back to training mode
-        for k, v in rollout_info.items():
-            rollout_stats[k] += v
-        metrics_logger.log_metrics(rollout_stats)
-        logger.info("Starting training...")
-        num_states = states['board'].shape[0]
-        for epoch in range(SAMPLE_REUSE):
-            logger.info(f"  Epoch {epoch}/{SAMPLE_REUSE}...")
-            all_idxes = np.random.permutation(num_states)
-            n_batches = num_states // BATCH_SIZE
-            for idx in range(n_batches):
-                batch_idxes = all_idxes[idx * BATCH_SIZE: (idx + 1) * BATCH_SIZE]
-                batch_obs = {}
-                for key in states:
-                    batch_obs[key] = states[key][batch_idxes]
-                batch_labels = np.array(labels)[batch_idxes]
-                batch_labels = th.from_numpy(batch_labels).to(device)
-                optimizer.zero_grad()
-                disc_logprob = policy(batch_obs) # [batch, 1]
-                batch_labels = th.unsqueeze(batch_labels, 1)
-                loss = th.nn.BCEWithLogitsLoss()(disc_logprob, batch_labels)
-                loss.backward()
-                optimizer.step()
-                if idx in [0, n_batches // 2, n_batches - 1]:
-                    max_batch_digits = len(str(n_batches))
-                    metrics_logger.log_metrics({f"loss/epoch_{epoch}/batch_{idx:0>{max_batch_digits}}": loss.item()})
-                turns_optimized += len(batch_idxes)
-        logger.info(f"Iteration {iteration} complete.")
-        param_norm = sum([th.norm(param, p=2) for param in policy.parameters()]).item()
-        metrics_logger.log_metrics({'turns_optimized': turns_optimized, 'param_norm': param_norm})
+            with metrics_logger.timing('checkpointing'):
+                logger.info("Saving checkpoint...")
+                # Save with more rollouts_per_turn. TODO - clean up this hack.
+                agent.rollouts_per_turn = ROLLOUTS_PER_TURN * EVAL_COMPUTE_BOOST
+                agent.save(os.path.join(checkpoint_dir, f"iter_{iteration}"))
+                agent.rollouts_per_turn = ROLLOUTS_PER_TURN
+        with metrics_logger.timing('rollouts'):
+            logger.info("Starting rollouts...")
+            policy.eval()  # Set policy to non-training mode
+            states, labels, rollout_info = rollouts(game_kwargs, [agent, agent])
+            policy.train()  # Set policy back to training mode
+            for k, v in rollout_info.items():
+                rollout_stats[k] += v
+            metrics_logger.log_metrics(rollout_stats)
+        with metrics_logger.timing('training'):
+            logger.info("Starting training...")
+            num_states = states['board'].shape[0]
+            for epoch in range(SAMPLE_REUSE):
+                logger.info(f"  Epoch {epoch}/{SAMPLE_REUSE}...")
+                all_idxes = np.random.permutation(num_states)
+                n_batches = num_states // BATCH_SIZE
+                for idx in range(n_batches):
+                    with metrics_logger.timing('training_batch'):
+                        batch_idxes = all_idxes[idx * BATCH_SIZE: (idx + 1) * BATCH_SIZE]
+                        batch_obs = {}
+                        for key in states:
+                            batch_obs[key] = states[key][batch_idxes]
+                        batch_labels = np.array(labels)[batch_idxes]
+                        batch_labels = th.from_numpy(batch_labels).to(device)
+                        optimizer.zero_grad()
+                        disc_logprob = policy(batch_obs) # [batch, 1]
+                        batch_labels = th.unsqueeze(batch_labels, 1)
+                        loss = th.nn.BCEWithLogitsLoss()(disc_logprob, batch_labels)
+                        loss.backward()
+                        optimizer.step()
+                        if idx in [0, n_batches // 2, n_batches - 1]:
+                            max_batch_digits = len(str(n_batches))
+                            metrics_logger.log_metrics({f"loss/epoch_{epoch}/batch_{idx:0>{max_batch_digits}}": loss.item()})
+                        turns_optimized += len(batch_idxes)
+            logger.info(f"Iteration {iteration} complete.")
+            param_norm = sum([th.norm(param, p=2) for param in policy.parameters()]).item()
+            metrics_logger.log_metrics({'turns_optimized': turns_optimized, 'param_norm': param_norm})
         metrics_logger.flush()
 
         iteration += 1
 
         if iteration % EVAL_EVERY == 0:
-            logger.info("Evaluating...")
-            policy.eval()  # Set policy to non-training mode
-            eval_winrate = eval_vs_random(agent)
-            policy.train()  # Set policy back to training mode
-            metrics_logger.log_metrics({"eval_winrate": eval_winrate})
-            logger.info(f"Win rate vs random = {eval_winrate}")
+            with metrics_logger.timing('eval'):
+                logger.info("Evaluating...")
+                policy.eval()  # Set policy to non-training mode
+                eval_winrate = eval_vs_random(agent)
+                policy.train()  # Set policy back to training mode
+                metrics_logger.log_metrics({"eval_winrate": eval_winrate})
+                logger.info(f"Win rate vs random = {eval_winrate}")
 
 
 
