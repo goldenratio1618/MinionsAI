@@ -61,6 +61,8 @@ game_kwargs = {'symmetrize': False}
 # Eval env registered in scoreboard_envs.py
 EVAL_ENV_NAME = 'zombies5x5'
 
+MAX_ITERATIONS = None
+
 def find_device():
     logger.info("=========================")
     # set device to cpu or cuda
@@ -197,7 +199,7 @@ def main(run_name):
     iteration = 0
     turns_optimized = 0
     rollout_stats = defaultdict(int)
-    while True:
+    while MAX_ITERATIONS is None or iteration < MAX_ITERATIONS:
         metrics_logger.log_metrics({'iteration': iteration})
         print()
         print("====================================")
