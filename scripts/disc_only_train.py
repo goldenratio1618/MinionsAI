@@ -41,9 +41,10 @@ SAMPLE_REUSE = 3
 
 # Frequency of running evals vs random agent
 EVAL_EVERY = 4
+EVAL_VS_PAST_ITERS = [2, 8, 16, 32]
 
 # Frequency of storing a saved agent
-CHECKPOINT_EVERY = 4
+CHECKPOINT_EVERY = 2
 
 # During evals, run this many times extra rollouts compared to during rollout generation
 EVAL_COMPUTE_BOOST = 1
@@ -167,17 +168,16 @@ def rollouts(game_kwargs, agents):
     metrics_logger.log_metrics({'first_player_winrate': first_player_wins / games})
     return states, labels, {'rollout_games': games, 'rollout_states': rollout_states}
 
-def eval_vs_random(agent):
+def eval_vs_other(agent, eval_agent):
     wins = 0
     games = 0
     for i in tqdm.tqdm(range(100)):
-        random_agent = RandomAIAgent()
         good_agent = TrainedAgent(agent.policy, agent.translator, agent.generator, ROLLOUTS_PER_TURN * EVAL_COMPUTE_BOOST)
         good_idx = i % 2
 
         agents = [None, None]
         agents[good_idx] = good_agent
-        agents[1 - good_idx] = random_agent
+        agents[1 - good_idx] = eval_agent
 
         game = ENVS[EVAL_ENV_NAME]()
         winner = run_game(game, agents=agents)
@@ -257,10 +257,18 @@ def main(run_name):
             with metrics_logger.timing('eval'):
                 logger.info("Evaluating...")
                 policy.eval()  # Set policy to non-training mode
-                eval_winrate = eval_vs_random(agent)
+                for iter in EVAL_VS_PAST_ITERS:
+                    agent_name = f"iter_{iter}"
+                    agent_path = os.path.join(checkpoint_dir, agent_name)
+                    print(f"Looking for agent at {agent_path}...")
+                    if os.path.exists(agent_path):
+                        logger.info(f"Loading {agent_name}...")
+                        eval_agent = TrainedAgent.load(agent_path)
+                        winrate = eval_vs_other(agent, eval_agent)
+                        metrics_logger.log_metrics({f"eval_winrate/{agent_name}": winrate})
+                        logger.info(f"Win rate vs {agent_name} = {winrate}")
+
                 policy.train()  # Set policy back to training mode
-                metrics_logger.log_metrics({"eval_winrate": eval_winrate})
-                logger.info(f"Win rate vs random = {eval_winrate}")
 
 
 
