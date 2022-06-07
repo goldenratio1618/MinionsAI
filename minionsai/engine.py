@@ -39,7 +39,7 @@ class Board():
             b.board[i][j].is_water = hex.is_water
             b.board[i][j].is_graveyard = hex.is_graveyard
             if hex.unit is not None:
-                copied_unit = copy.deepcopy(hex.unit)
+                copied_unit = hex.unit.copy()
                 b.board[i][j].add_unit(copied_unit)
         return b
 
@@ -504,3 +504,12 @@ class Unit():
         unit.isExhausted = json["isExhausted"]
         unit.is_soulbound = json["is_soulbound"]
         return unit
+
+    def copy(self):
+        u = Unit(self.color, self.type)
+        u.curr_health = self.curr_health
+        u.hasMoved = self.hasMoved
+        u.remainingAttack = self.remainingAttack
+        u.isExhausted = self.isExhausted
+        u.is_soulbound = self.is_soulbound
+        return u
