@@ -132,3 +132,16 @@ Once you have a good agent, you can submit it to the scoreboard at `minions-scor
 To submit an agent, run `agent.save(directory)`. Then rename the directory to `<agent_name>`, zip it into `<agent_name>.zip` and upload it to the scoreboard. 
 Make sure to give it a very unique name - recommend putting your name and the date in there at the very least.
 Note that (for me at least), the agent name winds up being the name fo teh directory pre-zipping, so make sure to rename first.
+
+## Restarting the Scoreboard
+If the scoreboard is down, here is the minimal set of instructions to restart it:
+1. ssh and enter the tmux
+```
+local> ssh root@minions-scoreboard.com
+minions> tmux a 
+```
+2. Now you're in the tmux (which is a persistent terminal that survives your ssh tunnel ending). 
+It's got two panes, which you can navigate between with `ctrl-b <uparrow>` and ```ctrl-b <downarrow>`. 
+One pane is the web server and the other is the trueskill evaluator.
+Both should be produing logs.
+If either is not, you should be able to use `<uparrow>` in the appropriate pane to rerun the latest command.
