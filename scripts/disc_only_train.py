@@ -257,16 +257,21 @@ def main(run_name):
             with metrics_logger.timing('eval'):
                 logger.info("Evaluating...")
                 policy.eval()  # Set policy to non-training mode
-                for iter in EVAL_VS_PAST_ITERS:
-                    agent_name = f"iter_{iter}"
-                    agent_path = os.path.join(checkpoint_dir, agent_name)
-                    print(f"Looking for agent at {agent_path}...")
-                    if os.path.exists(agent_path):
-                        logger.info(f"Loading {agent_name}...")
-                        eval_agent = TrainedAgent.load(agent_path)
-                        winrate = eval_vs_other(agent, eval_agent)
-                        metrics_logger.log_metrics({f"eval_winrate/{agent_name}": winrate})
-                        logger.info(f"Win rate vs {agent_name} = {winrate}")
+                if iteration <= min(EVAL_VS_PAST_ITERS):
+                    eval_agent = RandomAIAgent()
+                    winrate = eval_vs_other(agent, eval_agent)
+                    metrics_logger.log_metrics({f"eval_winrate/random": winrate})
+                else:
+                    for iter in EVAL_VS_PAST_ITERS:
+                        agent_name = f"iter_{iter}"
+                        agent_path = os.path.join(checkpoint_dir, agent_name)
+                        print(f"Looking for agent at {agent_path}...")
+                        if os.path.exists(agent_path):
+                            logger.info(f"Loading {agent_name}...")
+                            eval_agent = TrainedAgent.load(agent_path)
+                            winrate = eval_vs_other(agent, eval_agent)
+                            metrics_logger.log_metrics({f"eval_winrate/{agent_name}": winrate})
+                            logger.info(f"Win rate vs {agent_name} = {winrate}")
 
                 policy.train()  # Set policy back to training mode
 
