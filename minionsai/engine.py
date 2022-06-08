@@ -1,3 +1,4 @@
+from collections import defaultdict
 import copy
 import enum
 import random
@@ -514,3 +515,14 @@ class Unit():
         u.isExhausted = self.isExhausted
         u.is_soulbound = self.is_soulbound
         return u
+
+def print_n_games(games):
+    width = 15
+    height = 9
+    result = [""] * height
+    for game in games:
+        game_pretty_print = game.pretty_print(do_print=False).split("\n")
+        assert len(game_pretty_print) == height, f"Expected {height} lines, got {len(game_pretty_print)}:\n{game.pretty_print}"
+        for i in range(height):
+            result[i] += game_pretty_print[i][:width].ljust(width) + "|"
+    print("\n".join(result))

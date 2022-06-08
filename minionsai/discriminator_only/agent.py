@@ -1,3 +1,4 @@
+from minionsai.engine import print_n_games
 from .model import MinionsDiscriminator
 from ..agent import Agent, RandomAIAgent
 import os
@@ -8,6 +9,12 @@ import json
 
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
+
+def equal_obs(x, y):
+    if isinstance(x, np.ndarray):
+        return np.array_equal(x, y)
+    elif isinstance(x, dict):
+        return all(k in y for k in x) and all(equal_obs(x[k], y[k]) for k in x)
 
 class TrainedAgent(Agent):
     def __init__(self, policy, translator, generator, rollouts_per_turn, verbose_level=0):
@@ -20,19 +27,37 @@ class TrainedAgent(Agent):
     def act(self, game):
         options_action_list = []
         options_obs = []
+        options_final_states = []  # used for printing only
         for i in range(self.rollouts_per_turn):
             game_copy = game.copy()
             actions = self.generator.act(game_copy)
             game_copy.full_turn(actions)
             options_obs.append(self.translator.translate(game_copy))
             options_action_list.append(actions)
+            options_final_states.append(game_copy)
 
-            if self.verbose_level >= 2:
-                print(f"Option {i}")
-                game_copy.pretty_print()
         obs_flat = {k: np.concatenate([o[k] for o in options_obs]) for k in options_obs[0]}
-        disc_logprobs = self.policy(obs_flat).detach().cpu().numpy()  # [num_options]
+        disc_logprobs = self.policy(obs_flat).detach().cpu().numpy()  # [num_options, 1]
+        # Remove extra dimension
+        disc_logprobs = disc_logprobs.squeeze(1)
         best_option_idx = np.argmax(disc_logprobs)
+        if self.verbose_level >= 2:
+            # Find non-equivalent games
+            equivalent_games = []
+            for i, obs in enumerate(options_obs):
+                copy = False
+                for j in equivalent_games:
+                    if equal_obs(options_obs[i], options_obs[j]):
+                        copy = True
+                        break
+                if not copy:
+                    equivalent_games.append(i)
+            k = 8
+            # best k options in descending order
+            best_k_options = sorted(equivalent_games, key=lambda i: disc_logprobs[i], reverse=True)[:k]
+            print_n_games([options_final_states[i] for i in best_k_options])
+            print("|".join([f"Opt {i:<3}: {sigmoid(disc_logprobs[i]).item():.1%}".ljust(15) 
+                for i in best_k_options]))
         if self.verbose_level >= 1:
             print(f"Choosing option {best_option_idx}; win prob = {sigmoid(disc_logprobs[best_option_idx]).item() * 100:.1f}%")
         best_option = options_action_list[best_option_idx]
