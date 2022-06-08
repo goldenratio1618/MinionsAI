@@ -155,7 +155,7 @@ class Game():
                     new_graveyards = []
                     for loc in graveyard_locs:
                         i, j = loc
-                        if (i + j == BOARD_SIZE - 1):
+                        if (2 * i == BOARD_SIZE - 1 and 2 * j == BOARD_SIZE - 1):
                             new_graveyards.append(loc)
                         else:
                             if random.random() < 0.5:
