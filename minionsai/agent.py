@@ -1,4 +1,5 @@
 import abc
+from multiprocessing.managers import ValueProxy
 import random
 import subprocess
 import sys
@@ -277,7 +278,7 @@ class RandomAIAgent(Agent):
             game_copy.pretty_print()
             spawn_actions = []
         else:
-            adjacent_targets = adjacent_hexes(*necromancer_location)
+            adjacent_targets = adjacent_hexes(*necromancer_destination)
             spawn_actions = [
                 SpawnAction(ZOMBIE, dest)
                 for dest in random.sample(adjacent_targets, 2)
