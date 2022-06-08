@@ -1,5 +1,6 @@
 from minionsai.action import MoveAction
-from minionsai.engine import BOARD_SIZE, Board, Unit, Game
+from minionsai.agent import RandomAIAgent
+from minionsai.engine import BOARD_SIZE, Board, Unit, Game, print_n_games
 from minionsai.unit_type import ZOMBIE
 
 
@@ -93,3 +94,7 @@ def test_game_encode_json():
     assert game.active_player_color == game_copy.active_player_color
     for unit, (i, j) in game.units_with_locations():
         check_units_equivalent(unit, game_copy.board.board[i][j].unit)
+
+def test_print_n_games():
+    games = [Game() for _ in range(10)]
+    print_n_games(games)

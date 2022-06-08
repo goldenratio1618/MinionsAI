@@ -15,7 +15,7 @@ def main(agent_dir=None):
         agent = RandomAIAgent()
     else:
         agent = Agent.load(agent_dir)
-        agent.verbose_level = 1
+        agent.verbose_level = 2
     game = Game()
     winner = run_game(game, (HumanCLIAgent(), agent), verbose=True)
     print("Game over.\nWinner:", winner)
@@ -43,7 +43,6 @@ if __name__ == "__main__":
             # Find the latest iteration based on the filenames
             choices = os.listdir(agents_dir)
             choices_iters = [int(choice.split('_')[-1]) for choice in choices]
-            print(choices_iters)
             iter = max(choices_iters)
         else:
             print(f"Using specified iter: {args.iter}")
