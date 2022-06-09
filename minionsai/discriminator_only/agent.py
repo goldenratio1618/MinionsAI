@@ -1,4 +1,5 @@
-from minionsai.engine import print_n_games
+from ..engine import print_n_games
+from ..experiment_tooling import find_device
 from .model import MinionsDiscriminator
 from ..agent import Agent, RandomAIAgent
 import os
@@ -79,7 +80,7 @@ class TrainedAgent(Agent):
         rollouts_per_turn = config['rollouts_per_turn']
         model = MinionsDiscriminator(d_model=d_model, depth=depth)
         model.load_state_dict(th.load(os.path.join(directory, 'weights.pt'), map_location=th.device('cpu')))
-        model.to(th.device('cpu'))  # TODO get better device if present.
+        model.to(find_device())
         model.eval()  # Set to eval mode to disable dropout, etc.
 
         agent = TrainedAgent(model, Translator(), RandomAIAgent(), rollouts_per_turn)
