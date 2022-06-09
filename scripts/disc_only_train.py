@@ -9,6 +9,7 @@ Then agent checkpoints & logs are saved in <your temp dir>/MinionsAI/my_run
 import argparse
 from collections import defaultdict
 from tkinter import Y
+from minionsai.experiment_tooling import find_device, setup_directory
 from minionsai.run_game import run_game
 from minionsai.discriminator_only.agent import TrainedAgent
 from minionsai.discriminator_only.model import MinionsDiscriminator
@@ -20,9 +21,7 @@ import torch as th
 import numpy as np
 import os
 import tqdm
-import shutil
 import random
-import tempfile
 import logging
 from minionsai.metrics_logger import metrics_logger
 
@@ -63,43 +62,6 @@ game_kwargs = {'symmetrize': False}
 EVAL_ENV_NAME = 'zombies5x5'
 
 MAX_ITERATIONS = None
-
-def find_device():
-    logger.info("=========================")
-    # set device to cpu or cuda
-    if (th.cuda.is_available()): 
-        device = th.device('cuda:0') 
-        th.cuda.empty_cache()
-        logger.info("Device set to : " + str(th.cuda.get_device_name(device)))
-    else:
-        device = th.device('cpu')
-        logger.info("Device set to : cpu")
-    logger.info("=========================")
-    return device
-
-def setup_directory(run_name):
-    """
-    Set up logging and checkpoint directories for a run.
-    Returns the subdirectory for checkpoints.
-    """
-    tempdir = tempfile.gettempdir()
-    run_directory = os.path.join(tempdir, 'MinionsAI', run_name)
-    checkpoint_dir = os.path.join(run_directory, 'checkpoints')
-    # If the directory already exists, warn the user and check if it's ok to overwrite it.
-    if os.path.exists(run_directory):
-        print(f"Run directory already exists at {run_directory}")
-        ok = input("OK to overwrite? (y/n) ")
-        if ok != "y":
-            exit()
-        shutil.rmtree(run_directory)
-    os.makedirs(checkpoint_dir)
-
-    logging.basicConfig(filename=os.path.join(run_directory, 'logs.txt'), level=logging.DEBUG, 
-                        format='[%(levelname)s %(asctime)s] %(name)s: %(message)s')
-    logging.getLogger().addHandler(logging.StreamHandler())
-
-    metrics_logger.configure(os.path.join(run_directory, 'metrics.csv'))
-    return checkpoint_dir
 
 def build_agent():
     generator = RandomAIAgent()
