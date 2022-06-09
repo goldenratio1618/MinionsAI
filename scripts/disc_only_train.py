@@ -33,27 +33,27 @@ ROLLOUTS_PER_TURN = 64
 # How many episodes of data do we collect each iteration, before running a few epochs of optimization?
 # Potentially good to use a few times bigger EPISODES_PER_ITERATION * DATA_AUG_FACTOR than BATCH_SIZE, to minimize correlation within batches
 # (DATA_AUG_FACTOR = 4)
-EPISODES_PER_ITERATION = 64
+EPISODES_PER_ITERATION = 256
 
 # Once we've collected the data, how many times do we go over it for optimization (within one iteration)?
-SAMPLE_REUSE = 3
+SAMPLE_REUSE = 2
 
 # Frequency of running evals vs random agent
-EVAL_EVERY = 4
+EVAL_EVERY = 2
 EVAL_VS_PAST_ITERS = [2, 8, 16, 32]
 
 # Frequency of storing a saved agent
-CHECKPOINT_EVERY = 2
+CHECKPOINT_EVERY = 1
 
 # During evals, run this many times extra rollouts compared to during rollout generation
-EVAL_COMPUTE_BOOST = 1
+EVAL_COMPUTE_BOOST = 4
 
 # Model Size
 DEPTH = 2
 D_MODEL = 64 * DEPTH
 
 # Optimizer hparams
-BATCH_SIZE = 32
+BATCH_SIZE = 256
 LR = 3e-5
 
 # kwargs to create a game (passed to Game)

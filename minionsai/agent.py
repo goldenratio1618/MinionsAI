@@ -5,7 +5,7 @@ import subprocess
 import sys
 
 from .action import ActionList, SpawnAction, MoveAction
-from .engine import Game, Phase, adjacent_hexes
+from .engine import Board, Game, Phase, adjacent_hexes
 from .unit_type import ZOMBIE, NECROMANCER, flexible_unit_type, unitList, unit_type_from_name
 
 import os
@@ -245,6 +245,13 @@ class CLIAgent(Agent):
 
 
 class RandomAIAgent(Agent):
+    def adjacent_zombies(self, board: Board, loc, color):
+        result = []
+        for i, j in adjacent_hexes(*loc):
+            if board.board[i][j].unit is not None and board.board[i][j].unit.type == ZOMBIE and board.board[i][j].unit.color == color:
+                result.append((i, j))
+        return result
+
     def act(self, game_copy: Game) -> ActionList:
         necromancer_location = None
         necromancer_destination = None
@@ -254,6 +261,21 @@ class RandomAIAgent(Agent):
                 break
         
         move_actions = []
+
+        # If any enemy zombies can be killed, probably do that
+        dead_zombie_attackers = []
+        for unit, (i, j) in game_copy.units_with_locations(color=game_copy.inactive_player_color):
+            if unit.type == ZOMBIE:
+                adjacent_my_zombies = self.adjacent_zombies(game_copy.board, (i, j), game_copy.active_player_color)
+                if len(adjacent_my_zombies) >= 2 and random.random() < 0.8:
+                    dead_zombie_attackers.append(((i, j), adjacent_my_zombies))
+
+        random.shuffle(dead_zombie_attackers)
+        for enemy_zombie, attackers in dead_zombie_attackers:
+            random.shuffle(attackers)
+            for my_zombie in attackers[:2]:
+                move_actions.append(MoveAction(my_zombie, enemy_zombie))
+
         for unit, (i, j) in game_copy.units_with_locations(color=game_copy.active_player_color):
             if random.random() < 0.2:
                 # Don't move this guy

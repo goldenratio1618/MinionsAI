@@ -1,6 +1,7 @@
 from collections import defaultdict
 import copy
 import enum
+from functools import lru_cache
 import random
 from typing import Optional, Tuple
 from .unit_type import UnitType, NECROMANCER, ZOMBIE, unit_type_from_name
@@ -14,6 +15,7 @@ def dist(xi, yi, xf, yf):
     return max(abs(yf - yi), abs(xf - xi) + (abs(yf - yi) if (xi > xf) == (yi > yf) else 0))
 
 # return an array of tuples of adjacent hexes
+@lru_cache
 def adjacent_hexes(x, y):
     hex_list = []
     if x > 0: hex_list.append((x-1,y))
