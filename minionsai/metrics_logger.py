@@ -48,8 +48,10 @@ class MetricsLogger():
         return self._csv_path
 
     def log_metrics(self, metrics, prefix=""):
+        if len(prefix) > 0 and not prefix.endswith("/"):
+            prefix = prefix + "/"
         for key, value in metrics.items():
-            full_key = f"{prefix}/{key}"
+            full_key = prefix + key
             if full_key in self._metrics_this_step:
                 raise ValueError(f"Metric {full_key} already logged this step")
             self._metrics_this_step[full_key] = value
