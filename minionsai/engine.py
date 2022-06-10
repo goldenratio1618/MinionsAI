@@ -125,7 +125,8 @@ class Game():
                  symmetrize=True,
                  min_graveyards=3,
                  max_graveyards=8,
-                 phase=Phase.TURN_END):
+                 phase=Phase.TURN_END,
+                 record_metrics=True):
         """
         Important API pieces:
             game.full_turn(action_list) - process an action list for the current player
@@ -188,6 +189,10 @@ class Game():
             self.active_player_color = 1 - self.active_player_color
             assert self.phase == Phase.TURN_END, "New game should start with TURN_END phase."
 
+        self.record_metrics = record_metrics
+        if self.record_metrics:
+            self._metrics = (defaultdict(float), defaultdict(float))
+
     @property
     def done(self) -> bool:
         return self.remaining_turns <= 0
@@ -216,6 +221,16 @@ class Game():
     @property
     def inactive_player_color(self) -> int:
         return 1 - self.active_player_color
+
+    def get_metrics(self, color):
+        if self.record_metrics:
+            return self._metrics[color]
+        else:
+            raise ValueError("Metrics are not being recorded.")
+
+    def add_to_metric(self, color, key, amount):
+        if self.record_metrics:
+            self._metrics[color][key] += amount
 
     def pretty_print(self, do_print=True):
         """
@@ -269,6 +284,10 @@ class Game():
         self.remaining_turns -= 1
         if self.done:
             self.phase = Phase.GAME_OVER
+            for color in (0, 1):
+                self.add_to_metric(color, 'final_money', self.money[color])
+                self.add_to_metric(color, 'final_num_units', len(self.units_with_locations(color=color)))
+            self.add_to_metric(self.winner, 'wins', 1)
             return
 
         for row in self.board.board:
@@ -354,6 +373,7 @@ class Game():
                 self.money[self.inactive_player_color] += self.board.board[xf][yf].unit.type.cost
                 self.board.board[xf][yf].remove_unit()
                 self.board.board[xi][yi].unit.remainingAttack = 0
+                self.add_to_metric(self.active_player_color, "bounces", 1)
                 return True, None
             # flurry deals 1 attack
             if self.board.board[xi][yi].unit.type.flurry:
@@ -369,6 +389,7 @@ class Game():
                 self.board.board[xf][yf].remove_unit()
                 # process rebate
                 self.money[self.inactive_player_color] += attack_outcome
+                self.add_to_metric(self.active_player_color, "kills", 1)
         return True, None
 
     def process_single_spawn(self, spawn_action: SpawnAction) -> Tuple[bool, Optional[str]]:
@@ -441,7 +462,8 @@ class Game():
                     active_player_color=self.active_player_color, 
                     phase=self.phase,
                     income_bonus=self.income_bonus,
-                    new_game=False)
+                    new_game=False,
+                    record_metrics=False)
 
     def encode_json(self):
         """

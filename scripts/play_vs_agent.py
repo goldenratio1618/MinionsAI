@@ -17,8 +17,12 @@ def main(agent_dir=None):
         agent = Agent.load(agent_dir)
         agent.verbose_level = 2
     game = Game()
-    winner = run_game(game, (HumanCLIAgent(), agent), verbose=True)
+    winner = run_game(game, (agent, HumanCLIAgent()), verbose=True)
     print("Game over.\nWinner:", winner)
+    print("Game metrics (player 0):")
+    print(game.get_metrics(0))
+    print("Game metrics (player 1):")
+    print(game.get_metrics(1))
 
 if __name__ == "__main__":
     # Use argparse to parse arguments "path", "name" and "iter"

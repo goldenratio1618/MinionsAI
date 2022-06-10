@@ -104,22 +104,23 @@ def single_rollout(game_kwargs, agents):
     loser_labels = np.zeros(len(loser_states))
     all_states = winner_states + loser_states
     all_labels = np.concatenate([winner_labels, loser_labels])
-    return all_states, all_labels, winner
+    return all_states, all_labels, (game.get_metrics(0), game.get_metrics(1))
 
 def rollouts(game_kwargs, agents):
     states = []
     labels = []
 
     games = 0
-    first_player_wins = 0
+    metrics_accumulated = (defaultdict(list), defaultdict(list))
     for _ in tqdm.tqdm(range(EPISODES_PER_ITERATION)):
         with metrics_logger.timing('single_episode'):
-           states_, labels_, winning_color = single_rollout(game_kwargs, agents)
+           states_, labels_, this_game_metrics = single_rollout(game_kwargs, agents)
         states.extend(states_)
         labels.extend(labels_)
         games += 1
-        if winning_color == 0:
-            first_player_wins += 1
+        for color, this_color_metrics in enumerate(this_game_metrics):
+            for key in set(metrics_accumulated[color].keys()).union(set(this_color_metrics.keys())):
+                metrics_accumulated[color][key].append(this_color_metrics[key])
     rollout_states = len(states)
     # convert from list of dicts of arrays to a single dict of arrays with large batch dimension
     states = {k: np.concatenate([s[k] for s in states], axis=0) for k in states[0]}
@@ -131,7 +132,8 @@ def rollouts(game_kwargs, agents):
     states = {k: np.concatenate([s[k] for s in symmetrized_states], axis=0) for k in states}
     labels = np.concatenate([labels]*len(symmetrized_states), axis=0)
     # Log instantaneous metrics here, and send cumulative out to the main control flow to integrate
-    metrics_logger.log_metrics({'first_player_winrate': first_player_wins / games})
+    for color in (0, 1):
+        metrics_logger.log_metrics({k: sum(v)/EPISODES_PER_ITERATION for k, v in metrics_accumulated[color].items()}, prefix=f'rollouts/game/{color}')
     return states, labels, {'rollout_games': games, 'rollout_states': rollout_states}
 
 def eval_vs_other_by_path(agent, eval_agent_path):

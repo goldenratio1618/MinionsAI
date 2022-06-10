@@ -47,11 +47,12 @@ class MetricsLogger():
             raise Exception("Logger not configured. call logger.configure(path)")
         return self._csv_path
 
-    def log_metrics(self, metrics):
+    def log_metrics(self, metrics, prefix=""):
         for key, value in metrics.items():
-            if key in self._metrics_this_step:
-                raise ValueError(f"Metric {key} already logged this step")
-            self._metrics_this_step[key] = value
+            full_key = f"{prefix}/{key}"
+            if full_key in self._metrics_this_step:
+                raise ValueError(f"Metric {full_key} already logged this step")
+            self._metrics_this_step[full_key] = value
 
     @contextmanager
     def timing(self, key):
