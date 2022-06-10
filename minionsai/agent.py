@@ -301,11 +301,12 @@ class RandomAIAgent(Agent):
             spawn_actions = []
         else:
             adjacent_targets = adjacent_hexes(*necromancer_destination)
+            random.shuffle(adjacent_targets)
             spawn_actions = [
                 SpawnAction(ZOMBIE, dest)
                 for dest in random.sample(adjacent_targets, 2)
             ]
-            # Also try spawning some spces two away from the necromancer
+            # Also try spawning some spaces two away from the necromancer
             # in case he moved.
             adjacent_targets = adjacent_hexes(*necromancer_destination)
             spawn_actions += [
