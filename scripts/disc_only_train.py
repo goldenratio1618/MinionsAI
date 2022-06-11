@@ -60,6 +60,8 @@ D_MODEL = 64 * DEPTH
 BATCH_SIZE = 256
 LR = 3e-5
 
+LAMBDA = 0.95
+
 # kwargs to create a game (passed to Game)
 game_kwargs = {'symmetrize': False}
 # Eval env registered in scoreboard_envs.py
@@ -80,6 +82,26 @@ def build_agent():
     agent = TrainedAgent(policy, translator, generator, ROLLOUTS_PER_TURN)
     return agent
 
+def smooth_labels(labels, lam):
+    """
+    Takes a list of win probs with a 0/1 at the end
+    and smooths them into targets for the model
+    using exponential moving average
+    """
+    reversed_labels = np.array(labels)[::-1]
+    lambda_powers = lam ** np.arange(len(labels), 0, -1)
+    turn_contribs = np.cumsum(reversed_labels * lambda_powers)
+    norm = np.cumsum(lambda_powers)
+    return (turn_contribs / norm)[::-1]
+
+# TODO put this in a separate file
+array = [1, 2]
+desired = np.array([2/3 * 1 + 1/3 * 2, 2.])
+np.testing.assert_allclose(smooth_labels(array, 0.5), desired)
+
+array = [1, 2, 3]
+np.testing.assert_allclose(smooth_labels(array, 0.5), [4/7 * 1 + 2/7 * 2 + 1/7 * 3, 2/3 * 2 + 1/3 * 3, 3])
+
 # TODO - use run_game instead, with a custom Agent subclass that remembers the states.
 def single_rollout(game_kwargs, agents):
     # Randomize starting money
@@ -87,24 +109,34 @@ def single_rollout(game_kwargs, agents):
 
     game = Game(**game_kwargs)
     state_buffers = [[], []]  # one for each player
+    label_buffers = [[], []]  # one for each player
     while True:
         game.next_turn()
         if game.done:
             break
         active_player = game.active_player_color
-        actionlist = agents[active_player].act(game)
+        actionlist, winprob = agents[active_player].act_with_winprob(game)
         game.full_turn(actionlist)
         state_buffers[active_player].append(agents[active_player].translator.translate(game))
+        label_buffers[active_player].append(winprob)
+        
     winner = game.winner
+
+    metrics = (game.get_metrics(0), game.get_metrics(1))
+    metrics[winner]["pfinal"] = label_buffers[winner][-1]
+    metrics[1 - winner]["pfinal"] = 1 - label_buffers[1 - winner][-1]
+
+    label_buffers[winner].append(1)
+    label_buffers[1 - winner].append(0)
     # game.pretty_print()
     # print(winner)
     winner_states = state_buffers[winner]
-    winner_labels = np.ones(len(winner_states))
+    winner_labels = smooth_labels(label_buffers[winner][1:], LAMBDA)
     loser_states = state_buffers[1 - winner]
-    loser_labels = np.zeros(len(loser_states))
+    loser_labels = smooth_labels(label_buffers[1 - winner][1:], LAMBDA)
     all_states = winner_states + loser_states
     all_labels = np.concatenate([winner_labels, loser_labels])
-    return all_states, all_labels, (game.get_metrics(0), game.get_metrics(1))
+    return all_states, all_labels, metrics
 
 def rollouts(game_kwargs, agents):
     states = []

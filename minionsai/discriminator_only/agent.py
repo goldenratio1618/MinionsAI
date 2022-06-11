@@ -26,6 +26,10 @@ class TrainedAgent(Agent):
         self.verbose_level = verbose_level
     
     def act(self, game):
+        action, _ = self.act_with_winprob(game)
+        return action
+
+    def act_with_winprob(self, game):
         options_action_list = []
         options_obs = []
         options_final_states = []  # used for printing only
@@ -59,10 +63,11 @@ class TrainedAgent(Agent):
             print_n_games([options_final_states[i] for i in best_k_options])
             print("|".join([f"Opt {i:<3}: {sigmoid(disc_logprobs[i]).item():.1%}".ljust(15) 
                 for i in best_k_options]))
+        best_prob = sigmoid(disc_logprobs[best_option_idx]).item()
         if self.verbose_level >= 1:
-            print(f"Choosing option {best_option_idx}; win prob = {sigmoid(disc_logprobs[best_option_idx]).item() * 100:.1f}%")
+            print(f"Choosing option {best_option_idx}; win prob = {best_prob * 100:.1f}%")
         best_option = options_action_list[best_option_idx]
-        return best_option
+        return best_option, best_prob
 
     def save_instance(self, directory: str):
         th.save(self.policy.state_dict(), os.path.join(directory, 'weights.pt'))
