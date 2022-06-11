@@ -4,18 +4,23 @@ Play against an agent with
 """
 import sys
 from minionsai.agent import Agent, HumanCLIAgent, RandomAIAgent
+from minionsai.gen_disc.agent import GenDiscAgent
+from minionsai.gen_disc.discriminators import HumanDiscriminator
 from minionsai.run_game import run_game
 from minionsai.engine import Game
 import argparse
 import tempfile
 import os
 
-def main(agent_dir=None):
+def main(agent_dir=None, disc_mode=False):
     if agent_dir is None:
         agent = RandomAIAgent()
     else:
         agent = Agent.load(agent_dir)
         agent.verbose_level = 2
+
+    if disc_mode:
+        agent = GenDiscAgent(HumanDiscriminator(filter_agent=agent), RandomAIAgent(), rollouts_per_turn=agent.rollouts_per_turn)
     game = Game()
     winner = run_game(game, (agent, HumanCLIAgent()), verbose=True)
     print("Game over.\nWinner:", winner)
@@ -30,6 +35,7 @@ if __name__ == "__main__":
     parser.add_argument("--path", help="Full path to agent directory")
     parser.add_argument("--name", help="Experiment name (will automatically find path in <tempdir>/MinionsAI/<name>/checkpoints)")
     parser.add_argument("--iter", help="Iteration number (if unspecified, uses latest)")
+    parser.add_argument("--disc_mode", type=bool, default=False, help="Choose among n random options like a discriminator.")
     args = parser.parse_args()
 
     if args.iter is not None:
@@ -56,4 +62,4 @@ if __name__ == "__main__":
         path = None
     print(f"Getting agent from: {path}")
 
-    main(path)
+    main(path, args.disc_mode)

@@ -1,3 +1,4 @@
+from ..game_util import equal_np_dicts
 from ..engine import print_n_games
 from ..experiment_tooling import find_device
 from .model import MinionsDiscriminator
@@ -11,12 +12,8 @@ import json
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
 
-def equal_obs(x, y):
-    if isinstance(x, np.ndarray):
-        return np.array_equal(x, y)
-    elif isinstance(x, dict):
-        return all(k in y for k in x) and all(equal_obs(x[k], y[k]) for k in x)
-
+# TODO - make this class a subclass of GenDiscAgent
+# Hard part is getting save / load to work.
 class TrainedAgent(Agent):
     def __init__(self, policy, translator, generator, rollouts_per_turn, verbose_level=0):
         self.translator = translator
@@ -52,7 +49,7 @@ class TrainedAgent(Agent):
             for i, obs in enumerate(options_obs):
                 copy = False
                 for j in equivalent_games:
-                    if equal_obs(options_obs[i], options_obs[j]):
+                    if equal_np_dicts(options_obs[i], options_obs[j]):
                         copy = True
                         break
                 if not copy:
