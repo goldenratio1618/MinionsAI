@@ -20,9 +20,11 @@ def main(agent_dir=None, disc_mode=False):
         agent.verbose_level = 2
 
     if disc_mode:
-        agent = GenDiscAgent(HumanDiscriminator(filter_agent=agent), RandomAIAgent(), rollouts_per_turn=agent.rollouts_per_turn)
+        human_agent = GenDiscAgent(HumanDiscriminator(filter_agent=agent), RandomAIAgent(), rollouts_per_turn=agent.rollouts_per_turn)
+    else:
+        human_agent = HumanCLIAgent(agent)
     game = Game()
-    winner = run_game(game, (agent, HumanCLIAgent()), verbose=True)
+    winner = run_game(game, (agent, human_agent), verbose=True)
     print("Game over.\nWinner:", winner)
     print("Game metrics (player 0):")
     print(game.get_metrics(0))
