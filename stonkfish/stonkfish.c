@@ -276,22 +276,35 @@ int main() {
     }
     // spawn zombies on other adjacent locations
     // TODO: More elegant to check if there's actually money first
-    for (int i = 0; i < 6; i ++) {
-      int x = adjacent_hexes[i].x;
-      int y = adjacent_hexes[i].y;
-      if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
-      // check new location to make sure it's safe
-      location new_neighbors[6];
-      get_adjacent_hexes(new_neighbors, adjacent_hexes + i);
-      int adjacent_zombies = 0;
-      for (int j = 0; j < 6; j ++) {
-        int nx = new_neighbors[j].x;
-        int ny = new_neighbors[j].y;
-        if (nx < 0 || nx >= BOARD_SIZE || ny < 0 || ny >= BOARD_SIZE) continue;
-        if (zombies[nx * BOARD_SIZE + ny] == 1 - color) adjacent_zombies ++;
+    int best_x, best_y;
+    for (int j = 0; j < 6; j++) {
+      best_x = -1;
+      int best_dist = BOARD_SIZE * 2;
+      for (int i = 0; i < 6; i ++) {
+        int x = adjacent_hexes[i].x;
+        int y = adjacent_hexes[i].y;
+        if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
+        if (zombies[x * BOARD_SIZE + y] != -1) continue;
+        if (x == xe && y == ye) continue;
+        // check new location to make sure it's safe
+        location new_neighbors[6];
+        get_adjacent_hexes(new_neighbors, adjacent_hexes + i);
+        int adjacent_zombies = 0;
+        for (int j = 0; j < 6; j ++) {
+          int nx = new_neighbors[j].x;
+          int ny = new_neighbors[j].y;
+          if (nx < 0 || nx >= BOARD_SIZE || ny < 0 || ny >= BOARD_SIZE) continue;
+          if (zombies[nx * BOARD_SIZE + ny] == 1 - color) adjacent_zombies ++;
+        }
+        if (adjacent_zombies >= 2) continue;
+        int new_dist = dist(x, y, xe, ye);
+        if (new_dist >= best_dist) continue;
+        best_dist = new_dist;
+        best_x = x;
+        best_y = y;
       }
-      if (adjacent_zombies < 2)
-        printf("1 %d %d\n", x, y);
+      if (best_x == -1) break;
+      printf("1 %d %d\n", best_x, best_y);
     }
     printf("\n");
     fflush(stdout);
