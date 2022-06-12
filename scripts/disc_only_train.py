@@ -12,12 +12,12 @@ import tempfile
 from minionsai.experiment_tooling import find_device, setup_directory
 from minionsai.gen_disc.agent import GenDiscAgent
 from minionsai.gen_disc.discriminators import ScriptedDiscriminator
-from minionsai.run_game import run_game
+from minionsai.run_game import run_game, run_n_games
 from minionsai.discriminator_only.agent import TrainedAgent
 from minionsai.discriminator_only.model import MinionsDiscriminator
 from minionsai.discriminator_only.translator import Translator
 from minionsai.engine import Game
-from minionsai.agent import RandomAIAgent
+from minionsai.agent import Agent, RandomAIAgent
 from minionsai.scoreboard_envs import ENVS
 import torch as th
 import numpy as np
@@ -46,6 +46,7 @@ EVAL_VS_PAST_ITERS = [2, 8, 16]
 EVAL_VS_AGENTS = [GenDiscAgent(ScriptedDiscriminator(), RandomAIAgent(), rollouts_per_turn=16)]
 EVAL_VS_RANDOM_UNTIL = 5
 EVAL_TRIALS = 100
+EVAL_THREADS = 4
 
 # Frequency of storing a saved agent
 CHECKPOINT_EVERY = 1
@@ -177,22 +178,9 @@ def eval_vs_other_by_path(agent, eval_agent_path):
         eval_vs_other(agent, eval_agent, agent_name)
 
 def eval_vs_other(agent, eval_agent, name):
-    wins = 0
-    games = 0
-    for i in tqdm.tqdm(range(EVAL_TRIALS)):
-        good_agent = TrainedAgent(agent.policy, agent.translator, agent.generator, ROLLOUTS_PER_TURN * EVAL_COMPUTE_BOOST)
-        good_idx = i % 2
-
-        agents = [None, None]
-        agents[good_idx] = good_agent
-        agents[1 - good_idx] = eval_agent
-
-        game = ENVS[EVAL_ENV_NAME]()
-        winner = run_game(game, agents=agents)
-        if winner == good_idx:
-            wins += 1
-        games += 1
-    winrate = wins / games
+    good_agent = TrainedAgent(agent.policy, agent.translator, agent.generator, ROLLOUTS_PER_TURN * EVAL_COMPUTE_BOOST)
+    wins, _metrics = run_n_games(ENVS[EVAL_ENV_NAME], [good_agent, eval_agent], n=EVAL_TRIALS, num_threads=EVAL_THREADS)
+    winrate = wins[0] / EVAL_TRIALS
     metrics_logger.log_metrics({f"eval_winrate/{name}": winrate})
     logger.info(f"Win rate vs {name} = {winrate}")  
 
@@ -270,8 +258,11 @@ def main(run_name):
                 if iteration < EVAL_VS_RANDOM_UNTIL:
                     eval_agent = RandomAIAgent()
                     eval_vs_other(agent, eval_agent, 'random')
-                for eval_agent_path in EVAL_VS_AGENTS:
-                    eval_vs_other_by_path(agent, eval_agent_path)                  
+                for eval_agent in EVAL_VS_AGENTS:
+                    if isinstance(eval_agent, str):
+                        eval_vs_other_by_path(agent, eval_agent)
+                    elif isinstance(eval_agent, Agent):                  
+                        eval_vs_other(agent, eval_agent, name=eval_agent.__class__.__name__)
                 for iter in EVAL_VS_PAST_ITERS:
                     eval_vs_other_by_path(agent, os.path.join(checkpoint_dir, f"iter_{iter}"))
 

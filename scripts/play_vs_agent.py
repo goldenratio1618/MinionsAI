@@ -6,7 +6,7 @@ from minionsai.agent import Agent, HumanCLIAgent, RandomAIAgent
 from minionsai.experiment_tooling import get_experiments_directory
 from minionsai.gen_disc.agent import GenDiscAgent
 from minionsai.gen_disc.discriminators import HumanDiscriminator
-from minionsai.run_game import run_game
+from minionsai.run_game import run_game_with_metrics
 from minionsai.engine import Game
 import argparse
 import os
@@ -23,12 +23,12 @@ def main(agent_dir=None, disc_mode=False):
     else:
         human_agent = HumanCLIAgent(agent)
     game = Game()
-    winner = run_game(game, (agent, human_agent), verbose=True)
+    winner, metrics = run_game_with_metrics(game, (agent, human_agent), verbose=True, randomize_player_order=True)
     print("Game over.\nWinner:", winner)
-    print("Game metrics (player 0):")
-    print(game.get_metrics(0))
-    print("Game metrics (player 1):")
-    print(game.get_metrics(1))
+    print("Game metrics (Agent):")
+    print(metrics[0])
+    print("Game metrics (Human):")
+    print(metrics[1])
 
 if __name__ == "__main__":
     # Use argparse to parse arguments "path", "name" and "iter"

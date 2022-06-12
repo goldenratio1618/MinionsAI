@@ -99,19 +99,10 @@ class Agent(abc.ABC):
             print(f"Loading from directory...")
             outer_dir = os.path.dirname(directory)
             print(f"  Temporarily adding to sys.path: {outer_dir}")
-            added_to_path = False
             if not outer_dir in sys.path:
                 sys.path.append(outer_dir)
-                added_to_path = True
-            try:
-                module_name = os.path.basename(directory)
-                module = importlib.import_module(module_name)
-            except Exception as e:
-                raise
-            finally:
-                # Make sure to remove it no matter what, even if tehre was an error
-                if added_to_path:
-                    sys.path.remove(outer_dir)
+            module_name = os.path.basename(directory)
+            module = importlib.import_module(module_name)
             return module.build_agent()
 
 class NullAgent(Agent):
