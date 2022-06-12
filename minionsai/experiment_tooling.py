@@ -1,3 +1,4 @@
+from functools import lru_cache
 import os
 import shutil
 import tempfile
@@ -6,6 +7,14 @@ import logging
 from .metrics_logger import metrics_logger
 
 logger = logging.getLogger(__name__)
+
+@lru_cache
+def get_experiments_directory():
+    try:
+        from .local_config import EXPERIMENTS_DIRECTORY
+        return EXPERIMENTS_DIRECTORY
+    except ImportError:
+        return os.path.join(tempfile.gettempdir(), 'MinionsAI')
 
 def find_device():
     logger.info("=========================")
@@ -25,8 +34,7 @@ def setup_directory(run_name):
     Set up logging and checkpoint directories for a run.
     Returns the subdirectory for checkpoints.
     """
-    tempdir = tempfile.gettempdir()
-    run_directory = os.path.join(tempdir, 'MinionsAI', run_name)
+    run_directory = os.path.join(get_experiments_directory(), run_name)
     checkpoint_dir = os.path.join(run_directory, 'checkpoints')
     # If the directory already exists, warn the user and check if it's ok to overwrite it.
     if os.path.exists(run_directory):

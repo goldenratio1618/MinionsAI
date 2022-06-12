@@ -2,14 +2,13 @@
 Play against an agent with
 > python play_vs_agent.py path/to/agent
 """
-import sys
 from minionsai.agent import Agent, HumanCLIAgent, RandomAIAgent
+from minionsai.experiment_tooling import get_experiments_directory
 from minionsai.gen_disc.agent import GenDiscAgent
 from minionsai.gen_disc.discriminators import HumanDiscriminator
 from minionsai.run_game import run_game
 from minionsai.engine import Game
 import argparse
-import tempfile
 import os
 
 def main(agent_dir=None, disc_mode=False):
@@ -48,7 +47,7 @@ if __name__ == "__main__":
         assert args.name is None, "Cannot specify both --path and --name"
         path = args.path
     elif args.name is not None:
-        agents_dir = os.path.join(tempfile.gettempdir(), "MinionsAI", args.name, "checkpoints")
+        agents_dir = os.path.join(get_experiments_directory(), args.name, "checkpoints")
         print(f"Finding path by experiment name: {agents_dir}")
         if args.iter is None:
             print("Finding latest iter ...")

@@ -1,6 +1,7 @@
 *.db
 */data/
 *.prof
+local_config.py
 
 # Copied from https://github.com/github/gitignore/blob/main/Python.gitignore
 # Byte-compiled / optimized / DLL files
