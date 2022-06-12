@@ -5,7 +5,7 @@ import sys
 
 from .action import ActionList, SpawnAction, MoveAction
 from .engine import Game, Phase, adjacent_hexes
-from .unit_type import ZOMBIE, NECROMANCER, unitList, unit_type_from_name
+from .unit_type import ZOMBIE, NECROMANCER, flexible_unit_type, unitList, unit_type_from_name
 
 import os
 import shutil
@@ -172,13 +172,7 @@ class HumanCLIAgent(Agent):
             if input_list[0] in ["s", "spawn"]:
                 try:
                     unit_type_str = input_list[1]
-                    # if it's an int, use it as an index; if it's one letter, look for one with that first letter
-                    if unit_type_str.isdigit():
-                        unit_type = unitList[int(unit_type_str)]
-                    elif len(unit_type_str) == 1:
-                        unit_type = next(unit for unit in unitList if unit.name[0].lower() == unit_type_str.lower())
-                    else:
-                        unit_type = unit_type_from_name(unit_type_str)
+                    unit_type = flexible_unit_type(unit_type_str)
                     (i, j) = [int(x) for x in input_list[2:]]
                 except ValueError:
                     print("Invalid spawn command; should be `(s)pawn type i j`")
@@ -207,12 +201,15 @@ class CLIAgent(Agent):
 
     def __init__(self, commands):
         self.proc = subprocess.Popen(commands, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1, universal_newlines=True)
+        self.commands = commands
         # send initial board config to process
         self.original_stdout = sys.stdout
 
     def act(self, game_copy: Game) -> ActionList:
         # send board state to process and then signal that turn begins
         sys.stdout = self.proc.stdin
+        print("Your color")
+        print(game_copy.active_player_color)
         game_copy.board.print_board_properties()
         print()
         game_copy.board.print_board_state()
@@ -224,6 +221,24 @@ class CLIAgent(Agent):
         move_actions = self.parse_input()
         spawn_actions = self.parse_input()
         return ActionList(move_actions, spawn_actions)
+
+    def save_instance(self, directory: str):
+        f = open(os.path.join(directory, "commands.txt"), "w")
+        for i in self.commands: f.write(i)
+        f.close()
+
+    @classmethod
+    def load_instance(cls, directory: str):
+        f = open(os.path.join(directory, "commands.txt"), "r")
+        commands = []
+        for i in f: commands.append(i)
+        os.chdir(directory)
+        os.chdir("../code")
+        # set execution bit
+        # we don't know which word of commands is file, so try all of them
+        for i in commands: os.system("chmod +x " + i)
+        agent = CLIAgent(commands)
+        return agent
 
 
 class RandomAIAgent(Agent):

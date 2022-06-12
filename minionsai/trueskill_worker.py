@@ -42,7 +42,7 @@ class TrueskillWorker():
         self.game_fn = game_fn
         self.choose_underevaluated_agents_prob = 0.5
         self.batch_size = batch_size
-        self.env = trueskill.TrueSkill(tau=0, draw_probability=0.0)
+        self.env = trueskill.TrueSkill(tau=0.02, draw_probability=0.0)
         self.dropped_agents = []
         self.max_crash_rate = 0.5
         self.scores_file = scores_file or os.path.join(directory, "scores.csv")

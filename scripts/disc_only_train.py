@@ -15,6 +15,7 @@ from minionsai.discriminator_only.model import MinionsDiscriminator
 from minionsai.discriminator_only.translator import Translator
 from minionsai.engine import Game
 from minionsai.agent import RandomAIAgent
+from minionsai.scoreboard_envs import ENVS
 import torch as th
 import numpy as np
 import os
@@ -31,8 +32,9 @@ logger = logging.getLogger(__name__)
 ROLLOUTS_PER_TURN = 64
 
 # How many episodes of data do we collect each iteration, before running a few epochs of optimization?
-# Potentially good to use a few times bigger EPISODES_PER_ITERATION than BATCH_SIZE, to minimize correlation within batches
-EPISODES_PER_ITERATION = 128  
+# Potentially good to use a few times bigger EPISODES_PER_ITERATION * DATA_AUG_FACTOR than BATCH_SIZE, to minimize correlation within batches
+# (DATA_AUG_FACTOR = 4)
+EPISODES_PER_ITERATION = 64
 
 # Once we've collected the data, how many times do we go over it for optimization (within one iteration)?
 SAMPLE_REUSE = 3
@@ -55,8 +57,9 @@ BATCH_SIZE = 32
 LR = 3e-5
 
 # kwargs to create a game (passed to Game)
-game_kwargs = {}
-eval_game_kwargs = {}
+game_kwargs = {'symmetrize': False}
+# Eval env registered in scoreboard_envs.py
+EVAL_ENV_NAME = 'zombies5x5'
 
 def find_device():
     logger.info("=========================")
@@ -147,9 +150,19 @@ def rollouts(game_kwargs, agents):
         games += 1
         if winning_color == 0:
             first_player_wins += 1
+    rollout_states = len(states)
+    # convert from list of dicts of arrays to a single dict of arrays with large batch dimension
+    states = {k: np.concatenate([s[k] for s in states], axis=0) for k in states[0]}
+    
+    # Add symmetries
+    symmetrized_states = Translator.symmetries(states)
+
+    # Now combine them into one big states dict
+    states = {k: np.concatenate([s[k] for s in symmetrized_states], axis=0) for k in states}
+    labels = np.concatenate([labels]*len(symmetrized_states), axis=0)
     # Log instantaneous metrics here, and send cumulative out to the main control flow to integrate
     metrics_logger.log_metrics({'first_player_winrate': first_player_wins / games})
-    return states, labels, {'rollout_games': games, 'rollout_states': len(states)}
+    return states, labels, {'rollout_games': games, 'rollout_states': rollout_states}
 
 def eval_vs_random(agent):
     wins = 0
@@ -163,7 +176,7 @@ def eval_vs_random(agent):
         agents[good_idx] = good_agent
         agents[1 - good_idx] = random_agent
 
-        game = Game(**eval_game_kwargs)
+        game = ENVS[EVAL_ENV_NAME]()
         winner = run_game(game, agents=agents)
         if winner == good_idx:
             wins += 1
@@ -198,21 +211,23 @@ def main(run_name):
             agent.rollouts_per_turn = ROLLOUTS_PER_TURN
 
         logger.info("Starting rollouts...")
+        policy.eval()  # Set policy to non-training mode
         states, labels, rollout_info = rollouts(game_kwargs, [agent, agent])
+        policy.train()  # Set policy back to training mode
         for k, v in rollout_info.items():
             rollout_stats[k] += v
         metrics_logger.log_metrics(rollout_stats)
         logger.info("Starting training...")
+        num_states = states['board'].shape[0]
         for epoch in range(SAMPLE_REUSE):
             logger.info(f"  Epoch {epoch}/{SAMPLE_REUSE}...")
-            all_idxes = np.random.permutation(len(states))
-            n_batches = len(all_idxes) // BATCH_SIZE
-            final_loss = None
+            all_idxes = np.random.permutation(num_states)
+            n_batches = num_states // BATCH_SIZE
             for idx in range(n_batches):
                 batch_idxes = all_idxes[idx * BATCH_SIZE: (idx + 1) * BATCH_SIZE]
                 batch_obs = {}
-                for key in states[0]:
-                    batch_obs[key] = np.concatenate([states[i][key] for i in batch_idxes], axis=0)
+                for key in states:
+                    batch_obs[key] = states[key][batch_idxes]
                 batch_labels = np.array(labels)[batch_idxes]
                 batch_labels = th.from_numpy(batch_labels).to(device)
                 optimizer.zero_grad()
@@ -221,19 +236,22 @@ def main(run_name):
                 loss = th.nn.BCEWithLogitsLoss()(disc_logprob, batch_labels)
                 loss.backward()
                 optimizer.step()
-                if idx == n_batches - 1:
-                    final_loss = loss.item()
+                if idx in [0, n_batches // 2, n_batches - 1]:
+                    max_batch_digits = len(str(n_batches))
+                    metrics_logger.log_metrics({f"loss/epoch_{epoch}/batch_{idx:0>{max_batch_digits}}": loss.item()})
                 turns_optimized += len(batch_idxes)
         logger.info(f"Iteration {iteration} complete.")
         param_norm = sum([th.norm(param, p=2) for param in policy.parameters()]).item()
-        metrics_logger.log_metrics({"loss": final_loss, 'turns_optimized': turns_optimized, 'param_norm': param_norm})
+        metrics_logger.log_metrics({'turns_optimized': turns_optimized, 'param_norm': param_norm})
         metrics_logger.flush()
 
         iteration += 1
 
         if iteration % EVAL_EVERY == 0:
             logger.info("Evaluating...")
+            policy.eval()  # Set policy to non-training mode
             eval_winrate = eval_vs_random(agent)
+            policy.train()  # Set policy back to training mode
             metrics_logger.log_metrics({"eval_winrate": eval_winrate})
             logger.info(f"Win rate vs random = {eval_winrate}")
 

@@ -54,8 +54,8 @@ class Translator():
         # Clip the obs to be within bounds
         remaining_turns = min(remaining_turns, self.MAX_REMAINING_TURNS)
         
-        money = min(all_money[0], self.MAX_MONEY)
-        opp_money = min(all_money[1], self.MAX_MONEY)
+        money = min(all_money[game.active_player_color], self.MAX_MONEY)
+        opp_money = min(all_money[1 - game.active_player_color], self.MAX_MONEY)
         score_diff = max(min(scores[game.active_player_color] - scores[game.inactive_player_color], self.MAX_SCORE_DIFF), -self.MAX_SCORE_DIFF) + self.MAX_SCORE_DIFF
         # TODO: Should the translator be in charge of calling ObservationEnum.encode()?
         return {
@@ -65,3 +65,23 @@ class Translator():
             'opp_money': np.array([[opp_money]]),
             'score_diff': np.array([[score_diff]])
         }
+
+    @staticmethod
+    def symmetries(obs):
+        # Takes an obs that came out of translator.translate()
+        # and returns a list of symmetric observations
+        # TODO(david) - this function really should be tested.
+        board = obs['board']
+        num = board.shape[0]
+        board = np.reshape(board, [num, BOARD_SIZE, BOARD_SIZE, 3])
+        all_boards = [board, np.transpose(board, axes=[0, 2, 1, 3])]
+        rotated_boards = [np.flip(np.flip(b, axis=1), axis=2) for b in all_boards]
+        all_boards = all_boards + rotated_boards
+        all_boards = [np.reshape(b, [num, BOARD_SIZE ** 2, 3]) for b in all_boards]
+        return [{
+            'board': b,
+            'remaining_turns': obs['remaining_turns'],
+            'money': obs['money'],
+            'opp_money': obs['opp_money'],
+            'score_diff': obs['score_diff']
+        } for b in all_boards]

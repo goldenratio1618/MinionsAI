@@ -1,7 +1,8 @@
+import copy
 import enum
 import random
 from typing import Tuple
-from .unit_type import UnitType, NECROMANCER, ZOMBIE
+from .unit_type import UnitType, NECROMANCER, ZOMBIE, unit_type_from_name
 from .action import ActionType, Action, ActionList, MoveAction, SpawnAction
 import numpy as np
 
@@ -9,7 +10,7 @@ BOARD_SIZE = 5
 
 # distance function between two hexes
 def dist(xi, yi, xf, yf):
-    return max(abs(yf - yi), abs(xf - xi) + (abs(yf - yi) if xi > xf == yi > yf else 0))
+    return max(abs(yf - yi), abs(xf - xi) + (abs(yf - yi) if (xi > xf) == (yi > yf) else 0))
 
 # return an array of tuples of adjacent hexes
 def adjacent_hexes(x, y):
@@ -38,7 +39,8 @@ class Board():
             b.board[i][j].is_water = hex.is_water
             b.board[i][j].is_graveyard = hex.is_graveyard
             if hex.unit is not None:
-                b.board[i][j].add_unit(Unit(color=hex.unit.color, unit_type=hex.unit.type))
+                copied_unit = copy.deepcopy(hex.unit)
+                b.board[i][j].add_unit(copied_unit)
         return b
 
     def board_properties(self):
@@ -69,6 +71,24 @@ class Board():
         for i, row in enumerate(self.board):
             for j, hex in enumerate(row):
                 yield (i, j), hex
+
+    def encode_json(self):
+        return [[{
+            'is_water': hex.is_water,
+            'is_graveyard': hex.is_graveyard,
+            'unit': hex.unit.encode_json() if hex.unit is not None else None
+        } for hex in row] for row in self.board]
+
+    @staticmethod
+    def decode_json(json_data):
+        board = Board([], [])
+        for i, row in enumerate(json_data):
+            for j, hex in enumerate(row):
+                board.board[i][j].is_water = hex['is_water']
+                board.board[i][j].is_graveyard = hex['is_graveyard']
+                if hex['unit'] is not None:
+                    board.board[i][j].add_unit(Unit.decode_json(hex['unit']))
+        return board
                 
 class Hex():
     def __init__(self, is_water, is_graveyard):
@@ -83,7 +103,9 @@ class Hex():
     def remove_unit(self):
         self.unit = None
 
-class Phase(enum.Enum):
+# This multiple inheritance is a bit horrifying,
+# but according to SO it's the way to get enum's to be json-able.
+class Phase(str, enum.Enum):
     MOVE = "move"  # Move phase
     SPAWN = "spawn"  # Spawn Phase
     TURN_END = "turn_end"  # After spawn phase, but haven't yet run next_turn()
@@ -97,6 +119,9 @@ class Game():
                  new_game=True,
                  active_player_color=0,
                  max_turns=20, 
+                 symmetrize=True,
+                 min_graveyards=3,
+                 max_graveyards=8,
                  phase=Phase.TURN_END):
         """
         Important API pieces:
@@ -122,9 +147,24 @@ class Game():
         """
         if board is None:
             # starting position: captains on opposite corners with one graveyard in center
-            graveyard_locs = [(i, j) for i in range(BOARD_SIZE) for j in range(BOARD_SIZE) if random.random() < 0.25 and 1 <= i + j and i + j <= (2 * BOARD_SIZE - 3)]
+            new_graveyards = []
+            while (len(new_graveyards) < min_graveyards or len(new_graveyards) > max_graveyards):
+                graveyard_locs = [(i, j) for i in range(BOARD_SIZE) for j in range(BOARD_SIZE) if random.random() < 0.25 and 1 <= i + j and i + j <= (2 * BOARD_SIZE - 3)]
+                # symmetrize: remove graveyards with 50% probability and otherwise mirror reflect them
+                if symmetrize:
+                    new_graveyards = []
+                    for loc in graveyard_locs:
+                        i, j = loc
+                        if (i + j == BOARD_SIZE - 1):
+                            new_graveyards.append(loc)
+                        else:
+                            if random.random() < 0.5:
+                                new_graveyards.append(loc)
+                                new_graveyards.append((BOARD_SIZE - 1 - i, BOARD_SIZE - 1 - j))
+                else:
+                    new_graveyards = graveyard_locs
             water_locs = []
-            board = Board(water_locs, graveyard_locs)
+            board = Board(water_locs, new_graveyards)
             board.board[0][0].add_unit(Unit(0, NECROMANCER)) # yellow captain
             board.board[BOARD_SIZE - 1][ BOARD_SIZE - 1].add_unit(Unit(1, NECROMANCER)) # blue captain
         self.board: Board = board
@@ -174,7 +214,7 @@ class Game():
     def inactive_player_color(self) -> int:
         return 1 - self.active_player_color
 
-    def pretty_print(self):
+    def pretty_print(self, do_print=True):
         """
         Prints board in ascii
         """
@@ -209,9 +249,9 @@ class Game():
             row_strs[1] += phase
         else:
             row_strs[-2] += phase
-
-        print("\n".join(row_strs))
-
+        result = "\n".join(row_strs)
+        if do_print: print(result)
+        return result
 
     def units_with_locations(self, color=None) -> Tuple[Tuple[int, int], Hex]:
         result = []
@@ -301,15 +341,16 @@ class Game():
             self.board.board[xf][yf].add_unit(temp)
         # if target hex is occupied by enemy unit, then attack
         elif self.board.board[xf][yf].unit.color != self.active_player_color:
+            if self.board.board[xi][yi].unit.remainingAttack == 0: return False
             if distance > attack_range: return False
+            # attacking prevents later movement
+            self.board.board[xi][yi].unit.hasMoved = True
             # unsummon removes non-persistent unit from board and refunds cost
             if self.board.board[xi][yi].unit.type.unsummoner and not self.board.board[xf][yf].unit.type.persistent:
                 self.money[self.inactive_player_color] += self.board.board[xf][yf].unit.type.cost
                 self.board.board[xf][yf].remove_unit()
+                self.board.board[xi][yi].unit.remainingAttack = 0
                 return True
-            if self.board.board[xi][yi].unit.remainingAttack == 0: return False
-            # attacking prevents later movement
-            self.board.board[xi][yi].unit.hasMoved = True
             # flurry deals 1 attack
             if self.board.board[xi][yi].unit.type.flurry:
                 self.board.board[xi][yi].unit.remainingAttack -= 1
@@ -398,6 +439,32 @@ class Game():
                     income_bonus=self.income_bonus,
                     new_game=False)
 
+    def encode_json(self):
+        """
+        Returns a JSON-encodable representation of the game.
+        """
+        return {
+            "board": self.board.encode_json(),
+            "money": self.money,
+            "max_turns": self.remaining_turns,
+            "active_player_color": self.active_player_color,
+            "phase": self.phase,
+            "income_bonus": self.income_bonus,
+        }
+
+    @staticmethod
+    def decode_json(json):
+        """
+        Returns a Game object from a JSON-encoded representation.
+        """
+        return Game(money=json["money"],
+                    max_turns=json["max_turns"],
+                    board=Board.decode_json(json["board"]),
+                    active_player_color=json["active_player_color"],
+                    phase=Phase(json["phase"]),
+                    income_bonus=json["income_bonus"],
+                    new_game=False)
+
 class Unit():
     def __init__(self, color, unit_type):
         self.type = unit_type
@@ -415,3 +482,25 @@ class Unit():
                 return -2
             return self.type.rebate
         return -1
+
+    def encode_json(self):
+        return {
+            "type": self.type.name,
+            "color": self.color,
+            "curr_health": self.curr_health,
+            "hasMoved": self.hasMoved,
+            "remainingAttack": self.remainingAttack,
+            "isExhausted": self.isExhausted,
+            "is_soulbound": self.is_soulbound,
+        }
+    
+    @staticmethod
+    def decode_json(json):
+        type = unit_type_from_name(json["type"])
+        unit = Unit(json["color"], type)
+        unit.curr_health = json["curr_health"]
+        unit.hasMoved = json["hasMoved"]
+        unit.remainingAttack = json["remainingAttack"]
+        unit.isExhausted = json["isExhausted"]
+        unit.is_soulbound = json["is_soulbound"]
+        return unit
