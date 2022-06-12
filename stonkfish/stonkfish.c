@@ -8,7 +8,9 @@
 #define BOARD_SIZE 5
 
 // timeout (in sec)
-#define TIMEOUT 10
+#define TIMEOUT 100
+
+#define max(x,y) x > y ? x : y
 
 void sig_handler (int signum) {
   _exit(1);
@@ -22,6 +24,13 @@ typedef struct location {
 // from https://stackoverflow.com/questions/14579920/fast-sign-of-integer-in-c
 int sign(int x) {
   return (x > 0) - (x < 0);
+}
+
+int dist(int xi, int yi, int xf, int yf) {
+  int dy = abs(yf - yi);
+  int dx = abs(xf - xi);
+  if ((xi > xf) == (yi > yf)) dx += abs(yf - yi);
+  return max(dx, dy);
 }
 
 // set adjacent to six adjacent hexes
@@ -205,22 +214,38 @@ int main() {
     }
 
     // movement: charge enemy captain
-    int xi, yi, xf, yf;
+    int xi, yi, xf, yf, xe, ye, xc, yc;
     xi = own_captain.x;
     yi = own_captain.y;
+    
+    xe = enemy_captain.x;
+    ye = enemy_captain.y;
+    
     xf = xi;
     yf = yi;
-    if (abs(yf - enemy_captain.y) >= abs(xf - enemy_captain.x))
-      yf -= sign(own_captain.y - enemy_captain.y);
-    else
-      xf -= sign(own_captain.x - enemy_captain.x);
-    location new_loc;
-    if (zombies[xf * BOARD_SIZE + yf] != (1-color) && (enemy_captain.x != xf || enemy_captain.y != yf)) {
-      printf("%d %d %d %d\n", xi, yi, xf, yf);
-    } else {
-      xf = xi;
-      yf = yi;
+
+    xc = (BOARD_SIZE - 1)/2;
+    yc = (BOARD_SIZE - 1)/2;
+
+    int distance = 10 * dist(xi, yi, xe, ye) + dist(xi, yi, xc, yc);
+    // look for empty adjacent hex with smaller distance
+    get_adjacent_hexes(adjacent_hexes, &own_captain);
+    for (int i = 0; i < 6; i ++) {
+      int x = adjacent_hexes[i].x;
+      int y = adjacent_hexes[i].y;
+      if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
+      if (zombies [x * BOARD_SIZE + y] != -1) continue;
+      if ((xe == x) && (ye == y)) continue;
+      int new_dist = 10 * dist(x, y, xe, ye) + dist(x, y, xc, yc);
+      if (new_dist < distance) {
+        distance = new_dist;
+        xf = x;
+        yf = y;
+      }
     }
+    if (xi != xf || yi != yf)
+      printf("%d %d %d %d\n", xi, yi, xf, yf);
+    location new_loc;
     new_loc.x = xf;
     new_loc.y = yf;
 
