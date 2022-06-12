@@ -8,8 +8,10 @@ Then agent checkpoints & logs are saved in <your temp dir>/MinionsAI/my_run
 
 import argparse
 from collections import defaultdict
-from tkinter import Y
+import tempfile
 from minionsai.experiment_tooling import find_device, setup_directory
+from minionsai.gen_disc.agent import GenDiscAgent
+from minionsai.gen_disc.discriminators import ScriptedDiscriminator
 from minionsai.run_game import run_game
 from minionsai.discriminator_only.agent import TrainedAgent
 from minionsai.discriminator_only.model import MinionsDiscriminator
@@ -23,7 +25,6 @@ import os
 import tqdm
 import random
 import logging
-import tempfile
 from minionsai.metrics_logger import metrics_logger
 
 logger = logging.getLogger(__name__)
@@ -42,7 +43,7 @@ SAMPLE_REUSE = 2
 # Frequency of running evals vs random agent
 EVAL_EVERY = 2
 EVAL_VS_PAST_ITERS = [2, 8, 16]
-EVAL_VS_AGENTS = [os.path.join(tempfile.gettempdir(), "MinionsAI", "shuffle_spawn", "checkpoints", "iter_8")]
+EVAL_VS_AGENTS = [GenDiscAgent(ScriptedDiscriminator(), RandomAIAgent(), rollouts_per_turn=16)]
 EVAL_VS_RANDOM_UNTIL = 5
 EVAL_TRIALS = 100
 
