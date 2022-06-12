@@ -174,6 +174,7 @@ int main() {
           goto ZOMBIE_END;
 
         // move zombies randomly
+        // Update: Don't move onto hexes adjacent to two enemy zombies
         for (int i = 0; i < 6; i ++) {
           int x = adjacent_hexes[i].x;
           int y = adjacent_hexes[i].y;
@@ -181,8 +182,20 @@ int main() {
           if (zombies[x * BOARD_SIZE + y] == -1 
               && (enemy_captain.x != x || enemy_captain.y != y)
               && (own_captain.x != x || own_captain.y != y)) {
-            printf("%d %d %d %d\n", xi, yi, x, y);
-            goto ZOMBIE_END;
+            // check new location to make sure it's safe
+            location new_neighbors[6];
+            get_adjacent_hexes(new_neighbors, adjacent_hexes + i);
+            int adjacent_zombies = 0;
+            for (int j = 0; j < 6; j ++) {
+              int nx = new_neighbors[j].x;
+              int ny = new_neighbors[j].y;
+              if (nx < 0 || nx >= BOARD_SIZE || ny < 0 || ny >= BOARD_SIZE) continue;
+              if (zombies[nx * BOARD_SIZE + ny] == 1 - color) adjacent_zombies ++;
+            }
+            if (adjacent_zombies < 2) {
+              printf("%d %d %d %d\n", xi, yi, x, y);
+              goto ZOMBIE_END;
+            }
           }
         }
 
@@ -242,7 +255,18 @@ int main() {
       int x = adjacent_hexes[i].x;
       int y = adjacent_hexes[i].y;
       if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
-      printf("1 %d %d\n", x, y);
+      // check new location to make sure it's safe
+      location new_neighbors[6];
+      get_adjacent_hexes(new_neighbors, adjacent_hexes + i);
+      int adjacent_zombies = 0;
+      for (int j = 0; j < 6; j ++) {
+        int nx = new_neighbors[j].x;
+        int ny = new_neighbors[j].y;
+        if (nx < 0 || nx >= BOARD_SIZE || ny < 0 || ny >= BOARD_SIZE) continue;
+        if (zombies[nx * BOARD_SIZE + ny] == 1 - color) adjacent_zombies ++;
+      }
+      if (adjacent_zombies < 2)
+        printf("1 %d %d\n", x, y);
     }
     printf("\n");
     fflush(stdout);
