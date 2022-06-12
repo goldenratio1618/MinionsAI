@@ -8,6 +8,7 @@
       </h3>
       
       <pre>{{game.pretty_print(do_print=False)}}</pre>
+      {{error_msg}}
       {% if not game.done %}
       <form method="post">
          <input type="hidden" name="game_state" value="{{game_json}}">

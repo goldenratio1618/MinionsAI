@@ -1,7 +1,9 @@
+from collections import defaultdict
 import copy
 import enum
+from functools import lru_cache
 import random
-from typing import Tuple
+from typing import Optional, Tuple
 from .unit_type import UnitType, NECROMANCER, ZOMBIE, unit_type_from_name
 from .action import ActionType, Action, ActionList, MoveAction, SpawnAction
 import numpy as np
@@ -13,6 +15,7 @@ def dist(xi, yi, xf, yf):
     return max(abs(yf - yi), abs(xf - xi) + (abs(yf - yi) if (xi > xf) == (yi > yf) else 0))
 
 # return an array of tuples of adjacent hexes
+@lru_cache
 def adjacent_hexes(x, y):
     hex_list = []
     if x > 0: hex_list.append((x-1,y))
@@ -39,7 +42,7 @@ class Board():
             b.board[i][j].is_water = hex.is_water
             b.board[i][j].is_graveyard = hex.is_graveyard
             if hex.unit is not None:
-                copied_unit = copy.deepcopy(hex.unit)
+                copied_unit = hex.unit.copy()
                 b.board[i][j].add_unit(copied_unit)
         return b
 
@@ -122,7 +125,8 @@ class Game():
                  symmetrize=True,
                  min_graveyards=3,
                  max_graveyards=8,
-                 phase=Phase.TURN_END):
+                 phase=Phase.TURN_END,
+                 record_metrics=True):
         """
         Important API pieces:
             game.full_turn(action_list) - process an action list for the current player
@@ -155,7 +159,7 @@ class Game():
                     new_graveyards = []
                     for loc in graveyard_locs:
                         i, j = loc
-                        if (i + j == BOARD_SIZE - 1):
+                        if (2 * i == BOARD_SIZE - 1 and 2 * j == BOARD_SIZE - 1):
                             new_graveyards.append(loc)
                         else:
                             if random.random() < 0.5:
@@ -185,6 +189,10 @@ class Game():
             self.active_player_color = 1 - self.active_player_color
             assert self.phase == Phase.TURN_END, "New game should start with TURN_END phase."
 
+        self.record_metrics = record_metrics
+        if self.record_metrics:
+            self._metrics = (defaultdict(float), defaultdict(float))
+
     @property
     def done(self) -> bool:
         return self.remaining_turns <= 0
@@ -213,6 +221,16 @@ class Game():
     @property
     def inactive_player_color(self) -> int:
         return 1 - self.active_player_color
+
+    def get_metrics(self, color):
+        if self.record_metrics:
+            return self._metrics[color]
+        else:
+            raise ValueError("Metrics are not being recorded.")
+
+    def add_to_metric(self, color, key, amount):
+        if self.record_metrics:
+            self._metrics[color][key] += amount
 
     def pretty_print(self, do_print=True):
         """
@@ -266,6 +284,10 @@ class Game():
         self.remaining_turns -= 1
         if self.done:
             self.phase = Phase.GAME_OVER
+            for color in (0, 1):
+                self.add_to_metric(color, 'final_money', self.money[color])
+                self.add_to_metric(color, 'final_num_units', len(self.units_with_locations(color=color)))
+            self.add_to_metric(self.winner, 'wins', 1)
             return
 
         for row in self.board.board:
@@ -276,7 +298,7 @@ class Game():
                     square.unit.curr_health = square.unit.type.defense
         self.phase = Phase.MOVE
 
-    def process_single_action(self, action: Action) -> bool:
+    def process_single_action(self, action: Action) -> Tuple[bool, Optional[str]]:
         if self.phase == Phase.MOVE:
             # Note: We need to compare the names not the enum types,
             # in case the agent submitted an action from their local copy of the codebase
@@ -295,26 +317,27 @@ class Game():
         else:
             raise ValueError(f"Wrong phase ({self.phase}) for processing actions.")
 
-    def process_single_move(self, move_action: MoveAction) -> bool:
+    def process_single_move(self, move_action: MoveAction) -> Tuple[bool, Optional[str]]:
         # returns true if move is legal & succesful, false otherwise
+        # Second entry is the error message if move is illegal
 
         assert self.phase == Phase.MOVE, f"Tried to move during phase {self.phase}"
         # TODO: Make sure there is a path from origin to destination
         xi, yi = move_action.from_xy
         xf, yf = move_action.to_xy
         # make sure from hex has unit that can move
-        if self.board.board[xi][yi].unit == None: return False
+        if self.board.board[xi][yi].unit == None: return False, "No unit at start location"
         # only move your own units
-        if self.board.board[xi][yi].unit.color != self.active_player_color: return False
+        if self.board.board[xi][yi].unit.color != self.active_player_color: return False, "Unit at start location is not your unit"
         # make sure origin and destination are sufficiently close
         speed = self.board.board[xi][yi].unit.type.speed
         attack_range = self.board.board[xi][yi].unit.type.attack_range
         distance = dist(xi, yi, xf, yf)
         # if target hex is empty parse move as movement
         if self.board.board[xf][yf].unit == None:
-            if distance > speed: return False
-            if self.board.board[xi][yi].unit.hasMoved: return False
-            if not self.board.board[xi][yi].unit.type.flying and self.board.board[xf][yf].is_water: return False
+            if distance > speed: return False, f"Move is too far ({distance} > {speed})"
+            if self.board.board[xi][yi].unit.hasMoved: return False, "Unit has already moved"
+            if not self.board.board[xi][yi].unit.type.flying and self.board.board[xf][yf].is_water: return False, "Unit is not flying and is trying to move to water"
             self.board.board[xi][yi].unit.hasMoved = True
             if self.board.board[xi][yi].unit.type.lumbering:
                 self.board.board[xi][yi].unit.remainingAttack = 0
@@ -322,12 +345,12 @@ class Game():
             self.board.board[xi][yi].remove_unit()
         # if target hex is occupied by friendly unit then swap the units
         elif self.board.board[xf][yf].unit.color == self.active_player_color:
-            if distance > speed: return False
-            if distance > self.board.board[xf][yf].unit.type.speed: return False
-            if self.board.board[xi][yi].unit.hasMoved: return False
-            if self.board.board[xf][yf].unit.hasMoved: return False
-            if not self.board.board[xi][yi].unit.type.flying and self.board.board[xf][yf].is_water: return False
-            if not self.board.board[xf][yf].unit.type.flying and self.board.board[xi][yi].is_water: return False
+            if distance > speed: return False, f"Move is too far ({distance} > {speed})"
+            if distance > self.board.board[xf][yf].unit.type.speed: return False, f"Move is too far for swapping unit ({distance} > {self.board.board[xf][yf].unit.type.speed})"
+            if self.board.board[xi][yi].unit.hasMoved: return False, "Unit has already moved"
+            if self.board.board[xf][yf].unit.hasMoved: return False, "Swapping unit has already moved"
+            if not self.board.board[xi][yi].unit.type.flying and self.board.board[xf][yf].is_water: return False, "Unit is not flying and is trying to move to water"
+            if not self.board.board[xf][yf].unit.type.flying and self.board.board[xi][yi].is_water: return False, "Swapping unit is not flying and is trying to move to water"
             self.board.board[xi][yi].unit.hasMoved = True
             self.board.board[xf][yf].unit.hasMoved = True
             if self.board.board[xi][yi].unit.type.lumbering:
@@ -341,8 +364,8 @@ class Game():
             self.board.board[xf][yf].add_unit(temp)
         # if target hex is occupied by enemy unit, then attack
         elif self.board.board[xf][yf].unit.color != self.active_player_color:
-            if self.board.board[xi][yi].unit.remainingAttack == 0: return False
-            if distance > attack_range: return False
+            if self.board.board[xi][yi].unit.remainingAttack == 0: return False, "Unit has no remaining attack"
+            if distance > attack_range: return False, f"Attack is too far ({distance} > {attack_range})"
             # attacking prevents later movement
             self.board.board[xi][yi].unit.hasMoved = True
             # unsummon removes non-persistent unit from board and refunds cost
@@ -350,7 +373,8 @@ class Game():
                 self.money[self.inactive_player_color] += self.board.board[xf][yf].unit.type.cost
                 self.board.board[xf][yf].remove_unit()
                 self.board.board[xi][yi].unit.remainingAttack = 0
-                return True
+                self.add_to_metric(self.active_player_color, "bounces", 1)
+                return True, None
             # flurry deals 1 attack
             if self.board.board[xi][yi].unit.type.flurry:
                 self.board.board[xi][yi].unit.remainingAttack -= 1
@@ -365,9 +389,10 @@ class Game():
                 self.board.board[xf][yf].remove_unit()
                 # process rebate
                 self.money[self.inactive_player_color] += attack_outcome
-        return True
+                self.add_to_metric(self.active_player_color, "kills", 1)
+        return True, None
 
-    def process_single_spawn(self, spawn_action: SpawnAction) -> bool:
+    def process_single_spawn(self, spawn_action: SpawnAction) -> Tuple[bool, Optional[str]]:
         # returns true if spawn is legal & succesful, false otherwise
 
         assert self.phase == Phase.SPAWN, f"Tried to spawn during phase {self.phase}"
@@ -376,9 +401,9 @@ class Game():
         x, y = spawn_action.to_xy
         # check to see if we have enough money
         cost = unit_type.cost
-        if cost > self.money[self.active_player_color]: return False
+        if cost > self.money[self.active_player_color]: return False, f"Not enough money to spawn {unit_type.name}"
         # check to make sure hex is unoccupied
-        if self.board.board[x][y].unit != None: return False
+        if self.board.board[x][y].unit != None: return False, f"Hex {x}, {y} is already occupied"
         # check to make sure we are adjacent to spawner
         adjacent_spawner = False
         for square in adjacent_hexes(x, y):
@@ -386,12 +411,12 @@ class Game():
             if self.board.board[ax][ay].unit != None and self.board.board[ax][ay].unit.color == self.active_player_color \
                     and self.board.board[ax][ay].unit.type.spawn:
                 adjacent_spawner = True
-        if not adjacent_spawner: return False
+        if not adjacent_spawner: return False, "Not adjacent to spawner"
         # purchase unit
         self.money[self.active_player_color] -= cost
         # add unit to board
         self.board.board[x][y].add_unit(Unit(self.active_player_color, unit_type))
-        return True
+        return True, None
 
     def end_spawn_phase(self):
         assert self.phase == Phase.SPAWN, f"Tried to end spawn phase during phase {self.phase}"
@@ -416,14 +441,14 @@ class Game():
         if verbose:
             print(f"Processing actionlist: {action_list}")
         for action in action_list.move_phase:
-            success = self.process_single_action(action)
+            success, error_msg = self.process_single_action(action)
             if verbose and not success:
-                print(f"Failed to process action: {action}")
+                print(f"Failed to process action: {action} -- {error_msg}")
         self.end_move_phase()
         for action in action_list.spawn_phase:
-            success = self.process_single_spawn(action)
+            success, error_msg = self.process_single_spawn(action)
             if verbose and not success:
-                print(f"Failed to process action: {action}")
+                print(f"Failed to process action: {action} -- {error_msg}")
         self.end_spawn_phase()
 
     def copy(self):
@@ -437,7 +462,8 @@ class Game():
                     active_player_color=self.active_player_color, 
                     phase=self.phase,
                     income_bonus=self.income_bonus,
-                    new_game=False)
+                    new_game=False,
+                    record_metrics=False)
 
     def encode_json(self):
         """
@@ -504,3 +530,23 @@ class Unit():
         unit.isExhausted = json["isExhausted"]
         unit.is_soulbound = json["is_soulbound"]
         return unit
+
+    def copy(self):
+        u = Unit(self.color, self.type)
+        u.curr_health = self.curr_health
+        u.hasMoved = self.hasMoved
+        u.remainingAttack = self.remainingAttack
+        u.isExhausted = self.isExhausted
+        u.is_soulbound = self.is_soulbound
+        return u
+
+def print_n_games(games):
+    width = 15
+    height = 9
+    result = [""] * height
+    for game in games:
+        game_pretty_print = game.pretty_print(do_print=False).split("\n")
+        assert len(game_pretty_print) == height, f"Expected {height} lines, got {len(game_pretty_print)}:\n{game.pretty_print}"
+        for i in range(height):
+            result[i] += game_pretty_print[i][:width].ljust(width) + "|"
+    print("\n".join(result))

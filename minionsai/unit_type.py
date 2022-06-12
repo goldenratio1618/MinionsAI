@@ -21,6 +21,9 @@ class UnitType():
         self.cost = cost
         self.rebate = rebate
 
+    def __eq__(self, __o: object) -> bool:
+        return self.name == __o.name
+
 NECROMANCER = UnitType("Necromancer", 255, 0, 0, 7, persistent=True, immune=True, spawn=True, unsummoner=True)
 ZOMBIE = UnitType("Zombie", 2, 0, 1, 2, lumbering=True)
 

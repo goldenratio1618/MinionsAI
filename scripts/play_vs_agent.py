@@ -4,21 +4,32 @@ Play against an agent with
 """
 import sys
 from minionsai.agent import Agent, HumanCLIAgent, RandomAIAgent
+from minionsai.gen_disc.agent import GenDiscAgent
+from minionsai.gen_disc.discriminators import HumanDiscriminator
 from minionsai.run_game import run_game
 from minionsai.engine import Game
 import argparse
 import tempfile
 import os
 
-def main(agent_dir=None):
+def main(agent_dir=None, disc_mode=False):
     if agent_dir is None:
         agent = RandomAIAgent()
     else:
         agent = Agent.load(agent_dir)
-        agent.verbose_level = 1
+        agent.verbose_level = 2
+
+    if disc_mode:
+        human_agent = GenDiscAgent(HumanDiscriminator(filter_agent=agent), RandomAIAgent(), rollouts_per_turn=agent.rollouts_per_turn)
+    else:
+        human_agent = HumanCLIAgent(agent)
     game = Game()
-    winner = run_game(game, (HumanCLIAgent(), agent))
+    winner = run_game(game, (agent, human_agent), verbose=True)
     print("Game over.\nWinner:", winner)
+    print("Game metrics (player 0):")
+    print(game.get_metrics(0))
+    print("Game metrics (player 1):")
+    print(game.get_metrics(1))
 
 if __name__ == "__main__":
     # Use argparse to parse arguments "path", "name" and "iter"
@@ -26,6 +37,7 @@ if __name__ == "__main__":
     parser.add_argument("--path", help="Full path to agent directory")
     parser.add_argument("--name", help="Experiment name (will automatically find path in <tempdir>/MinionsAI/<name>/checkpoints)")
     parser.add_argument("--iter", help="Iteration number (if unspecified, uses latest)")
+    parser.add_argument("--disc_mode", type=bool, default=False, help="Choose among n random options like a discriminator.")
     args = parser.parse_args()
 
     if args.iter is not None:
@@ -43,7 +55,6 @@ if __name__ == "__main__":
             # Find the latest iteration based on the filenames
             choices = os.listdir(agents_dir)
             choices_iters = [int(choice.split('_')[-1]) for choice in choices]
-            print(choices_iters)
             iter = max(choices_iters)
         else:
             print(f"Using specified iter: {args.iter}")
@@ -53,4 +64,4 @@ if __name__ == "__main__":
         path = None
     print(f"Getting agent from: {path}")
 
-    main(path)
+    main(path, args.disc_mode)

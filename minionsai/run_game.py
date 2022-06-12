@@ -26,5 +26,5 @@ def run_game(game: Game, agents: Tuple[Agent, Agent], verbose=False) -> int:
             raise AgentException(e, game.active_player_color)
         if verbose:
             print(actionlist)
-        game.full_turn(actionlist)
+        game.full_turn(actionlist, verbose=verbose)
     return game.winner

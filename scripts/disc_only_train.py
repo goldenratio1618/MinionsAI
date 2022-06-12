@@ -9,6 +9,7 @@ Then agent checkpoints & logs are saved in <your temp dir>/MinionsAI/my_run
 import argparse
 from collections import defaultdict
 from tkinter import Y
+from minionsai.experiment_tooling import find_device, setup_directory
 from minionsai.run_game import run_game
 from minionsai.discriminator_only.agent import TrainedAgent
 from minionsai.discriminator_only.model import MinionsDiscriminator
@@ -20,10 +21,9 @@ import torch as th
 import numpy as np
 import os
 import tqdm
-import shutil
 import random
-import tempfile
 import logging
+import tempfile
 from minionsai.metrics_logger import metrics_logger
 
 logger = logging.getLogger(__name__)
@@ -34,69 +34,40 @@ ROLLOUTS_PER_TURN = 64
 # How many episodes of data do we collect each iteration, before running a few epochs of optimization?
 # Potentially good to use a few times bigger EPISODES_PER_ITERATION * DATA_AUG_FACTOR than BATCH_SIZE, to minimize correlation within batches
 # (DATA_AUG_FACTOR = 4)
-EPISODES_PER_ITERATION = 64
+EPISODES_PER_ITERATION = 256
 
 # Once we've collected the data, how many times do we go over it for optimization (within one iteration)?
-SAMPLE_REUSE = 3
+SAMPLE_REUSE = 2
 
 # Frequency of running evals vs random agent
-EVAL_EVERY = 4
+EVAL_EVERY = 2
+EVAL_VS_PAST_ITERS = [2, 8, 16]
+EVAL_VS_AGENTS = [os.path.join(tempfile.gettempdir(), "MinionsAI", "shuffle_spawn", "checkpoints", "iter_8")]
+EVAL_VS_RANDOM_UNTIL = 5
+EVAL_TRIALS = 100
 
 # Frequency of storing a saved agent
-CHECKPOINT_EVERY = 4
+CHECKPOINT_EVERY = 1
 
 # During evals, run this many times extra rollouts compared to during rollout generation
-EVAL_COMPUTE_BOOST = 1
+EVAL_COMPUTE_BOOST = 4
 
 # Model Size
 DEPTH = 2
 D_MODEL = 64 * DEPTH
 
 # Optimizer hparams
-BATCH_SIZE = 32
+BATCH_SIZE = 256
 LR = 3e-5
+
+LAMBDA = 0.95
 
 # kwargs to create a game (passed to Game)
 game_kwargs = {'symmetrize': False}
 # Eval env registered in scoreboard_envs.py
 EVAL_ENV_NAME = 'zombies5x5'
 
-def find_device():
-    logger.info("=========================")
-    # set device to cpu or cuda
-    if (th.cuda.is_available()): 
-        device = th.device('cuda:0') 
-        th.cuda.empty_cache()
-        logger.info("Device set to : " + str(th.cuda.get_device_name(device)))
-    else:
-        device = th.device('cpu')
-        logger.info("Device set to : cpu")
-    logger.info("=========================")
-    return device
-
-def setup_directory(run_name):
-    """
-    Set up logging and checkpoint directories for a run.
-    Returns the subdirectory for checkpoints.
-    """
-    tempdir = tempfile.gettempdir()
-    run_directory = os.path.join(tempdir, 'MinionsAI', run_name)
-    checkpoint_dir = os.path.join(run_directory, 'checkpoints')
-    # If the directory already exists, warn the user and check if it's ok to overwrite it.
-    if os.path.exists(run_directory):
-        print(f"Run directory already exists at {run_directory}")
-        ok = input("OK to overwrite? (y/n) ")
-        if ok != "y":
-            exit()
-        shutil.rmtree(run_directory)
-    os.makedirs(checkpoint_dir)
-
-    logging.basicConfig(filename=os.path.join(run_directory, 'logs.txt'), level=logging.DEBUG, 
-                        format='[%(levelname)s %(asctime)s] %(name)s: %(message)s')
-    logging.getLogger().addHandler(logging.StreamHandler())
-
-    metrics_logger.configure(os.path.join(run_directory, 'metrics.csv'))
-    return checkpoint_dir
+MAX_ITERATIONS = None
 
 def build_agent():
     generator = RandomAIAgent()
@@ -111,6 +82,26 @@ def build_agent():
     agent = TrainedAgent(policy, translator, generator, ROLLOUTS_PER_TURN)
     return agent
 
+def smooth_labels(labels, lam):
+    """
+    Takes a list of win probs with a 0/1 at the end
+    and smooths them into targets for the model
+    using exponential moving average
+    """
+    reversed_labels = np.array(labels)[::-1]
+    lambda_powers = lam ** np.arange(len(labels), 0, -1)
+    turn_contribs = np.cumsum(reversed_labels * lambda_powers)
+    norm = np.cumsum(lambda_powers)
+    return (turn_contribs / norm)[::-1]
+
+# TODO put this in a separate file
+array = [1, 2]
+desired = np.array([2/3 * 1 + 1/3 * 2, 2.])
+np.testing.assert_allclose(smooth_labels(array, 0.5), desired)
+
+array = [1, 2, 3]
+np.testing.assert_allclose(smooth_labels(array, 0.5), [4/7 * 1 + 2/7 * 2 + 1/7 * 3, 2/3 * 2 + 1/3 * 3, 3])
+
 # TODO - use run_game instead, with a custom Agent subclass that remembers the states.
 def single_rollout(game_kwargs, agents):
     # Randomize starting money
@@ -118,38 +109,50 @@ def single_rollout(game_kwargs, agents):
 
     game = Game(**game_kwargs)
     state_buffers = [[], []]  # one for each player
+    label_buffers = [[], []]  # one for each player
     while True:
         game.next_turn()
         if game.done:
             break
         active_player = game.active_player_color
-        actionlist = agents[active_player].act(game)
+        actionlist, winprob = agents[active_player].act_with_winprob(game)
         game.full_turn(actionlist)
         state_buffers[active_player].append(agents[active_player].translator.translate(game))
+        label_buffers[active_player].append(winprob)
+        
     winner = game.winner
+
+    metrics = (game.get_metrics(0), game.get_metrics(1))
+    metrics[winner]["pfinal"] = label_buffers[winner][-1]
+    metrics[1 - winner]["pfinal"] = 1 - label_buffers[1 - winner][-1]
+
+    label_buffers[winner].append(1)
+    label_buffers[1 - winner].append(0)
     # game.pretty_print()
     # print(winner)
     winner_states = state_buffers[winner]
-    winner_labels = np.ones(len(winner_states))
+    winner_labels = smooth_labels(label_buffers[winner][1:], LAMBDA)
     loser_states = state_buffers[1 - winner]
-    loser_labels = np.zeros(len(loser_states))
+    loser_labels = smooth_labels(label_buffers[1 - winner][1:], LAMBDA)
     all_states = winner_states + loser_states
     all_labels = np.concatenate([winner_labels, loser_labels])
-    return all_states, all_labels, winner
+    return all_states, all_labels, metrics
 
 def rollouts(game_kwargs, agents):
     states = []
     labels = []
 
     games = 0
-    first_player_wins = 0
+    metrics_accumulated = (defaultdict(list), defaultdict(list))
     for _ in tqdm.tqdm(range(EPISODES_PER_ITERATION)):
-        states_, labels_, winning_color = single_rollout(game_kwargs, agents)
+        with metrics_logger.timing('single_episode'):
+           states_, labels_, this_game_metrics = single_rollout(game_kwargs, agents)
         states.extend(states_)
         labels.extend(labels_)
         games += 1
-        if winning_color == 0:
-            first_player_wins += 1
+        for color, this_color_metrics in enumerate(this_game_metrics):
+            for key in set(metrics_accumulated[color].keys()).union(set(this_color_metrics.keys())):
+                metrics_accumulated[color][key].append(this_color_metrics[key])
     rollout_states = len(states)
     # convert from list of dicts of arrays to a single dict of arrays with large batch dimension
     states = {k: np.concatenate([s[k] for s in states], axis=0) for k in states[0]}
@@ -161,27 +164,36 @@ def rollouts(game_kwargs, agents):
     states = {k: np.concatenate([s[k] for s in symmetrized_states], axis=0) for k in states}
     labels = np.concatenate([labels]*len(symmetrized_states), axis=0)
     # Log instantaneous metrics here, and send cumulative out to the main control flow to integrate
-    metrics_logger.log_metrics({'first_player_winrate': first_player_wins / games})
+    for color in (0, 1):
+        metrics_logger.log_metrics({k: sum(v)/EPISODES_PER_ITERATION for k, v in metrics_accumulated[color].items()}, prefix=f'rollouts/game/{color}')
     return states, labels, {'rollout_games': games, 'rollout_states': rollout_states}
 
-def eval_vs_random(agent):
+def eval_vs_other_by_path(agent, eval_agent_path):
+    logger.info(f"Looking for eval agent at {eval_agent_path}...")
+    if os.path.exists(eval_agent_path):
+        agent_name = os.path.basename(eval_agent_path)
+        eval_agent = TrainedAgent.load(eval_agent_path)
+        eval_vs_other(agent, eval_agent, agent_name)
+
+def eval_vs_other(agent, eval_agent, name):
     wins = 0
     games = 0
-    for i in tqdm.tqdm(range(100)):
-        random_agent = RandomAIAgent()
+    for i in tqdm.tqdm(range(EVAL_TRIALS)):
         good_agent = TrainedAgent(agent.policy, agent.translator, agent.generator, ROLLOUTS_PER_TURN * EVAL_COMPUTE_BOOST)
         good_idx = i % 2
 
         agents = [None, None]
         agents[good_idx] = good_agent
-        agents[1 - good_idx] = random_agent
+        agents[1 - good_idx] = eval_agent
 
         game = ENVS[EVAL_ENV_NAME]()
         winner = run_game(game, agents=agents)
         if winner == good_idx:
             wins += 1
         games += 1
-    return wins / games
+    winrate = wins / games
+    metrics_logger.log_metrics({f"eval_winrate/{name}": winrate})
+    logger.info(f"Win rate vs {name} = {winrate}")  
 
 def main(run_name):
     checkpoint_dir = setup_directory(run_name)
@@ -197,63 +209,72 @@ def main(run_name):
     iteration = 0
     turns_optimized = 0
     rollout_stats = defaultdict(int)
-    while True:
+    while MAX_ITERATIONS is None or iteration < MAX_ITERATIONS:
         metrics_logger.log_metrics({'iteration': iteration})
         print()
         print("====================================")
         logger.info(f"=========== Iteration: {iteration} ===========")
         print("====================================")
         if iteration % CHECKPOINT_EVERY == 0:
-            logger.info("Saving checkpoint...")
-            # Save with more rollouts_per_turn. TODO - clean up this hack.
-            agent.rollouts_per_turn = ROLLOUTS_PER_TURN * EVAL_COMPUTE_BOOST
-            agent.save(os.path.join(checkpoint_dir, f"iter_{iteration}"))
-            agent.rollouts_per_turn = ROLLOUTS_PER_TURN
-
-        logger.info("Starting rollouts...")
-        policy.eval()  # Set policy to non-training mode
-        states, labels, rollout_info = rollouts(game_kwargs, [agent, agent])
-        policy.train()  # Set policy back to training mode
-        for k, v in rollout_info.items():
-            rollout_stats[k] += v
-        metrics_logger.log_metrics(rollout_stats)
-        logger.info("Starting training...")
-        num_states = states['board'].shape[0]
-        for epoch in range(SAMPLE_REUSE):
-            logger.info(f"  Epoch {epoch}/{SAMPLE_REUSE}...")
-            all_idxes = np.random.permutation(num_states)
-            n_batches = num_states // BATCH_SIZE
-            for idx in range(n_batches):
-                batch_idxes = all_idxes[idx * BATCH_SIZE: (idx + 1) * BATCH_SIZE]
-                batch_obs = {}
-                for key in states:
-                    batch_obs[key] = states[key][batch_idxes]
-                batch_labels = np.array(labels)[batch_idxes]
-                batch_labels = th.from_numpy(batch_labels).to(device)
-                optimizer.zero_grad()
-                disc_logprob = policy(batch_obs) # [batch, 1]
-                batch_labels = th.unsqueeze(batch_labels, 1)
-                loss = th.nn.BCEWithLogitsLoss()(disc_logprob, batch_labels)
-                loss.backward()
-                optimizer.step()
-                if idx in [0, n_batches // 2, n_batches - 1]:
-                    max_batch_digits = len(str(n_batches))
-                    metrics_logger.log_metrics({f"loss/epoch_{epoch}/batch_{idx:0>{max_batch_digits}}": loss.item()})
-                turns_optimized += len(batch_idxes)
-        logger.info(f"Iteration {iteration} complete.")
-        param_norm = sum([th.norm(param, p=2) for param in policy.parameters()]).item()
-        metrics_logger.log_metrics({'turns_optimized': turns_optimized, 'param_norm': param_norm})
+            with metrics_logger.timing('checkpointing'):
+                logger.info("Saving checkpoint...")
+                # Save with more rollouts_per_turn. TODO - clean up this hack.
+                agent.rollouts_per_turn = ROLLOUTS_PER_TURN * EVAL_COMPUTE_BOOST
+                agent.save(os.path.join(checkpoint_dir, f"iter_{iteration}"))
+                agent.rollouts_per_turn = ROLLOUTS_PER_TURN
+        with metrics_logger.timing('rollouts'):
+            logger.info("Starting rollouts...")
+            policy.eval()  # Set policy to non-training mode
+            states, labels, rollout_info = rollouts(game_kwargs, [agent, agent])
+            policy.train()  # Set policy back to training mode
+            for k, v in rollout_info.items():
+                rollout_stats[k] += v
+            metrics_logger.log_metrics(rollout_stats)
+        with metrics_logger.timing('training'):
+            logger.info("Starting training...")
+            num_states = states['board'].shape[0]
+            for epoch in range(SAMPLE_REUSE):
+                logger.info(f"  Epoch {epoch}/{SAMPLE_REUSE}...")
+                all_idxes = np.random.permutation(num_states)
+                n_batches = num_states // BATCH_SIZE
+                for idx in range(n_batches):
+                    with metrics_logger.timing('training_batch'):
+                        batch_idxes = all_idxes[idx * BATCH_SIZE: (idx + 1) * BATCH_SIZE]
+                        batch_obs = {}
+                        for key in states:
+                            batch_obs[key] = states[key][batch_idxes]
+                        batch_labels = np.array(labels)[batch_idxes]
+                        batch_labels = th.from_numpy(batch_labels).to(device)
+                        optimizer.zero_grad()
+                        disc_logprob = policy(batch_obs) # [batch, 1]
+                        batch_labels = th.unsqueeze(batch_labels, 1)
+                        loss = th.nn.BCEWithLogitsLoss()(disc_logprob, batch_labels)
+                        loss.backward()
+                        optimizer.step()
+                        if idx in [0, n_batches // 2, n_batches - 1]:
+                            max_batch_digits = len(str(n_batches))
+                            metrics_logger.log_metrics({f"loss/epoch_{epoch}/batch_{idx:0>{max_batch_digits}}": loss.item()})
+                        turns_optimized += len(batch_idxes)
+            logger.info(f"Iteration {iteration} complete.")
+            param_norm = sum([th.norm(param, p=2) for param in policy.parameters()]).item()
+            metrics_logger.log_metrics({'turns_optimized': turns_optimized, 'param_norm': param_norm})
         metrics_logger.flush()
 
         iteration += 1
 
         if iteration % EVAL_EVERY == 0:
-            logger.info("Evaluating...")
-            policy.eval()  # Set policy to non-training mode
-            eval_winrate = eval_vs_random(agent)
-            policy.train()  # Set policy back to training mode
-            metrics_logger.log_metrics({"eval_winrate": eval_winrate})
-            logger.info(f"Win rate vs random = {eval_winrate}")
+            with metrics_logger.timing('eval'):
+                logger.info("Evaluating...")
+                policy.eval()  # Set policy to non-training mode
+                if iteration < EVAL_VS_RANDOM_UNTIL:
+                    eval_agent = RandomAIAgent()
+                    eval_vs_other(agent, eval_agent, 'random')
+                for eval_agent_path in EVAL_VS_AGENTS:
+                    eval_vs_other_by_path(agent, eval_agent_path)                  
+                for iter in EVAL_VS_PAST_ITERS:
+                    eval_vs_other_by_path(agent, os.path.join(checkpoint_dir, f"iter_{iter}"))
+
+                policy.train()  # Set policy back to training mode
 
 
 

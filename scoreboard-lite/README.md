@@ -1,4 +1,12 @@
-# Launching from scratch on new machine:
+# Overview
+The scoreboard is really two separate entities that live on the same machine:
+1. The *webserver* is a little flask app that serves pages to users. Flask is quite simple (I didn't know any flask before I started writing this). It's all defined in `app.py`.
+2. The *ts_worker* runs games among the agents forever and updates their trueskill values.
+Eventually we'll want one ts_worker per environment, I suspect.
+
+The two communicate by (a) the webserver loading agents into the `active_agents` directory which the ts_worker watches and (2) the ts_worker writes its state to the `scores.csv` file which the webserver reads.
+
+# Launching from scratch on new machine
 ```
 mkdir code
 cd code

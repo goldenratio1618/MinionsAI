@@ -1,0 +1,45 @@
+import os
+import shutil
+import tempfile
+import torch as th
+import logging
+from .metrics_logger import metrics_logger
+
+logger = logging.getLogger(__name__)
+
+def find_device():
+    logger.info("=========================")
+    # set device to cpu or cuda
+    if (th.cuda.is_available()): 
+        device = th.device('cuda:0') 
+        th.cuda.empty_cache()
+        logger.info("Device set to : " + str(th.cuda.get_device_name(device)))
+    else:
+        device = th.device('cpu')
+        logger.info("Device set to : cpu")
+    logger.info("=========================")
+    return device
+
+def setup_directory(run_name):
+    """
+    Set up logging and checkpoint directories for a run.
+    Returns the subdirectory for checkpoints.
+    """
+    tempdir = tempfile.gettempdir()
+    run_directory = os.path.join(tempdir, 'MinionsAI', run_name)
+    checkpoint_dir = os.path.join(run_directory, 'checkpoints')
+    # If the directory already exists, warn the user and check if it's ok to overwrite it.
+    if os.path.exists(run_directory):
+        print(f"Run directory already exists at {run_directory}")
+        ok = input("OK to overwrite? (y/n) ")
+        if ok != "y":
+            exit()
+        shutil.rmtree(run_directory)
+    os.makedirs(checkpoint_dir)
+
+    logging.basicConfig(filename=os.path.join(run_directory, 'logs.txt'), level=logging.DEBUG, 
+                        format='[%(levelname)s %(asctime)s] %(name)s: %(message)s')
+    logging.getLogger().addHandler(logging.StreamHandler())
+
+    metrics_logger.configure(os.path.join(run_directory, 'metrics.csv'))
+    return checkpoint_dir

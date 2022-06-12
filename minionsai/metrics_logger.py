@@ -14,7 +14,10 @@ for step in range(100):
 ```
 """
 
+from collections import defaultdict
+from contextlib import contextmanager
 import os
+import time
 import tabulate
 import logging
 import csv
@@ -29,6 +32,7 @@ class MetricsLogger():
         self._metrics_this_step = {}
         self._seen_keys = []
         self._last_seen_values = {}
+        self._timings = defaultdict(list)
 
     def configure(self, path):
         self._csv_path = path
@@ -43,12 +47,24 @@ class MetricsLogger():
             raise Exception("Logger not configured. call logger.configure(path)")
         return self._csv_path
 
-    def log_metrics(self, metrics):
+    def log_metrics(self, metrics, prefix=""):
+        if len(prefix) > 0 and not prefix.endswith("/"):
+            prefix = prefix + "/"
         for key, value in metrics.items():
-            if key in self._metrics_this_step:
-                raise ValueError(f"Metric {key} already logged this step")
-            self._metrics_this_step[key] = value
+            full_key = prefix + key
+            if full_key in self._metrics_this_step:
+                raise ValueError(f"Metric {full_key} already logged this step")
+            self._metrics_this_step[full_key] = value
 
+    @contextmanager
+    def timing(self, key):
+        """
+        Contextmanager that adds the average time taken within it as a metric
+        """
+        start = time.perf_counter()
+        yield
+        end = time.perf_counter()
+        self._timings[key].append(end - start)
     
     def format_if_number(self, number):
         """
@@ -66,7 +82,19 @@ class MetricsLogger():
                 return f"{number:.4f}"
         return number
 
+    def _flush_timings(self):
+        for key, timings in self._timings.items():
+            if len(timings) > 1:
+                self._metrics_this_step[f"timing/{key}/total"] = sum(timings)
+                self._metrics_this_step[f"timing/{key}/avg"] = np.mean(timings)
+                self._metrics_this_step[f"timing/{key}/std"] = np.std(timings)
+                self._metrics_this_step[f"timing/{key}/n"] = len(timings)
+            else:
+                self._metrics_this_step[f"timing/{key}"] = timings[0]
+        self._timings = defaultdict(list)
+
     def flush(self):
+        self._flush_timings()
         new_keys = list(set(self._metrics_this_step.keys()) - set(self._seen_keys))
         if len(new_keys) > 0:
             logger.info(f"New metrics created this step: {new_keys}")
