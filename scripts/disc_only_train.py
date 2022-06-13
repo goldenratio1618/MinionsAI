@@ -40,10 +40,13 @@ EPISODES_PER_ITERATION = 256
 # Once we've collected the data, how many times do we go over it for optimization (within one iteration)?
 SAMPLE_REUSE = 2
 
-# Frequency of running evals vs random agent
+# Frequency of running evals
 EVAL_EVERY = 2
-EVAL_VS_PAST_ITERS = [2, 8, 16]
+# Put iteration numbers here to eval vs past versions of this train run.
+EVAL_VS_PAST_ITERS = []
+# Specific agent instances to eval vs
 EVAL_VS_AGENTS = [GenDiscAgent(ScriptedDiscriminator(), RandomAIAgent(), rollouts_per_turn=16)]
+# Eval against random up until this iteration
 EVAL_VS_RANDOM_UNTIL = 5
 EVAL_TRIALS = 100
 EVAL_THREADS = 1
