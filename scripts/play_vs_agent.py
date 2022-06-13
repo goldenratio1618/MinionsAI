@@ -21,7 +21,7 @@ def main(agent_dir=None, disc_mode=False):
     if disc_mode:
         human_agent = GenDiscAgent(HumanDiscriminator(filter_agent=agent), RandomAIAgent(), rollouts_per_turn=agent.rollouts_per_turn)
     else:
-        human_agent = HumanCLIAgent(agent)
+        human_agent = HumanCLIAgent()
     game = Game()
     winner, metrics = run_game_with_metrics(game, (agent, human_agent), verbose=True, randomize_player_order=True)
     print("Game over.\nWinner:", winner)
