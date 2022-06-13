@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 
 # How many rollouts do we run of each turn before picking the best
 ROLLOUTS_PER_TURN = 64
+EPSILON_GREEEDY = 0.1
 
 # How many episodes of data do we collect each iteration, before running a few epochs of optimization?
 # Potentially good to use a few times bigger EPISODES_PER_ITERATION * DATA_AUG_FACTOR than BATCH_SIZE, to minimize correlation within batches
@@ -84,7 +85,7 @@ def build_agent():
     logger.info(f"Policy total parameter count: {sum(p.numel() for p in policy.parameters() if p.requires_grad):,}")
 
     translator = Translator()
-    agent = TrainedAgent(policy, translator, generator, ROLLOUTS_PER_TURN)
+    agent = TrainedAgent(policy, translator, generator, ROLLOUTS_PER_TURN, epsilon_greedy=EPSILON_GREEEDY)
     return agent
 
 def smooth_labels(labels, lam):
@@ -108,7 +109,7 @@ array = [1, 2, 3]
 np.testing.assert_allclose(smooth_labels(array, 0.5), [4/7 * 1 + 2/7 * 2 + 1/7 * 3, 2/3 * 2 + 1/3 * 3, 3])
 
 # TODO - use run_game instead, with a custom Agent subclass that remembers the states.
-def single_rollout(game_kwargs, agents):
+def single_rollout(game_kwargs, agents, lam=None):
     # Randomize starting money
     game_kwargs["money"] = (random.randint(1, 4), random.randint(1, 4))
 
@@ -120,10 +121,10 @@ def single_rollout(game_kwargs, agents):
         if game.done:
             break
         active_player = game.active_player_color
-        actionlist, winprob = agents[active_player].act_with_winprob(game)
+        actionlist, best_winprob = agents[active_player].act_with_winprob(game)
         game.full_turn(actionlist)
         state_buffers[active_player].append(agents[active_player].translator.translate(game))
-        label_buffers[active_player].append(winprob)
+        label_buffers[active_player].append(best_winprob)
         
     winner = game.winner
 
@@ -136,14 +137,17 @@ def single_rollout(game_kwargs, agents):
     # game.pretty_print()
     # print(winner)
     winner_states = state_buffers[winner]
-    winner_labels = smooth_labels(label_buffers[winner][1:], LAMBDA)
+    winner_labels = label_buffers[winner][1:]
     loser_states = state_buffers[1 - winner]
-    loser_labels = smooth_labels(label_buffers[1 - winner][1:], LAMBDA)
+    loser_labels = label_buffers[1 - winner][1:]
+    if lam is not None:
+        winner_labels = smooth_labels(winner_labels, lam)
+        loser_labels = smooth_labels(loser_labels, lam)
     all_states = winner_states + loser_states
     all_labels = np.concatenate([winner_labels, loser_labels])
     return all_states, all_labels, metrics
 
-def rollouts(game_kwargs, agents):
+def rollouts(game_kwargs, agents, lam=None):
     states = []
     labels = []
 
@@ -151,7 +155,7 @@ def rollouts(game_kwargs, agents):
     metrics_accumulated = (defaultdict(list), defaultdict(list))
     for _ in tqdm.tqdm(range(EPISODES_PER_ITERATION)):
         with metrics_logger.timing('single_episode'):
-           states_, labels_, this_game_metrics = single_rollout(game_kwargs, agents)
+           states_, labels_, this_game_metrics = single_rollout(game_kwargs, agents, lam=lam)
         states.extend(states_)
         labels.extend(labels_)
         games += 1
@@ -217,7 +221,12 @@ def main(run_name):
         with metrics_logger.timing('rollouts'):
             logger.info("Starting rollouts...")
             policy.eval()  # Set policy to non-training mode
-            states, labels, rollout_info = rollouts(game_kwargs, [agent, agent])
+            
+            # Early in training use td-lambda to reduce variance of gradients
+            # Late in training, turn this off since it introduces a bias when epsilon-greedy actions are taken.
+            lam = None if iteration >= 20 else 1 - iteration / 20
+            metrics_logger.log_metrics({'lambda': lam})
+            states, labels, rollout_info = rollouts(game_kwargs, [agent, agent], lam=lam)
             policy.train()  # Set policy back to training mode
             for k, v in rollout_info.items():
                 rollout_stats[k] += v
