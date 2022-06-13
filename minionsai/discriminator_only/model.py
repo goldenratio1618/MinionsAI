@@ -40,9 +40,9 @@ class MinionsDiscriminator(th.nn.Module):
         return self._device
 
     def process_input(self, obs: th.Tensor):
-        # obs is dict of:
+        # obs is dict of ints to be embedded:
         #   board: [batch, num_hexes, 3]
-        #   remaining_turns: [batch, 1]
+        #   remaining_turns, money, etc: each [batch, 1]
         #
         # Extract these tensors, keeping the int type
         obs = {k: th.Tensor(v).int().to(self.device) for k, v in obs.items()}
@@ -52,7 +52,7 @@ class MinionsDiscriminator(th.nn.Module):
         hex_embs = self.hex_embedding(board_obs[:, :, 0])  # [batch, num_hexes, d_model]
         terrain_emb = self.terrain_embedding(board_obs[:, :, 1])  # [batch, num_hexes, d_model]
         unit_type_embs = self.unit_embedding(board_obs[:, :, 2])  # [batch, num_hexes, d_model]
-        embs = th.cat([hex_embs + terrain_emb + unit_type_embs], dim=1)
+        embs = hex_embs + terrain_emb + unit_type_embs
         assert tuple(embs.shape[1:]) == (BOARD_SIZE ** 2, self.d_model), embs.shape
         remaining_turns_emb = self.remaining_turns_embedding(obs['remaining_turns'])
         money_emb = self.money_embedding(obs['money'])
