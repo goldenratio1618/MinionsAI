@@ -45,9 +45,24 @@ def setup_directory(run_name):
         shutil.rmtree(run_directory)
     os.makedirs(checkpoint_dir)
 
+    ####### Configure logger #######
     logging.basicConfig(filename=os.path.join(run_directory, 'logs.txt'), level=logging.DEBUG, 
                         format='[%(levelname)s %(asctime)s] %(name)s: %(message)s')
     logging.getLogger().addHandler(logging.StreamHandler())
 
     metrics_logger.configure(os.path.join(run_directory, 'metrics.csv'))
-    return checkpoint_dir
+
+    ####### Snapshot the codebase #######
+    # Copy all of MinionsAI/ into directory/code, ignoring files that match ignore_patterns
+    # In a cross-platform compatible way
+
+    # No recursive copying
+    ignore_patterns = [".git", "__pycache__", "scoreboard*", "tests", "scripts"]
+    ignore_patterns.append("*" + run_name + "*")
+
+    code_dir = os.path.join(run_directory, 'code')
+
+    code_source = os.path.join(os.path.dirname(__file__), '..')
+    shutil.copytree(code_source, code_dir, ignore=shutil.ignore_patterns(*ignore_patterns))
+
+    return checkpoint_dir, code_dir

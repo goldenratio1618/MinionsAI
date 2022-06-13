@@ -62,7 +62,7 @@ DEPTH = 2
 D_MODEL = 64 * DEPTH
 
 # Optimizer hparams
-BATCH_SIZE = 256
+BATCH_SIZE = EPISODES_PER_ITERATION
 LR = 3e-5
 
 LAMBDA = 0.95
@@ -188,7 +188,7 @@ def eval_vs_other(agent, eval_agent, name):
     logger.info(f"Win rate vs {name} = {winrate}")  
 
 def main(run_name):
-    checkpoint_dir = setup_directory(run_name)
+    checkpoint_dir, code_dir = setup_directory(run_name)
     logger.info(f"Starting run {run_name}")
 
     device = find_device()
@@ -212,7 +212,7 @@ def main(run_name):
                 logger.info("Saving checkpoint...")
                 # Save with more rollouts_per_turn. TODO - clean up this hack.
                 agent.rollouts_per_turn = ROLLOUTS_PER_TURN * EVAL_COMPUTE_BOOST
-                agent.save(os.path.join(checkpoint_dir, f"iter_{iteration}"))
+                agent.save(os.path.join(checkpoint_dir, f"iter_{iteration}"), copy_code_from=code_dir)
                 agent.rollouts_per_turn = ROLLOUTS_PER_TURN
         with metrics_logger.timing('rollouts'):
             logger.info("Starting rollouts...")

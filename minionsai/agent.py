@@ -47,7 +47,7 @@ class Agent(abc.ABC):
         """
         pass
 
-    def save(self, directory: str, exists_ok=False):
+    def save(self, directory: str, exists_ok=False, copy_code_from=None):
         """
         Creates a snapshot of this agent that can be passed around and run on other codebases inside `directory`
         It should expose an API like this:
@@ -59,7 +59,11 @@ class Agent(abc.ABC):
         1. The current codebase
         2. A __init__.py file with build_agent() entry point
         3. Your subclass may need to store other stuff as well to reproduce an instance;
-            you should do that by overriding save_instance():
+            you should do that by overriding save_instance().
+
+        If `exists_ok` is True, then the directory will be overwritten if it exists.
+        If `copy_code_from` is not None, then the codebase will be copied from that directory.
+            That directory should be equivalent to MinionsAI/
         """
         print(f"Saving agent into {directory}")
         if os.path.exists(directory):
@@ -78,9 +82,10 @@ class Agent(abc.ABC):
         # Copy all of MinionsAI/ into directory, ignoring files that match ignore_patterns
         # In a cross-platform compatible way
         
-        source = os.path.join(os.path.dirname(__file__), '..')
+        if copy_code_from is None:
+            copy_code_from = os.path.join(os.path.dirname(__file__), '..')
         dest = os.path.join(directory, 'code')
-        shutil.copytree(source, dest, ignore=shutil.ignore_patterns(*ignore_patterns))
+        shutil.copytree(copy_code_from, dest, ignore=shutil.ignore_patterns(*ignore_patterns))
 
         ####### 2. Make __init__.py #######
         module = self.__module__
