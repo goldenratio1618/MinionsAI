@@ -1,7 +1,11 @@
+from minionsai.action import ActionList
+from minionsai.action_bot.actions import possibly_legal_moves, possibly_legal_spawns
+from minionsai.engine import Phase
 from .model import MinionsDiscriminator
 from ..agent import Agent, RandomAIAgent
 import os
 import numpy as np
+import random
 from .translator import ActionTranslator
 import torch as th
 import json
@@ -10,25 +14,79 @@ def sigmoid(x):
     return 1 / (1 + np.exp(-x))
 
 class ActionAgent(Agent):
-    def __init__(self, policy, translator, generator, rollouts_per_turn, attempts_per_action, verbose_level=0):
+    def __init__(self, policy, translator, generator, rollouts_per_turn, attempts_per_action, n_actions, verbose_level=0):
         self.translator = translator
         self.policy = policy
         self.generator = generator
         self.rollouts_per_turn = rollouts_per_turn
         self.attempts_per_action = attempts_per_action
         self.verbose_level = verbose_level
-    
-    NUM_ACTIONS = 625
+        self.n_actions = n_actions
+        self.eps_threshold = 1.0
+        self.possible_moves = possibly_legal_moves()
+        self.possible_spawns = possibly_legal_spawns()
+        self.num_possible_moves = len(self.possible_moves)
+        self.num_possible_actions = self.num_possible_moves + len(self.possible_spawns)
 
-    def act(self, game):
-        is_legal = True
-        while is_legal:
-            game_copy = game.copy()
+    def set_epsilon(self, eps_threshold):
+        self.eps_threshold = eps_threshold
+    
+
+    def select_action(self, state, test=False):
+        # print(state)
+        global steps_done
+        sample = random.random()
+        if test or sample > self.eps_threshold:
+            with th.no_grad():
+                # t.max(1) will return largest column value of each row.
+                # second column on max result is index of where max element was
+                # found, so we pick action with the larger expected reward.
+                s = self.policy(state)
+                # print(s)
+                s_max = s.max(1)[1]
+                return s_max
+                # s_max = th.tensor([[s_max]], device=device, dtype=th.long)
+                # print("Selected")
+                # print(s_max)
+                # return s_max
+        else:
+            s_rand = random.randrange(self.n_actions)
+            # print("Random")
+            return s_rand
+
+    def try_action(self, game, s_max):
+        action = None
+        if s_max <= self.num_possible_moves:
+            try:
+                action = self.possible_moves[s_max]
+                game.process_single_action(action)
+            except e:
+                return None
+        else:
+            if game.phase == Phase.MOVE:
+                game.end_move_phase()
+            try:
+                action = self.possible_spawns[s_max - self.num_possible_moves]
+                game.process_single_action(action)
+            except e:
+                return None
+        return action
+
+    def act(self, game, test=False):
+        game_copy = game.copy()
+        action_list_move = []
+        action_list_spawn = []
+        while True:
             obs = self.translator.translate(game_copy)
-            action_nn = self.policy(obs).detach().cpu().numpy()
-            for i in range(self.attempts_per_action):
-                action = np.random.choice(range(NUM_ACTIONS), p=action_nn/sum(action_nn))
-                try 
+            action_nn = self.select_action(obs, test)
+            action = self.try_action(game_copy, action_nn)
+            if action is None:
+                break
+            if game_copy.phase == Phase.MOVE:
+                action_list_move.push(action)
+            else:
+                action_list_spawn.push(action)
+        turn = ActionList(action_list_move, action_list_spawn)
 
         options_action_list = []
         options_obs = []

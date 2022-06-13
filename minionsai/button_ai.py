@@ -1,196 +1,267 @@
 # from baselines.common.atari_wrappers import make_atari, wrap_deepmind
 import numpy as np
-import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras import layers
+import random
+import math
+import torch as th
+import torch.nn as nn
+import torch.optim as optim
+import torch.nn.functional as F
+import torchvision.transforms as T
+from collections import namedtuple, deque
 
-# Configuration paramaters for the whole setup
-seed = 42
-gamma = 0.99  # Discount factor for past rewards
-epsilon = 1.0  # Epsilon greedy parameter, initially 1.0
-epsilon_min = 0.0  # Minimum epsilon greedy parameter, initially 0.1
-epsilon_max = 1.0  # Maximum epsilon greedy parameter
-epsilon_interval = (
-    epsilon_max - epsilon_min
-)  # Rate at which to reduce chance of random action being taken
-batch_size = 32  # Size of batch taken from replay buffer
-max_steps_per_episode = 100 # initially 10000
+n_actions = 700
+board_size = 4
+depth = 2
+d_model = 8
 
-# # Use the Baseline Atari environment because of Deepmind helper functions
-# env = make_atari("BreakoutNoFrameskip-v4")
-# # Warp the frames, grey scale, stake four frame and scale to smaller ratio
-# env = wrap_deepmind(env, frame_stack=True, scale=True)
-# env.seed(seed)
+Transition = namedtuple('Transition',
+                        ('state', 'action', 'next_state', 'reward'))
+device = th.device("cuda" if th.cuda.is_available() else "cpu")
+print(device)
 
-num_actions = 4
+class ReplayMemory(object):
+    def __init__(self, capacity):
+        self.memory = deque([],maxlen=capacity)
 
-def create_q_model():
+    def push(self, *args):
+        """Save a transition"""
+        self.memory.append(Transition(*args))
+
+    def sample(self, batch_size):
+        return random.sample(self.memory, batch_size)
+
+    def __len__(self):
+        return len(self.memory)
+
+class ButtonAI(th.nn.Module):
     # Network defined by the Deepmind paper
-    inputs = layers.Input(shape=(84, 84, 4,)) # initially (84,84,4)
+    def __init__(self, d_model, depth, n_actions):
+        super().__init__()
+        self.board_embedding = th.nn.Embedding(board_size, d_model)
+        self.transformer = th.nn.TransformerEncoder(
+            th.nn.TransformerEncoderLayer(d_model, 8, dim_feedforward=d_model, batch_first=True),
+            num_layers=depth
+        )
 
-    # Convolutions on the frames on the screen
-    layer1 = layers.Conv2D(32, 8, strides=4, activation="relu")(inputs)
-    layer2 = layers.Conv2D(64, 4, strides=2, activation="relu")(layer1)
-    layer3 = layers.Conv2D(64, 3, strides=1, activation="relu")(layer2)
+        self._device = None
+        self.depth = depth
+        self.d_model = d_model
 
-    layer4 = layers.Flatten()(layer3)
+        self.input_linear1 = th.nn.Linear(d_model, d_model)
+        self.input_linear2 = th.nn.Linear(d_model, d_model)
+        self.value_linear1 = th.nn.Linear(d_model, d_model)
+        self.value_linear2 = th.nn.Linear(d_model, n_actions)
 
-    layer5 = layers.Dense(512, activation="relu")(layer4)
-    action = layers.Dense(num_actions, activation="linear")(layer5)
+    def to(self, device):
+        super().to(device)
+        self._device = device
+    
+    @property
+    def device(self):
+        if self._device is None:
+            raise ValueError("Didn't tell policy what device to use!")
+        return self._device
 
-    return keras.Model(inputs=inputs, outputs=action)
+    def process_input(self, obs: th.Tensor):
+        # print(obs)
+        obs = obs.to(device)
+        embs = th.cat([self.board_embedding(obs)], dim=1)
+        # print(embs)
+        return embs
+
+    def process_output_into_scalar(self, trunk_out):
+        # print(trunk_out)
+        flat, _ = th.max(trunk_out, dim=1)
+        # print(flat)
+        # flat = trunk_out
+        # flat, _ = th.max(trunk_out, dim=1)  # [batch, d_model]
+        x = self.value_linear1(flat)  # [batch, d_model]
+        x = th.nn.ReLU()(x)  # [batch, d_model]
+        logit = self.value_linear2(flat)  # [batch, 1]
+        return logit
+
+    def forward(self, state):
+        # print("FORWARD")
+        # print(state)
+        obs = self.process_input(state)  # [batch, num_things, d_model]
+        # print(obs)
+        obs = self.input_linear1(obs)  # [batch, num_things, d_model]
+        # print(obs)
+        obs = th.nn.ReLU()(obs)  # [batch, num_things, d_model]
+        # print(obs)
+        obs = self.input_linear2(obs)  # [batch, num_things, d_model]
+        # print(obs)
+        trunk_out = self.transformer(obs)  # [batch, num_things, d_model]
+        # print(obs)
+        # trunk_out = obs
+        output = self.process_output_into_scalar(trunk_out)  # [batch, 1]
+        # print(output)
+        return output
+
+    def save(self, checkpoint_path):
+        th.save(self.state_dict(), checkpoint_path)
+
+    def load(self, checkpoint_path):
+        self.load_state_dict(th.load(checkpoint_path, map_location=lambda storage, loc: storage))
+
+BATCH_SIZE = 128
+GAMMA = 0.999
+EPS_START = 1.0#0.9
+EPS_END = 1.0#0.05
+EPS_DECAY = 200
+TARGET_UPDATE = 10
+
+policy_net = ButtonAI(d_model, depth, n_actions)
+policy_net.to(device)
+target_net = ButtonAI(d_model, depth, n_actions)
+target_net.to(device)
+target_net.load_state_dict(policy_net.state_dict())
+target_net.eval()
+
+optimizer = optim.RMSprop(policy_net.parameters())
+memory = ReplayMemory(10000)
 
 
-# The first model makes the predictions for Q-values which are used to
-# make a action.
-model = create_q_model()
-# Build a target model for the prediction of future rewards.
-# The weights of a target model get updated every 10000 steps thus when the
-# loss between the Q-values is calculated the target Q-value is stable.
-model_target = create_q_model()
+steps_done = 0
+
+def select_action(state, test=False):
+    # print(state)
+    global steps_done
+    sample = random.random()
+    eps_threshold = EPS_END + (EPS_START - EPS_END) * \
+        math.exp(-1. * steps_done / EPS_DECAY)
+    steps_done += 1
+    if test or sample > eps_threshold:
+        with th.no_grad():
+            # t.max(1) will return largest column value of each row.
+            # second column on max result is index of where max element was
+            # found, so we pick action with the larger expected reward.
+            s = policy_net(state)
+            # print(s)
+            s_max = s.max(1)[1]
+            s_max = th.tensor([[s_max]], device=device, dtype=th.long)
+            # print("Selected")
+            # print(s_max)
+            return s_max
+    else:
+        s_rand = th.tensor([[random.randrange(n_actions)]], device=device, dtype=th.long)
+        # print("Random")
+        return s_rand
 
 
-# In the Deepmind paper they use RMSProp however then Adam optimizer
-# improves training time
-optimizer = keras.optimizers.Adam(learning_rate=0.00025, clipnorm=1.0)
 
-# Experience replay buffers
-action_history = []
-state_history = []
-state_next_history = []
-rewards_history = []
-done_history = []
-episode_reward_history = []
-running_reward = 0
-episode_count = 0
-frame_count = 0
-# Number of frames to take random action and observe output
-epsilon_random_frames = 2 # initially 50000
-# Number of frames for exploration
-epsilon_greedy_frames = 2.0 # initially 1000000.0
-# Maximum replay length
-# Note: The Deepmind paper suggests 1000000 however this causes memory issues
-max_memory_length = 100000
-# Train the model after 4 actions
-update_after_actions = 4
-# How often to update the target network
-update_target_network = 100 # initially 10000
-# Using huber loss for stability
-loss_function = keras.losses.Huber()
+episode_durations = []
 
-for t in range(100):  # Run until solved. Initially `while True`
-    state = np.zeros((84,84,4))
-    win = np.random.randint(4)
-    state[:,:,win] = 1
-    episode_reward = 0
 
-    for timestep in range(1, max_steps_per_episode):
-        # env.render(); Adding this line would show the attempts
-        # of the agent in a pop up window.
-        frame_count += 1
+def optimize_model():
+    if len(memory) < BATCH_SIZE:
+        return
+    transitions = memory.sample(BATCH_SIZE)
+    # Transpose the batch (see https://stackoverflow.com/a/19343/3343043 for
+    # detailed explanation). This converts batch-array of Transitions
+    # to Transition of batch-arrays.
+    batch = Transition(*zip(*transitions))
 
-        # Use epsilon-greedy for exploration
-        if frame_count < epsilon_random_frames or epsilon > np.random.rand(1)[0]:
-            # Take random action
-            action = np.random.choice(num_actions)
+    # print(batch.state)
+    # print(batch.action)
+    # print(batch.reward)
+
+    # Compute a mask of non-final states and concatenate the batch elements
+    # (a final state would've been the one after which simulation ended)
+    non_final_mask = th.tensor(tuple(map(lambda s: s is not None,
+                                          batch.next_state)), device=device, dtype=th.bool)
+    non_final_next_states = th.cat([s for s in batch.next_state
+                                                if s is not None])
+    state_batch = th.cat(batch.state)
+    action_batch = th.cat(batch.action)
+    reward_batch = th.cat(batch.reward)
+
+    # print("state batch = " + str(state_batch))
+    # print("action batch = " + str(action_batch))
+    # print("reward batch = " + str(reward_batch))
+
+
+    # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
+    # columns of actions taken. These are the actions which would've been taken
+    # for each batch state according to policy_net
+    state_action_values = policy_net(state_batch)
+    # print("state actions 1 = " + str(state_action_values))
+    state_action_values = state_action_values.gather(1, action_batch)
+    # print("state actions 2 = " + str(state_action_values))
+
+    # Compute V(s_{t+1}) for all next states.
+    # Expected values of actions for non_final_next_states are computed based
+    # on the "older" target_net; selecting their best reward with max(1)[0].
+    # This is merged based on the mask, such that we'll have either the expected
+    # state value or 0 in case the state was final.
+    next_state_values = th.zeros(BATCH_SIZE, device=device)
+    next_state_values[non_final_mask] = target_net(non_final_next_states).max(1)[0].detach()
+    # Compute the expected Q values
+    expected_state_action_values = (next_state_values * GAMMA) + reward_batch
+
+    # Compute Huber loss
+    criterion = nn.SmoothL1Loss()
+    loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
+
+    # print(loss)
+
+    # Optimize the model
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+
+def init_state():
+    win = np.random.choice(range(board_size))
+    state = win
+    state = th.from_numpy(np.array([[state]]))
+    return state, win
+
+num_episodes = 51
+durations = 500
+for i_episode in range(num_episodes):
+    # Initialize the environment and state
+    state, win = init_state()
+
+    for t in range(durations):
+        # Select and perform an action
+
+        action = select_action(state)
+        reward = (action == win)
+        # print(str(reward) + " " + str(action) + " " + str(win))
+        done = (t == durations)
+        reward = th.tensor([reward], device=device)
+
+        if not done:
+            next_state, next_win = init_state()
         else:
-            # Predict action Q-values
-            # From environment state
-            state_tensor = tf.convert_to_tensor(state)
-            state_tensor = tf.expand_dims(state_tensor, 0)
-            action_probs = model(state_tensor, training=False)
-            # Take best action
-            action = tf.argmax(action_probs[0]).numpy()
+            next_state = None
 
-        # Decay probability of taking random action
-        epsilon -= epsilon_interval / epsilon_greedy_frames
-        epsilon = max(epsilon, epsilon_min)
+        # Store the transition in memory
+        memory.push(state, action, next_state, reward)
 
-        # Apply the sampled action in our environment
-        state_next = np.zeros((84,84,4))
-        win = np.random.randint(4)
-        state_next[0,0,win] = 1
-        reward = state[0,0,action]
-        done = False
+        # Move to the next state
+        state = next_state
+        win = next_win
 
-        episode_reward += reward
-
-        # Save actions and states in replay buffer
-        action_history.append(action)
-        state_history.append(state)
-        state_next_history.append(state_next)
-        done_history.append(done)
-        rewards_history.append(reward)
-        state = state_next
-
-        # Update every fourth frame and once batch size is over 32
-        if frame_count % update_after_actions == 0 and len(done_history) > batch_size:
-
-            # Get indices of samples for replay buffers
-            indices = np.random.choice(range(len(done_history)), size=batch_size)
-
-            # Using list comprehension to sample from replay buffer
-            state_sample = np.array([state_history[i] for i in indices])
-            state_next_sample = np.array([state_next_history[i] for i in indices])
-            rewards_sample = [rewards_history[i] for i in indices]
-            action_sample = [action_history[i] for i in indices]
-            done_sample = tf.convert_to_tensor(
-                [float(done_history[i]) for i in indices]
-            )
-
-            # Build the updated Q-values for the sampled future states
-            # Use the target model for stability
-            future_rewards = model_target.predict(state_next_sample)
-            # Q value = reward + discount factor * expected future reward
-            updated_q_values = rewards_sample + gamma * tf.reduce_max(
-                future_rewards, axis=1
-            )
-
-            # If final frame set the last value to -1
-            updated_q_values = updated_q_values * (1 - done_sample) - done_sample
-
-            # Create a mask so we only calculate loss on the updated Q-values
-            masks = tf.one_hot(action_sample, num_actions)
-
-            with tf.GradientTape() as tape:
-                # Train the model on the states and updated Q-values
-                q_values = model(state_sample)
-
-                # Apply the masks to the Q-values to get the Q-value for action taken
-                q_action = tf.reduce_sum(tf.multiply(q_values, masks), axis=1)
-                # Calculate loss between new Q-value and old Q-value
-                loss = loss_function(updated_q_values, q_action)
-
-            # Backpropagation
-            grads = tape.gradient(loss, model.trainable_variables)
-            optimizer.apply_gradients(zip(grads, model.trainable_variables))
-
-        if frame_count % update_target_network == 0:
-            # update the the target network with new weights
-            model_target.set_weights(model.get_weights())
-            # Log details
-            template = "running reward: {:.2f} at episode {}, frame count {}"
-            print(template.format(running_reward, episode_count, frame_count))
-
-        # Limit the state and reward history
-        if len(rewards_history) > max_memory_length:
-            del rewards_history[:1]
-            del state_history[:1]
-            del state_next_history[:1]
-            del action_history[:1]
-            del done_history[:1]
-
+        # Perform one step of the optimization (on the policy network)
+        optimize_model()
         if done:
+            episode_durations.append(t + 1)
+            # plot_durations()
             break
+    # Update the target network, copying all weights and biases in DQN
+    if i_episode % TARGET_UPDATE == 0:
+        target_net.load_state_dict(policy_net.state_dict())
+        target_net.save("/home/aaatanas/MinionsAI_tests/buttonAI/test3/"+ str(i_episode))
+        n_success = 0
+        for t in range(durations):
+            state, win = init_state()
+            # Select and perform an action
+            action = select_action(state, True)
+            # print(str(action) + ", " + str(win) + ": " + str(reward))
+            reward = (action == win)
+            done = False
+            n_success += reward
+        print("Iteration " + str(i_episode) + " success rate: " + str(n_success/durations))
 
-    # Update running reward to check condition for solving
-    episode_reward_history.append(episode_reward)
-    if len(episode_reward_history) > 100:
-        del episode_reward_history[:1]
-    running_reward = np.mean(episode_reward_history)
-
-    episode_count += 1
-
-    if running_reward > 100:  # Condition to consider the task solved
-        print("Solved at episode {}!".format(episode_count))
-        break
+print('Complete')

@@ -1,4 +1,5 @@
 from minionsai.discriminator_only.translator import Translator, ObservationEnum
+from minionsai.engine import Phase
 
 class ActionTranslator(Translator):
     def translate_action(self, game: Game, action: Int):
@@ -28,6 +29,7 @@ class ActionTranslator(Translator):
                 self.UNIT_TYPES.encode(unit_type)
             ])
 
+        phase = (game.phase == Phase.MOVE)
         remaining_turns = game.remaining_turns
         all_money = game.money
         scores = game.get_scores
@@ -40,6 +42,7 @@ class ActionTranslator(Translator):
         # TODO: Should the translator be in charge of calling ObservationEnum.encode()?
         return {
             'board': np.array([board_obs]),
+            'phase': np.array([[phase]]),
             'remaining_turns': np.array([[remaining_turns]]),  # shape is [batch, num_items]
             'money': np.array([[money]]),
             'opp_money': np.array([[opp_money]]),
