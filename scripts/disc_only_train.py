@@ -46,7 +46,7 @@ EVAL_VS_PAST_ITERS = [2, 8, 16]
 EVAL_VS_AGENTS = [GenDiscAgent(ScriptedDiscriminator(), RandomAIAgent(), rollouts_per_turn=16)]
 EVAL_VS_RANDOM_UNTIL = 5
 EVAL_TRIALS = 100
-EVAL_THREADS = 4
+EVAL_THREADS = 1
 
 # Frequency of storing a saved agent
 CHECKPOINT_EVERY = 1
