@@ -4,7 +4,7 @@ from typing import Tuple
 import tqdm
 from .engine import Game
 from .agent import Agent
-from multiprocessing import pool
+from torch.multiprocessing import Pool, set_start_method
 import numpy as np
 
 class AgentException(Exception):
@@ -79,7 +79,10 @@ def run_n_games(game_fn, agents, n, num_threads, randomize_player_order=True, pr
             iterator = tqdm.tqdm(iterator)
         results = [run_game_from_fn(game_fn, agents, randomize_player_order=randomize_player_order) for _ in iterator]
     else:
-        with pool.Pool(num_threads) as p:
+        raise NotImplementedError("num_threads > 1 doesn't seem to work. All pytorch agents seem to play randomly when run in parallel like this (at least they get 50% winrate vs random).")
+        # No idea if this `Pool` thing is the right way to go....
+        set_start_method("spawn")
+        with Pool(num_threads) as p:
             inputs = [(game_fn, agents, False, randomize_player_order)] * n
             if progress_bar:
                 inputs = tqdm.tqdm(inputs, total=n)
