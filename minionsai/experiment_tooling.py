@@ -8,7 +8,7 @@ from .metrics_logger import metrics_logger
 
 logger = logging.getLogger(__name__)
 
-@lru_cache
+@lru_cache()
 def get_experiments_directory():
     try:
         from .local_config import EXPERIMENTS_DIRECTORY

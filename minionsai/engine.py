@@ -15,7 +15,7 @@ def dist(xi, yi, xf, yf):
     return max(abs(yf - yi), abs(xf - xi) + (abs(yf - yi) if (xi > xf) == (yi > yf) else 0))
 
 # return an array of tuples of adjacent hexes
-@lru_cache
+@lru_cache()
 def adjacent_hexes(x, y):
     hex_list = []
     if x > 0: hex_list.append((x-1,y))
