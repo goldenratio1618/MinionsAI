@@ -22,7 +22,6 @@ class ObservationEnum():
 
 class Translator():
     HEXES = ObservationEnum([(i, j) for i in range(BOARD_SIZE) for j in range(BOARD_SIZE)])
-    LOCATIONS = ObservationEnum([(i, j) for i in range(BOARD_SIZE) for j in range(BOARD_SIZE)])
 
     # 2x embeddings for unit types to encompass "mine" (True) and "opponent" (False)
     UNIT_TYPES =  ObservationEnum([(u, c) for u in [u.name for u in unitList] for c in [True, False]], none_value=True)
@@ -32,7 +31,6 @@ class Translator():
     MAX_REMAINING_TURNS = 20
     MAX_MONEY = 20
     MAX_SCORE_DIFF = 20
-    REMAINING_TURNS = ObservationEnum(list(range(MAX_REMAINING_TURNS + 1)))
 
     def translate(self, game: Game):
         board_obs = [] # [num_hexes, 3 (location, terrain, unit_type)]
