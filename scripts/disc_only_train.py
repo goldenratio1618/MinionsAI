@@ -8,11 +8,10 @@ Then agent checkpoints & logs are saved in <your temp dir>/MinionsAI/my_run
 
 import argparse
 from collections import defaultdict
-import tempfile
 from minionsai.experiment_tooling import find_device, setup_directory
 from minionsai.gen_disc.agent import GenDiscAgent
 from minionsai.gen_disc.discriminators import ScriptedDiscriminator
-from minionsai.run_game import run_game, run_n_games
+from minionsai.run_game import run_n_games
 from minionsai.discriminator_only.agent import TrainedAgent
 from minionsai.discriminator_only.model import MinionsDiscriminator
 from minionsai.discriminator_only.translator import Translator
@@ -34,8 +33,7 @@ ROLLOUTS_PER_TURN = 64
 EPSILON_GREEEDY = 0.1
 
 # How many episodes of data do we collect each iteration, before running a few epochs of optimization?
-# Potentially good to use a few times bigger EPISODES_PER_ITERATION * DATA_AUG_FACTOR than BATCH_SIZE, to minimize correlation within batches
-# (DATA_AUG_FACTOR = 4)
+# Potentially good to use a few times bigger EPISODES_PER_ITERATION than BATCH_SIZE, to minimize correlation within batches
 EPISODES_PER_ITERATION = 256
 
 # Once we've collected the data, how many times do we go over it for optimization (within one iteration)?
