@@ -1,5 +1,6 @@
 
 
+from functools import lru_cache
 from typing import List
 from ..engine import Game, BOARD_SIZE
 from ..unit_type import unitList
@@ -11,13 +12,13 @@ class ObservationEnum():
             self.NULL = "null"
             values = [self.NULL] + values
         self.int_to_value = values
-        self.value_to_int = {v: i for i, v in enumerate(values)}
 
     def decode(self, idx):
         return self.int_to_value[idx]
 
+    @lru_cache(maxsize=None)
     def encode(self, value):
-        return self.value_to_int[value]
+        return self.int_to_value.index(value)
 
 class Translator():
     HEXES = ObservationEnum([(i, j) for i in range(BOARD_SIZE) for j in range(BOARD_SIZE)])
@@ -57,10 +58,10 @@ class Translator():
         money = min(all_money[game.active_player_color], self.MAX_MONEY)
         opp_money = min(all_money[1 - game.active_player_color], self.MAX_MONEY)
         score_diff = max(min(scores[game.active_player_color] - scores[game.inactive_player_color], self.MAX_SCORE_DIFF), -self.MAX_SCORE_DIFF) + self.MAX_SCORE_DIFF
-        # TODO: Should the translator be in charge of calling ObservationEnum.encode()?
+        
         return {
-            'board': np.array([board_obs]),
-            'remaining_turns': np.array([[remaining_turns]]),  # shape is [batch, num_items]
+            'board': np.array([board_obs]),  # shape is [batch, num_items=BOARD_SIZE^2]
+            'remaining_turns': np.array([[remaining_turns]]),  # shape is [batch, num_items=1]
             'money': np.array([[money]]),
             'opp_money': np.array([[opp_money]]),
             'score_diff': np.array([[score_diff]])

@@ -1,9 +1,8 @@
 from collections import defaultdict
-import copy
 import enum
 from functools import lru_cache
 import random
-from typing import Optional, Tuple
+from typing import Iterator, Optional, Tuple, List
 from .unit_type import UnitType, NECROMANCER, ZOMBIE, unit_type_from_name
 from .action import ActionType, Action, ActionList, MoveAction, SpawnAction
 import numpy as np
@@ -202,8 +201,7 @@ class Game():
         """
         Returns scores of both players.
         """
-        scores = np.array([0, 0])
-        scores += self.money
+        scores = self.money.copy()
         for unit, _ in self.units_with_locations():
             if unit.type != NECROMANCER:
                 scores[unit.color] += unit.type.cost
@@ -271,12 +269,10 @@ class Game():
         if do_print: print(result)
         return result
 
-    def units_with_locations(self, color=None) -> Tuple[Tuple[int, int], Hex]:
-        result = []
+    def units_with_locations(self, color=None) -> Iterator[Tuple["Unit", Tuple[int, int]]]:
         for (i, j), hex in self.board.hexes():
             if hex.unit is not None and (color is None or hex.unit.color == color):
-                result.append([hex.unit, (i, j)])
-        return result
+                yield (hex.unit, (i, j))
 
     def next_turn(self) -> None:
         assert self.phase == Phase.TURN_END, f"Can only call game.next_turn() from TURN_END phase; received call in {self.phase.name}. Did you forget to call game.end_spawn_phase()?"
@@ -286,7 +282,7 @@ class Game():
             self.phase = Phase.GAME_OVER
             for color in (0, 1):
                 self.add_to_metric(color, 'final_money', self.money[color])
-                self.add_to_metric(color, 'final_num_units', len(self.units_with_locations(color=color)))
+                self.add_to_metric(color, 'final_num_units', len(list(self.units_with_locations(color=color))))
             self.add_to_metric(self.winner, 'wins', 1)
             return
 
