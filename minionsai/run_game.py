@@ -73,7 +73,7 @@ def run_n_games(game_fn, agents, n, randomize_player_order=True, progress_bar=Tr
     iterator = range(n)
     if progress_bar:
         iterator = tqdm.tqdm(iterator)
-    results = [run_game(game_fn(), agents, randomize_player_order=randomize_player_order) for _ in iterator]
+    results = [run_game_with_metrics(game_fn(), agents, randomize_player_order=randomize_player_order) for _ in iterator]
     # Count how many times each agent won
     winners = [result[0] for result in results]
     wins = [0, 0]
