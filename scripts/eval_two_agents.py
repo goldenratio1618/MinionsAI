@@ -1,24 +1,29 @@
-from collections import defaultdict
 from minionsai.experiment_tooling import get_experiments_directory
 from minionsai.scoreboard_envs import ENVS
-import tqdm
+import time
 import os
 from minionsai.run_game import run_game_with_metrics, run_n_games
 from minionsai.agent import Agent, CLIAgent, RandomAIAgent
 
-# If this is 1, it runs in a single thread.
-# Increase it above 1 for multiple threads.
-# If you make it too high, you might consume all the RAM on your machine.
-NUM_THREADS = 1
-
-TOTAL_GAMES = 10
+TOTAL_GAMES = 100
 
 if __name__ == "__main__":
     # Update these to the agents you want to play
-    agent0_path = os.path.join(get_experiments_directory(), "scan_batch_size_1024", "checkpoints", "iter_9")
-    agent1_path = os.path.join(get_experiments_directory(), "scan_batch_size_256", "checkpoints", "iter_36")
+    agent0_path = os.path.join(get_experiments_directory(), "epi1024", "checkpoints", "iter_150")
+    agent1_path = os.path.join(get_experiments_directory(), "conv_big", "checkpoints", "iter_600")
 
-    agents = [Agent.load(agent0_path), RandomAIAgent()]
+    # while not os.path.exists(agent0_path):
+    #     print("Waiting for agent 1 to finish training...")
+    #     time.sleep(60)
+
+    # while not os.path.exists(agent1_path):
+    #     print("Waiting for agent 1 to finish training...")
+    #     time.sleep(60)
+
+    agent0 = Agent.load(agent0_path)
+    agent1 = Agent.load(agent1_path)
+    # agent1 = RandomAIAgent()
+    agents = [agent0, agent1]
     #agents = [CLIAgent(["./stonkfish/a.out"]), CLIAgent(["./stonkfish/a.out.old"])]
 
     verbose = True
@@ -32,7 +37,7 @@ if __name__ == "__main__":
     if TOTAL_GAMES > 1:
         wins, metrics = run_n_games(
             ENVS['zombies5x5'], agents, TOTAL_GAMES, 
-            num_threads=NUM_THREADS, randomize_player_order=True, progress_bar=verbose)
+            randomize_player_order=True, progress_bar=verbose)
     else:
         winner, metrics = run_game_with_metrics(ENVS['zombies5x5'](), agents, verbose=True, randomize_player_order=True)
         wins = [0, 0]

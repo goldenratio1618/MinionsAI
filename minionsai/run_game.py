@@ -4,7 +4,6 @@ from typing import Tuple
 import tqdm
 from .engine import Game
 from .agent import Agent
-from torch.multiprocessing import Pool, set_start_method
 import numpy as np
 
 class AgentException(Exception):
@@ -52,10 +51,6 @@ def run_game_with_metrics(game: Game, agents: Tuple[Agent, Agent], verbose=False
         winner_agent = winner_color
     return winner_agent, metrics
 
-def run_game_from_fn(game_fn, agents, verbose=False, randomize_player_order=False):
-    game = game_fn()
-    return run_game_with_metrics(game, agents, verbose=verbose, randomize_player_order=randomize_player_order)
-
 def accumulate_metrics(metrics_list, num_games):
     metrics = defaultdict(list)
     for metrics_dict in metrics_list:
@@ -65,7 +60,7 @@ def accumulate_metrics(metrics_list, num_games):
         metrics[key] = sum(value) / num_games
     return metrics
 
-def run_n_games(game_fn, agents, n, num_threads, randomize_player_order=True, progress_bar=True):
+def run_n_games(game_fn, agents, n, randomize_player_order=True, progress_bar=True):
     """
     Runs n games. If num_threads > 1, runs n games in parallel.
 
@@ -73,20 +68,12 @@ def run_n_games(game_fn, agents, n, num_threads, randomize_player_order=True, pr
     - wins, a tuple of ints of how many times each agent won
     - metrics, a tuple of average metrics for each agent.
     """
-    if num_threads == 1:
-        iterator = range(n)
-        if progress_bar:
-            iterator = tqdm.tqdm(iterator)
-        results = [run_game_from_fn(game_fn, agents, randomize_player_order=randomize_player_order) for _ in iterator]
-    else:
-        raise NotImplementedError("num_threads > 1 doesn't seem to work. All pytorch agents seem to play randomly when run in parallel like this (at least they get 50% winrate vs random).")
-        # No idea if this `Pool` thing is the right way to go....
-        set_start_method("spawn")
-        with Pool(num_threads) as p:
-            inputs = [(game_fn, agents, False, randomize_player_order)] * n
-            if progress_bar:
-                inputs = tqdm.tqdm(inputs, total=n)
-            results = p.starmap(run_game_from_fn, inputs)
+    # if agents are a string, treat it as a path to a file containing the agent
+    agents = [Agent.load(agent) if isinstance(agent, str) else agent for agent in agents]
+    iterator = range(n)
+    if progress_bar:
+        iterator = tqdm.tqdm(iterator)
+    results = [run_game(game_fn(), agents, randomize_player_order=randomize_player_order) for _ in iterator]
     # Count how many times each agent won
     winners = [result[0] for result in results]
     wins = [0, 0]
