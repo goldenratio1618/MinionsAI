@@ -11,6 +11,8 @@ from collections import defaultdict
 from minionsai.experiment_tooling import find_device, setup_directory
 from minionsai.gen_disc.agent import GenDiscAgent
 from minionsai.gen_disc.discriminators import ScriptedDiscriminator
+from minionsai.multiprocessing_rl.multiproc_rollouts import MultiProcessRolloutSource
+from minionsai.multiprocessing_rl.rollouts import InProcessRolloutSource
 from minionsai.run_game import run_n_games
 from minionsai.discriminator_only.agent import TrainedAgent
 from minionsai.discriminator_only.model import MinionsDiscriminator
@@ -35,6 +37,7 @@ EPSILON_GREEEDY = 0.1
 # How many episodes of data do we collect each iteration, before running a few epochs of optimization?
 # Potentially good to use a few times bigger EPISODES_PER_ITERATION than BATCH_SIZE, to minimize correlation within batches
 EPISODES_PER_ITERATION = 256
+ROLLOUT_PROCS = 4
 
 # Once we've collected the data, how many times do we go over it for optimization (within one iteration)?
 SAMPLE_REUSE = 2
@@ -86,95 +89,6 @@ def build_agent():
     agent = TrainedAgent(policy, translator, generator, ROLLOUTS_PER_TURN, epsilon_greedy=EPSILON_GREEEDY)
     return agent
 
-def smooth_labels(labels, lam):
-    """
-    Takes a list of win probs with a 0/1 at the end
-    and smooths them into targets for the model
-    using exponential moving average
-    """
-    reversed_labels = np.array(labels)[::-1]
-    lambda_powers = lam ** np.arange(len(labels), 0, -1)
-    turn_contribs = np.cumsum(reversed_labels * lambda_powers)
-    norm = np.cumsum(lambda_powers)
-    return (turn_contribs / norm)[::-1]
-
-# TODO put this in a separate file
-array = [1, 2]
-desired = np.array([2/3 * 1 + 1/3 * 2, 2.])
-np.testing.assert_allclose(smooth_labels(array, 0.5), desired)
-
-array = [1, 2, 3]
-np.testing.assert_allclose(smooth_labels(array, 0.5), [4/7 * 1 + 2/7 * 2 + 1/7 * 3, 2/3 * 2 + 1/3 * 3, 3])
-
-# TODO - use run_game instead, with a custom Agent subclass that remembers the states.
-def single_rollout(game_kwargs, agents, lam=None):
-    # Randomize starting money
-    game_kwargs["money"] = (random.randint(1, 4), random.randint(1, 4))
-
-    game = Game(**game_kwargs)
-    state_buffers = [[], []]  # one for each player
-    label_buffers = [[], []]  # one for each player
-    while True:
-        game.next_turn()
-        if game.done:
-            break
-        active_player = game.active_player_color
-        actionlist, best_winprob = agents[active_player].act_with_winprob(game)
-        game.full_turn(actionlist)
-        state_buffers[active_player].append(agents[active_player].translator.translate(game))
-        label_buffers[active_player].append(best_winprob)
-        
-    winner = game.winner
-
-    metrics = (game.get_metrics(0), game.get_metrics(1))
-    metrics[winner]["pfinal"] = label_buffers[winner][-1]
-    metrics[1 - winner]["pfinal"] = 1 - label_buffers[1 - winner][-1]
-
-    label_buffers[winner].append(1)
-    label_buffers[1 - winner].append(0)
-    # game.pretty_print()
-    # print(winner)
-    winner_states = state_buffers[winner]
-    winner_labels = label_buffers[winner][1:]
-    loser_states = state_buffers[1 - winner]
-    loser_labels = label_buffers[1 - winner][1:]
-    if lam is not None:
-        winner_labels = smooth_labels(winner_labels, lam)
-        loser_labels = smooth_labels(loser_labels, lam)
-    all_states = winner_states + loser_states
-    all_labels = np.concatenate([winner_labels, loser_labels])
-    return all_states, all_labels, metrics
-
-def rollouts(game_kwargs, agents, lam=None):
-    states = []
-    labels = []
-
-    games = 0
-    metrics_accumulated = (defaultdict(list), defaultdict(list))
-    for _ in tqdm.tqdm(range(EPISODES_PER_ITERATION)):
-        with metrics_logger.timing('single_episode'):
-           states_, labels_, this_game_metrics = single_rollout(game_kwargs, agents, lam=lam)
-        states.extend(states_)
-        labels.extend(labels_)
-        games += 1
-        for color, this_color_metrics in enumerate(this_game_metrics):
-            for key in set(metrics_accumulated[color].keys()).union(set(this_color_metrics.keys())):
-                metrics_accumulated[color][key].append(this_color_metrics[key])
-    rollout_states = len(states)
-    # convert from list of dicts of arrays to a single dict of arrays with large batch dimension
-    states = {k: np.concatenate([s[k] for s in states], axis=0) for k in states[0]}
-    
-    # Add symmetries
-    symmetrized_states = Translator.symmetries(states)
-
-    # Now combine them into one big states dict
-    states = {k: np.concatenate([s[k] for s in symmetrized_states], axis=0) for k in states}
-    labels = np.concatenate([labels]*len(symmetrized_states), axis=0)
-    # Log instantaneous metrics here, and send cumulative out to the main control flow to integrate
-    for color in (0, 1):
-        metrics_logger.log_metrics({k: sum(v)/EPISODES_PER_ITERATION for k, v in metrics_accumulated[color].items()}, prefix=f'rollouts/game/{color}')
-    return states, labels, {'rollout_games': games, 'rollout_states': rollout_states}
-
 def eval_vs_other_by_path(agent, eval_agent_path):
     logger.info(f"Looking for eval agent at {eval_agent_path}...")
     if os.path.exists(eval_agent_path):
@@ -184,7 +98,7 @@ def eval_vs_other_by_path(agent, eval_agent_path):
 
 def eval_vs_other(agent, eval_agent, name):
     good_agent = TrainedAgent(agent.policy, agent.translator, agent.generator, ROLLOUTS_PER_TURN * EVAL_COMPUTE_BOOST)
-    wins, _metrics = run_n_games(ENVS[EVAL_ENV_NAME], [good_agent, eval_agent], n=EVAL_TRIALS, num_threads=EVAL_THREADS)
+    wins, _metrics = run_n_games(ENVS[EVAL_ENV_NAME], [good_agent, eval_agent], n=EVAL_TRIALS)
     winrate = wins[0] / EVAL_TRIALS
     metrics_logger.log_metrics({f"eval_winrate/{name}": winrate})
     logger.info(f"Win rate vs {name} = {winrate}")  
@@ -199,6 +113,11 @@ def main(run_name):
     policy = agent.policy
     policy.to(device)
     optimizer = th.optim.Adam(policy.parameters(), lr=LR)
+
+    if ROLLOUT_PROCS == 1:
+        rollout_source = InProcessRolloutSource(EPISODES_PER_ITERATION, game_kwargs, agent)
+    else:
+        rollout_source = MultiProcessRolloutSource(build_agent, agent, EPISODES_PER_ITERATION, game_kwargs, ROLLOUT_PROCS)
 
     iteration = 0
     turns_optimized = 0
@@ -219,30 +138,27 @@ def main(run_name):
         with metrics_logger.timing('rollouts'):
             logger.info("Starting rollouts...")
             policy.eval()  # Set policy to non-training mode
-            
-            # Early in training use td-lambda to reduce variance of gradients
-            # Late in training, turn this off since it introduces a bias when epsilon-greedy actions are taken.
-            lam = None if iteration >= 20 else 1 - iteration / 20
-            metrics_logger.log_metrics({'lambda': lam})
-            states, labels, rollout_info = rollouts(game_kwargs, [agent, agent], lam=lam)
+
+            rollout_batch = rollout_source.get_rollouts(iteration=iteration)
+            num_turns = rollout_batch.labels.shape[0]
             policy.train()  # Set policy back to training mode
-            for k, v in rollout_info.items():
-                rollout_stats[k] += v
+            rollout_stats['rollouts/games'] += rollout_batch.num_games
+            rollout_stats['rollouts/turns'] += num_turns
             metrics_logger.log_metrics(rollout_stats)
+
         with metrics_logger.timing('training'):
             logger.info("Starting training...")
-            num_states = states['board'].shape[0]
             for epoch in range(SAMPLE_REUSE):
                 logger.info(f"  Epoch {epoch}/{SAMPLE_REUSE}...")
-                all_idxes = np.random.permutation(num_states)
-                n_batches = num_states // BATCH_SIZE
+                all_idxes = np.random.permutation(num_turns)
+                n_batches = num_turns // BATCH_SIZE
                 for idx in range(n_batches):
                     with metrics_logger.timing('training_batch'):
                         batch_idxes = all_idxes[idx * BATCH_SIZE: (idx + 1) * BATCH_SIZE]
                         batch_obs = {}
-                        for key in states:
-                            batch_obs[key] = states[key][batch_idxes]
-                        batch_labels = np.array(labels)[batch_idxes]
+                        for key in rollout_batch.obs:
+                            batch_obs[key] = rollout_batch.obs[key][batch_idxes]
+                        batch_labels = rollout_batch.labels[batch_idxes]
                         batch_labels = th.from_numpy(batch_labels).to(device)
                         optimizer.zero_grad()
                         disc_logprob = policy(batch_obs) # [batch, 1]
@@ -275,9 +191,7 @@ def main(run_name):
                         eval_vs_other(agent, eval_agent, name=eval_agent.__class__.__name__)
                 for iter in EVAL_VS_PAST_ITERS:
                     eval_vs_other_by_path(agent, os.path.join(checkpoint_dir, f"iter_{iter}"))
-
                 policy.train()  # Set policy back to training mode
-
 
 
 if __name__ == "__main__":
