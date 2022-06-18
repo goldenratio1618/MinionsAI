@@ -1,9 +1,8 @@
 from minionsai.experiment_tooling import get_experiments_directory
 from minionsai.scoreboard_envs import ENVS
-import time
 import os
-from minionsai.run_game import run_game_with_metrics, run_n_games
-from minionsai.agent import Agent, CLIAgent, RandomAIAgent
+from minionsai.run_game import run_n_games
+from minionsai.agent import Agent, RandomAIAgent
 
 NUM_THREADS = 1
 TOTAL_GAMES = 1
