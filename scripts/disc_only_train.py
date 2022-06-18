@@ -173,10 +173,9 @@ def main(run_name):
                 logger.info(f"Iteration {iteration} complete.")
                 param_norm = sum([th.norm(param, p=2) for param in policy.parameters()]).item()
                 metrics_logger.log_metrics({'turns_optimized': turns_optimized, 'param_norm': param_norm})
-            metrics_logger.flush()
-
             iteration += 1
 
+        metrics_logger.flush()
         if iteration % EVAL_EVERY == 0:
             with metrics_logger.timing('eval'):
                 logger.info("Evaluating...")
