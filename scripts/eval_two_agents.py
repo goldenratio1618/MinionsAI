@@ -5,12 +5,13 @@ import os
 from minionsai.run_game import run_game_with_metrics, run_n_games
 from minionsai.agent import Agent, CLIAgent, RandomAIAgent
 
-TOTAL_GAMES = 100
+NUM_THREADS = 1
+TOTAL_GAMES = 1
 
 if __name__ == "__main__":
     # Update these to the agents you want to play
-    agent0_path = os.path.join(get_experiments_directory(), "epi1024", "checkpoints", "iter_150")
-    agent1_path = os.path.join(get_experiments_directory(), "conv_big", "checkpoints", "iter_600")
+    agent0 = RandomAIAgent()
+    agent1 = os.path.join(get_experiments_directory(), "conv_big", "checkpoints", "iter_600")
 
     # while not os.path.exists(agent0_path):
     #     print("Waiting for agent 1 to finish training...")
@@ -20,8 +21,6 @@ if __name__ == "__main__":
     #     print("Waiting for agent 1 to finish training...")
     #     time.sleep(60)
 
-    agent0 = Agent.load(agent0_path)
-    agent1 = Agent.load(agent1_path)
     # agent1 = RandomAIAgent()
     agents = [agent0, agent1]
     #agents = [CLIAgent(["./stonkfish/a.out"]), CLIAgent(["./stonkfish/a.out.old"])]
@@ -30,18 +29,15 @@ if __name__ == "__main__":
 
     slow_mode = TOTAL_GAMES==1
     if TOTAL_GAMES == 1:
-        # Log win probs from agent 0
+        agents = [Agent.load(agent) if isinstance(agent, str) else agent for agent in agents]
+
+        # If we're only playing one game be more verbose
         agents[0].verbose_level = 2
         agents[1].verbose_level = 2
 
-    if TOTAL_GAMES > 1:
-        wins, metrics = run_n_games(
-            ENVS['zombies5x5'], agents, TOTAL_GAMES, 
-            randomize_player_order=True, progress_bar=verbose)
-    else:
-        winner, metrics = run_game_with_metrics(ENVS['zombies5x5'](), agents, verbose=True, randomize_player_order=True)
-        wins = [0, 0]
-        wins[winner] += 1
+    wins, metrics = run_n_games(
+        ENVS['zombies5x5'], agents, TOTAL_GAMES, num_threads=NUM_THREADS,
+        randomize_player_order=True, progress_bar=verbose)
 
     print("Agent 0 wins:", wins[0] / TOTAL_GAMES)
     if (verbose):
