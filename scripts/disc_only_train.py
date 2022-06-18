@@ -122,59 +122,60 @@ def main(run_name):
     turns_optimized = 0
     rollout_stats = defaultdict(int)
     while MAX_ITERATIONS is None or iteration < MAX_ITERATIONS:
-        metrics_logger.log_metrics({'iteration': iteration})
-        print()
-        print("====================================")
-        logger.info(f"=========== Iteration: {iteration} ===========")
-        print("====================================")
-        if iteration % CHECKPOINT_EVERY == 0:
-            with metrics_logger.timing('checkpointing'):
-                logger.info("Saving checkpoint...")
-                # Save with more rollouts_per_turn. TODO - clean up this hack.
-                agent.rollouts_per_turn = ROLLOUTS_PER_TURN * EVAL_COMPUTE_BOOST
-                agent.save(os.path.join(checkpoint_dir, f"iter_{iteration}"), copy_code_from=code_dir)
-                agent.rollouts_per_turn = ROLLOUTS_PER_TURN
-        with metrics_logger.timing('rollouts'):
-            logger.info("Starting rollouts...")
-            policy.eval()  # Set policy to non-training mode
+        with metrics_logger.timing('iteration'):
+            metrics_logger.log_metrics({'iteration': iteration})
+            print()
+            print("====================================")
+            logger.info(f"=========== Iteration: {iteration} ===========")
+            print("====================================")
+            if iteration % CHECKPOINT_EVERY == 0:
+                with metrics_logger.timing('checkpointing'):
+                    logger.info("Saving checkpoint...")
+                    # Save with more rollouts_per_turn. TODO - clean up this hack.
+                    agent.rollouts_per_turn = ROLLOUTS_PER_TURN * EVAL_COMPUTE_BOOST
+                    agent.save(os.path.join(checkpoint_dir, f"iter_{iteration}"), copy_code_from=code_dir)
+                    agent.rollouts_per_turn = ROLLOUTS_PER_TURN
+            with metrics_logger.timing('rollouts'):
+                logger.info("Starting rollouts...")
+                policy.eval()  # Set policy to non-training mode
 
-            rollout_batch = rollout_source.get_rollouts(iteration=iteration)
-            num_turns = rollout_batch.labels.shape[0]
-            policy.train()  # Set policy back to training mode
-            rollout_stats['rollouts/games'] += rollout_batch.num_games
-            rollout_stats['rollouts/turns'] += num_turns
-            metrics_logger.log_metrics(rollout_stats)
+                rollout_batch = rollout_source.get_rollouts(iteration=iteration)
+                num_turns = rollout_batch.labels.shape[0]
+                policy.train()  # Set policy back to training mode
+                rollout_stats['rollouts/games'] += rollout_batch.num_games
+                rollout_stats['rollouts/turns'] += num_turns
+                metrics_logger.log_metrics(rollout_stats)
 
-        with metrics_logger.timing('training'):
-            logger.info("Starting training...")
-            for epoch in range(SAMPLE_REUSE):
-                logger.info(f"  Epoch {epoch}/{SAMPLE_REUSE}...")
-                all_idxes = np.random.permutation(num_turns)
-                n_batches = num_turns // BATCH_SIZE
-                for idx in range(n_batches):
-                    with metrics_logger.timing('training_batch'):
-                        batch_idxes = all_idxes[idx * BATCH_SIZE: (idx + 1) * BATCH_SIZE]
-                        batch_obs = {}
-                        for key in rollout_batch.obs:
-                            batch_obs[key] = rollout_batch.obs[key][batch_idxes]
-                        batch_labels = rollout_batch.labels[batch_idxes]
-                        batch_labels = th.from_numpy(batch_labels).to(device)
-                        optimizer.zero_grad()
-                        disc_logprob = policy(batch_obs) # [batch, 1]
-                        batch_labels = th.unsqueeze(batch_labels, 1)
-                        loss = th.nn.BCEWithLogitsLoss()(disc_logprob, batch_labels)
-                        loss.backward()
-                        optimizer.step()
-                        if idx in [0, n_batches // 2, n_batches - 1]:
-                            max_batch_digits = len(str(n_batches))
-                            metrics_logger.log_metrics({f"loss/epoch_{epoch}/batch_{idx:0>{max_batch_digits}}": loss.item()})
-                        turns_optimized += len(batch_idxes)
-            logger.info(f"Iteration {iteration} complete.")
-            param_norm = sum([th.norm(param, p=2) for param in policy.parameters()]).item()
-            metrics_logger.log_metrics({'turns_optimized': turns_optimized, 'param_norm': param_norm})
-        metrics_logger.flush()
+            with metrics_logger.timing('training'):
+                logger.info("Starting training...")
+                for epoch in range(SAMPLE_REUSE):
+                    logger.info(f"  Epoch {epoch}/{SAMPLE_REUSE}...")
+                    all_idxes = np.random.permutation(num_turns)
+                    n_batches = num_turns // BATCH_SIZE
+                    for idx in range(n_batches):
+                        with metrics_logger.timing('training_batch'):
+                            batch_idxes = all_idxes[idx * BATCH_SIZE: (idx + 1) * BATCH_SIZE]
+                            batch_obs = {}
+                            for key in rollout_batch.obs:
+                                batch_obs[key] = rollout_batch.obs[key][batch_idxes]
+                            batch_labels = rollout_batch.labels[batch_idxes]
+                            batch_labels = th.from_numpy(batch_labels).to(device)
+                            optimizer.zero_grad()
+                            disc_logprob = policy(batch_obs) # [batch, 1]
+                            batch_labels = th.unsqueeze(batch_labels, 1)
+                            loss = th.nn.BCEWithLogitsLoss()(disc_logprob, batch_labels)
+                            loss.backward()
+                            optimizer.step()
+                            if idx in [0, n_batches // 2, n_batches - 1]:
+                                max_batch_digits = len(str(n_batches))
+                                metrics_logger.log_metrics({f"loss/epoch_{epoch}/batch_{idx:0>{max_batch_digits}}": loss.item()})
+                            turns_optimized += len(batch_idxes)
+                logger.info(f"Iteration {iteration} complete.")
+                param_norm = sum([th.norm(param, p=2) for param in policy.parameters()]).item()
+                metrics_logger.log_metrics({'turns_optimized': turns_optimized, 'param_norm': param_norm})
+            metrics_logger.flush()
 
-        iteration += 1
+            iteration += 1
 
         if iteration % EVAL_EVERY == 0:
             with metrics_logger.timing('eval'):
@@ -190,7 +191,7 @@ def main(run_name):
                         eval_vs_other(agent, eval_agent, name=eval_agent.__class__.__name__)
                 for iter in EVAL_VS_PAST_ITERS:
                     eval_vs_other_by_path(agent, os.path.join(checkpoint_dir, f"iter_{iter}"))
-                policy.train()  # Set policy back to training mode
+                    policy.train()  # Set policy back to training mode
 
 
 if __name__ == "__main__":
