@@ -75,7 +75,7 @@ class MultiProcessRolloutSource(OptimizerRolloutSource):
         for rank in range(num_procs):
             iteration_info_queue = mp.Queue()
             self.iteration_info_queues.append(iteration_info_queue)
-            proc = mp.Process(target=worker_proc_main, args=(rank, self.game_kwargs, self.agent_fn, self.requests_queue, self.episodes_queue, iteration_info_queue))
+            proc = mp.Process(target=worker_proc_main, args=(rank, self.game_kwargs, self.agent_fn, self.requests_queue, self.episodes_queue, iteration_info_queue), daemon=True)
             self.procs.append(proc)
         for p in self.procs:
             p.start()

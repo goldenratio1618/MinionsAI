@@ -51,7 +51,6 @@ EVAL_VS_AGENTS = [GenDiscAgent(ScriptedDiscriminator(), RandomAIAgent(), rollout
 # Eval against random up until this iteration
 EVAL_VS_RANDOM_UNTIL = 5
 EVAL_TRIALS = 100
-EVAL_THREADS = 1
 
 # Frequency of storing a saved agent
 CHECKPOINT_EVERY = 1

@@ -85,7 +85,7 @@ def run_n_games(game_fn, agents, n, num_threads=1, randomize_player_order=True, 
         output_queue = mp.Queue()
         assert n % num_threads == 0, f"n must be divisible by num_threads, n={n}, num_threads={num_threads}"
         num_games_per_thread = n // num_threads
-        processes = [mp.Process(target=_run_game_parallel_worker, args=(game_fn, agents, num_games_per_thread, output_queue, randomize_player_order)) for _ in range(num_threads)]
+        processes = [mp.Process(target=_run_game_parallel_worker, args=(game_fn, agents, num_games_per_thread, output_queue, randomize_player_order), daemon=True) for _ in range(num_threads)]
         for process in processes:
             process.start()
         for _ in iterator:
