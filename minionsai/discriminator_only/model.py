@@ -15,6 +15,8 @@ class MinionsDiscriminator(th.nn.Module):
         self.opp_money_embedding = th.nn.Embedding(21, d_model)
         self.score_diff_embedding = th.nn.Embedding(41, d_model)
 
+        self.activation = th.nn.GELU()
+
         # TODO We process the board with a conv net to help the model understand adjacency
         # This is ok when everything has speed 1, range 1.
         # But eventually we'll want to upgrade this to relative attention in the transformer
@@ -22,13 +24,11 @@ class MinionsDiscriminator(th.nn.Module):
         self.input_conv1 = th.nn.Conv2d(d_model, d_model, 3, padding='same')
         self.conv_ln = th.nn.LayerNorm(d_model)
         self.transformer = th.nn.TransformerEncoder(
-            th.nn.TransformerEncoderLayer(d_model, 8, dim_feedforward=d_model, batch_first=True),
+            th.nn.TransformerEncoderLayer(d_model, 8, dim_feedforward=d_model, batch_first=True, activation=self.activation),
             num_layers=depth,
         )
         self.value_linear1 = th.nn.Linear(d_model, d_model)
         self.value_linear2 = th.nn.Linear(d_model, 1)
-
-        self.activation = th.nn.ReLU()
 
         self.d_model = d_model
         self.depth = depth
@@ -58,7 +58,8 @@ class MinionsDiscriminator(th.nn.Module):
         terrain_emb = self.terrain_embedding(board_obs[:, :, 1])  # [batch, num_hexes, d_model]
         unit_type_embs = self.unit_embedding(board_obs[:, :, 2])  # [batch, num_hexes, d_model]
         board_embs = hex_embs + terrain_emb + unit_type_embs # [batch, num_hexes, d_model]
-        
+        board_embs = self.activation(board_embs)
+
         # Reshape to [batch, height, width, channels]
         board_embs_conv = board_embs.view(board_embs.shape[0], BOARD_SIZE, BOARD_SIZE, self.d_model)
         # But the conv wants [batch, channels, height, width]
