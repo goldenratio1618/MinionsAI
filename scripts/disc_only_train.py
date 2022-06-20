@@ -8,7 +8,7 @@ Then agent checkpoints & logs are saved in <your experiments dir>/MinionsAI/my_r
 
 import argparse
 from collections import defaultdict
-from minionsai.experiment_tooling import find_device, setup_directory
+from minionsai.experiment_tooling import find_device, get_experiments_directory, setup_directory
 from minionsai.gen_disc.agent import GenDiscAgent
 from minionsai.gen_disc.discriminators import ScriptedDiscriminator
 from minionsai.multiprocessing_rl.multiproc_rollouts import MultiProcessRolloutSource
@@ -23,8 +23,6 @@ from minionsai.scoreboard_envs import ENVS
 import torch as th
 import numpy as np
 import os
-import tqdm
-import random
 import logging
 from minionsai.metrics_logger import metrics_logger
 
@@ -43,17 +41,20 @@ ROLLOUT_PROCS = 4
 SAMPLE_REUSE = 2
 
 # Frequency of running evals
-EVAL_EVERY = 2
+EVAL_EVERY = 8
 # Put iteration numbers here to eval vs past versions of this train run.
 EVAL_VS_PAST_ITERS = []
 # Specific agent instances to eval vs
-EVAL_VS_AGENTS = [GenDiscAgent(ScriptedDiscriminator(), RandomAIAgent(), rollouts_per_turn=16)]
+EVAL_VS_AGENTS = [
+    # GenDiscAgent(ScriptedDiscriminator(), RandomAIAgent(), rollouts_per_turn=16),
+    os.path.join(get_experiments_directory(), "conv_big", "checkpoints", "iter_200")
+]
 # Eval against random up until this iteration
 EVAL_VS_RANDOM_UNTIL = 5
 EVAL_TRIALS = 100
 
 # Frequency of storing a saved agent
-CHECKPOINT_EVERY = 1
+CHECKPOINT_EVERY = 4
 
 # During evals, run this many times extra rollouts compared to during rollout generation
 EVAL_COMPUTE_BOOST = 4
@@ -64,16 +65,14 @@ D_MODEL = 64 * DEPTH
 
 # Optimizer hparams
 BATCH_SIZE = EPISODES_PER_ITERATION
-LR = 3e-5
-
-LAMBDA = 0.95
+LR = 1e-4
 
 # kwargs to create a game (passed to Game)
 game_kwargs = {'symmetrize': False}
 # Eval env registered in scoreboard_envs.py
 EVAL_ENV_NAME = 'zombies5x5'
 
-MAX_ITERATIONS = None
+MAX_ITERATIONS = 400
 
 def build_agent():
     generator = RandomAIAgent()
@@ -135,6 +134,14 @@ def main(run_name):
                     agent.rollouts_per_turn = ROLLOUTS_PER_TURN * EVAL_COMPUTE_BOOST
                     agent.save(os.path.join(checkpoint_dir, f"iter_{iteration}"), copy_code_from=code_dir)
                     agent.rollouts_per_turn = ROLLOUTS_PER_TURN
+
+            metrics_logger.log_metrics(rollout_stats)
+            param_norm = sum([th.norm(param, p=2) for param in policy.parameters()]).item()
+            metrics_logger.log_metrics({
+                'epsilon_greedy': agent.epsilon_greedy, 
+                'turns_optimized': turns_optimized, 
+                'param_norm': param_norm})
+
             with metrics_logger.timing('rollouts'):
                 logger.info("Starting rollouts...")
                 policy.eval()  # Set policy to non-training mode
@@ -144,7 +151,6 @@ def main(run_name):
                 policy.train()  # Set policy back to training mode
                 rollout_stats['rollouts/games'] += rollout_batch.num_games
                 rollout_stats['rollouts/turns'] += num_turns
-                metrics_logger.log_metrics(rollout_stats)
 
             with metrics_logger.timing('training'):
                 logger.info("Starting training...")
@@ -171,9 +177,8 @@ def main(run_name):
                                 metrics_logger.log_metrics({f"loss/epoch_{epoch}/batch_{idx:0>{max_batch_digits}}": loss.item()})
                             turns_optimized += len(batch_idxes)
                 logger.info(f"Iteration {iteration} complete.")
-                param_norm = sum([th.norm(param, p=2) for param in policy.parameters()]).item()
-                metrics_logger.log_metrics({'turns_optimized': turns_optimized, 'param_norm': param_norm})
             iteration += 1
+            # agent.epsilon_greedy = EPSILON_GREEEDY * (1 - 0.8 * iteration / MAX_ITERATIONS)
 
         metrics_logger.flush()
         if iteration % EVAL_EVERY == 0:
