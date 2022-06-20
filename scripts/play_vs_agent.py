@@ -24,7 +24,7 @@ def main(agent_dir=None, disc_mode=False):
         human_agent = HumanCLIAgent()
     game = Game()
     winner, metrics = run_game_with_metrics(game, (agent, human_agent), verbose=True, randomize_player_order=True)
-    print("Game over.\nWinner:", winner)
+    print(f"Game over.\nWinner: agent {winner} ({'AI' if winner == 0 else 'human'})")
     print("Game metrics (Agent):")
     print(metrics[0])
     print("Game metrics (Human):")
