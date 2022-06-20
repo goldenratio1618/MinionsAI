@@ -264,7 +264,9 @@ class RandomAIAgent(Agent):
             for my_zombie in attackers[:2]:
                 move_actions.append(MoveAction(my_zombie, enemy_zombie))
 
-        for unit, (i, j) in game_copy.units_with_locations(color=game_copy.active_player_color):
+        my_units = list(game_copy.units_with_locations(color=game_copy.active_player_color))
+        random.shuffle(my_units)
+        for unit, (i, j) in my_units:
             if random.random() < 0.2:
                 # Don't move this guy
                 dest = (i, j)
