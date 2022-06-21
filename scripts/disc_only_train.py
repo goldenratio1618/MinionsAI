@@ -120,7 +120,7 @@ def main(run_name):
     iteration = 0
     turns_optimized = 0
     rollout_stats = defaultdict(int)
-    while MAX_ITERATIONS is None or iteration < MAX_ITERATIONS:
+    while MAX_ITERATIONS is None or iteration <= MAX_ITERATIONS:
         with metrics_logger.timing('iteration'):
             metrics_logger.log_metrics({'iteration': iteration})
             print()
