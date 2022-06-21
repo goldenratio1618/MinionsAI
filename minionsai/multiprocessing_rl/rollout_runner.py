@@ -59,4 +59,9 @@ class RolloutRunner():
         all_obs = winner_obs + loser_obs
         all_labels = np.concatenate([winner_labels, loser_labels])
 
-        return RolloutEpisode(all_obs, all_labels, metrics)
+        return RolloutEpisode(
+            disc_obs=all_obs, 
+            disc_labels=all_labels, 
+            gen_obs=[],  # TODO - produce generator rollout data
+            gen_labels=[],  # TODO - produce generator rollout data
+            metrics=metrics)
