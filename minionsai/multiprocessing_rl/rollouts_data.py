@@ -20,6 +20,8 @@ class RolloutEpisode:
     """
     Data class for storing one episode of data.
     """
-    obs: List[Dict[str, np.array]]
-    labels: List[float]
+    disc_obs: List[Dict[str, np.array]]
+    disc_labels: List[float]
+    gen_obs: List[Dict[str, np.array]]
+    gen_labels: List[float]
     metrics: List[Dict]  # len 2, one per player
