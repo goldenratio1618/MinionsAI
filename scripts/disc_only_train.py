@@ -147,13 +147,14 @@ def main(run_name):
                 policy.eval()  # Set policy to non-training mode
 
                 rollout_batch = rollout_source.get_rollouts(iteration=iteration)
-                num_turns = rollout_batch.labels.shape[0]
+                num_turns = rollout_batch['discriminator'].labels.shape[0]
                 policy.train()  # Set policy back to training mode
-                rollout_stats['rollouts/games'] += rollout_batch.num_games
+                rollout_stats['rollouts/games'] += rollout_batch['discriminator'].num_games
                 rollout_stats['rollouts/turns'] += num_turns
 
-            with metrics_logger.timing('training'):
-                logger.info("Starting training...")
+            with metrics_logger.timing('training/disc'):
+                logger.info("Starting training discriminator...")
+                disc_rollout_batch = rollout_batch['discriminator']
                 for epoch in range(SAMPLE_REUSE):
                     logger.info(f"  Epoch {epoch}/{SAMPLE_REUSE}...")
                     all_idxes = np.random.permutation(num_turns)
@@ -162,9 +163,9 @@ def main(run_name):
                         with metrics_logger.timing('training_batch'):
                             batch_idxes = all_idxes[idx * BATCH_SIZE: (idx + 1) * BATCH_SIZE]
                             batch_obs = {}
-                            for key in rollout_batch.obs:
-                                batch_obs[key] = rollout_batch.obs[key][batch_idxes]
-                            batch_labels = rollout_batch.labels[batch_idxes]
+                            for key in disc_rollout_batch.obs:
+                                batch_obs[key] = disc_rollout_batch.obs[key][batch_idxes]
+                            batch_labels = disc_rollout_batch.labels[batch_idxes]
                             batch_labels = th.from_numpy(batch_labels).to(device)
                             optimizer.zero_grad()
                             disc_logprob = policy(batch_obs) # [batch, 1]
@@ -176,7 +177,8 @@ def main(run_name):
                                 max_batch_digits = len(str(n_batches))
                                 metrics_logger.log_metrics({f"loss/epoch_{epoch}/batch_{idx:0>{max_batch_digits}}": loss.item()})
                             turns_optimized += len(batch_idxes)
-                logger.info(f"Iteration {iteration} complete.")
+            # TODO - train genereator here
+            logger.info(f"Iteration {iteration} complete.")
             iteration += 1
             # agent.epsilon_greedy = EPSILON_GREEEDY * (1 - 0.8 * iteration / MAX_ITERATIONS)
 
