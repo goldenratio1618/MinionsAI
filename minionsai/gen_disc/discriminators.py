@@ -67,19 +67,22 @@ class HumanDiscriminator(BaseDiscriminator):
                 if not copy:
                     equivalent_games.append(i)
 
-            sorted_idxes = sorted(equivalent_games, key=lambda i: logprobs[i], reverse=True)
+            sorted_idxes = sorted(equivalent_games, key=lambda i: i)
         else:
             sorted_idxes = list(range(len(games)))
             logprobs = [None] * len(games)
 
-        return self.display_and_choose(sorted_idxes, logprobs, games)
+        chosen = self.display_and_choose(sorted_idxes, logprobs, games)
+        print(f"Chosen option {chosen} with win prob {th.sigmoid(logprobs[chosen]).item():.1%}")
+        return chosen
 
     def display_and_choose(self, sorted_idxes, logprobs, games):
         for r in range(min(self.nrows, len(sorted_idxes) // self.ncols + 1)):
             print("-" * 16 * self.ncols)
             idxs = sorted_idxes[r * self.ncols : (r + 1) * self.ncols]
             print_n_games([games[i] for i in idxs])
-            print("".join([f"Opt {i:<3} ({th.sigmoid(logprobs[i]).item():.1%})".ljust(15)+"|" for i in idxs]))
+            if self.filter_agent is not None:
+                print("".join([f"Opt {i:<3}".ljust(15)+"|" for i in idxs]))
 
         print("-" * 16 * self.ncols)
         print(f"{len(sorted_idxes)} unique choices of {len(games)} total generated.")
