@@ -23,5 +23,6 @@ class RolloutEpisode:
     disc_obs: List[Dict[str, np.array]]
     disc_labels: List[float]
     gen_obs: List[Dict[str, np.array]]
-    gen_labels: List[float]
+    gen_actions: np.array
+    gen_labels: np.array
     metrics: List[Dict]  # len 2, one per player
