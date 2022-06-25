@@ -129,7 +129,7 @@ class QDiscriminator(BaseDiscriminator):
         logprobs = self.model(obs)
         result = self.sample(logprobs)
         max_winprob = th.sigmoid(th.max(logprobs)).item()
-        return result, {"max_winprob": max_winprob, "chosen_final_obs": obs_list[result], "all_windprobs": th.sigmoid(logprobs)}
+        return result, {"max_winprob": max_winprob, "chosen_final_obs": obs_list[result], "all_winprobs": th.sigmoid(logprobs)}
 
     def sample(self, logprobs):
         if np.random.random() < self.epsilon_greedy:
