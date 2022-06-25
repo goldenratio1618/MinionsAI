@@ -73,7 +73,7 @@ game_kwargs = {'symmetrize': False}
 # Eval env registered in scoreboard_envs.py
 EVAL_ENV_NAME = 'zombies5x5'
 
-MAX_ITERATIONS = 400
+MAX_ITERATIONS = 200
 
 SEED = 12345
 
