@@ -129,7 +129,7 @@ class MultiProcessRolloutSource(OptimizerRolloutSource):
         self.iteration = iteration
 
         if isinstance(self.main_thread_agent, TrainedAgent):
-            agent_state = self.main_thread_agent.policy.state_dict()
+            agent_state = {k: v.cpu() for k, v in self.main_thread_agent.policy.state_dict().items()}
         elif isinstance(self.main_thread_agent, GenDiscAgent):
             # Hacketty hack hack
             agent_state = {}
