@@ -1,3 +1,4 @@
+from functools import lru_cache
 import os
 import shutil
 import tempfile
@@ -6,6 +7,14 @@ import logging
 from .metrics_logger import metrics_logger
 
 logger = logging.getLogger(__name__)
+
+@lru_cache()
+def get_experiments_directory():
+    try:
+        from .local_config import EXPERIMENTS_DIRECTORY
+        return EXPERIMENTS_DIRECTORY
+    except ImportError:
+        return os.path.join(tempfile.gettempdir(), 'MinionsAI')
 
 def find_device():
     logger.info("=========================")
@@ -25,8 +34,7 @@ def setup_directory(run_name):
     Set up logging and checkpoint directories for a run.
     Returns the subdirectory for checkpoints.
     """
-    tempdir = tempfile.gettempdir()
-    run_directory = os.path.join(tempdir, 'MinionsAI', run_name)
+    run_directory = os.path.join(get_experiments_directory(), run_name)
     checkpoint_dir = os.path.join(run_directory, 'checkpoints')
     # If the directory already exists, warn the user and check if it's ok to overwrite it.
     if os.path.exists(run_directory):
@@ -37,9 +45,24 @@ def setup_directory(run_name):
         shutil.rmtree(run_directory)
     os.makedirs(checkpoint_dir)
 
+    ####### Configure logger #######
     logging.basicConfig(filename=os.path.join(run_directory, 'logs.txt'), level=logging.DEBUG, 
                         format='[%(levelname)s %(asctime)s] %(name)s: %(message)s')
     logging.getLogger().addHandler(logging.StreamHandler())
 
     metrics_logger.configure(os.path.join(run_directory, 'metrics.csv'))
-    return checkpoint_dir
+
+    ####### Snapshot the codebase #######
+    # Copy all of MinionsAI/ into directory/code, ignoring files that match ignore_patterns
+    # In a cross-platform compatible way
+
+    # No recursive copying
+    ignore_patterns = [".git", "__pycache__", "scoreboard*", "tests", "scripts"]
+    ignore_patterns.append("*" + run_name + "*")
+
+    code_dir = os.path.join(run_directory, 'code')
+
+    code_source = os.path.join(os.path.dirname(__file__), '..')
+    shutil.copytree(code_source, code_dir, ignore=shutil.ignore_patterns(*ignore_patterns))
+
+    return checkpoint_dir, code_dir

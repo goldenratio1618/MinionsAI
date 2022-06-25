@@ -2,14 +2,13 @@
 Play against an agent with
 > python play_vs_agent.py path/to/agent
 """
-import sys
 from minionsai.agent import Agent, HumanCLIAgent, RandomAIAgent
+from minionsai.experiment_tooling import get_experiments_directory
 from minionsai.gen_disc.agent import GenDiscAgent
 from minionsai.gen_disc.discriminators import HumanDiscriminator
-from minionsai.run_game import run_game
+from minionsai.run_game import run_game_with_metrics
 from minionsai.engine import Game
 import argparse
-import tempfile
 import os
 
 def main(agent_dir=None, disc_mode=False):
@@ -22,14 +21,14 @@ def main(agent_dir=None, disc_mode=False):
     if disc_mode:
         human_agent = GenDiscAgent(HumanDiscriminator(filter_agent=agent), RandomAIAgent(), rollouts_per_turn=agent.rollouts_per_turn)
     else:
-        human_agent = HumanCLIAgent(agent)
+        human_agent = HumanCLIAgent()
     game = Game()
-    winner = run_game(game, (agent, human_agent), verbose=True)
-    print("Game over.\nWinner:", winner)
-    print("Game metrics (player 0):")
-    print(game.get_metrics(0))
-    print("Game metrics (player 1):")
-    print(game.get_metrics(1))
+    winner, metrics = run_game_with_metrics(game, (agent, human_agent), verbose=True, randomize_player_order=True)
+    print(f"Game over.\nWinner: agent {winner} ({'AI' if winner == 0 else 'human'})")
+    print("Game metrics (Agent):")
+    print(metrics[0])
+    print("Game metrics (Human):")
+    print(metrics[1])
 
 if __name__ == "__main__":
     # Use argparse to parse arguments "path", "name" and "iter"
@@ -48,7 +47,7 @@ if __name__ == "__main__":
         assert args.name is None, "Cannot specify both --path and --name"
         path = args.path
     elif args.name is not None:
-        agents_dir = os.path.join(tempfile.gettempdir(), "MinionsAI", args.name, "checkpoints")
+        agents_dir = os.path.join(get_experiments_directory(), args.name, "checkpoints")
         print(f"Finding path by experiment name: {agents_dir}")
         if args.iter is None:
             print("Finding latest iter ...")

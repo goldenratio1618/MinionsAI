@@ -8,7 +8,9 @@
 #define BOARD_SIZE 5
 
 // timeout (in sec)
-#define TIMEOUT 10
+#define TIMEOUT 100
+
+#define max(x,y) x > y ? x : y
 
 void sig_handler (int signum) {
   _exit(1);
@@ -22,6 +24,13 @@ typedef struct location {
 // from https://stackoverflow.com/questions/14579920/fast-sign-of-integer-in-c
 int sign(int x) {
   return (x > 0) - (x < 0);
+}
+
+int dist(int xi, int yi, int xf, int yf) {
+  int dy = abs(yf - yi);
+  int dx = abs(xf - xi);
+  if ((xi > xf) == (yi > yf)) dx += abs(yf - yi);
+  return max(dx, dy);
 }
 
 // set adjacent to six adjacent hexes
@@ -174,6 +183,7 @@ int main() {
           goto ZOMBIE_END;
 
         // move zombies randomly
+        // Update: Don't move onto hexes adjacent to two enemy zombies
         for (int i = 0; i < 6; i ++) {
           int x = adjacent_hexes[i].x;
           int y = adjacent_hexes[i].y;
@@ -181,8 +191,20 @@ int main() {
           if (zombies[x * BOARD_SIZE + y] == -1 
               && (enemy_captain.x != x || enemy_captain.y != y)
               && (own_captain.x != x || own_captain.y != y)) {
-            printf("%d %d %d %d\n", xi, yi, x, y);
-            goto ZOMBIE_END;
+            // check new location to make sure it's safe
+            location new_neighbors[6];
+            get_adjacent_hexes(new_neighbors, adjacent_hexes + i);
+            int adjacent_zombies = 0;
+            for (int j = 0; j < 6; j ++) {
+              int nx = new_neighbors[j].x;
+              int ny = new_neighbors[j].y;
+              if (nx < 0 || nx >= BOARD_SIZE || ny < 0 || ny >= BOARD_SIZE) continue;
+              if (zombies[nx * BOARD_SIZE + ny] == 1 - color) adjacent_zombies ++;
+            }
+            if (adjacent_zombies < 2) {
+              printf("%d %d %d %d\n", xi, yi, x, y);
+              goto ZOMBIE_END;
+            }
           }
         }
 
@@ -192,22 +214,38 @@ int main() {
     }
 
     // movement: charge enemy captain
-    int xi, yi, xf, yf;
+    int xi, yi, xf, yf, xe, ye, xc, yc;
     xi = own_captain.x;
     yi = own_captain.y;
+    
+    xe = enemy_captain.x;
+    ye = enemy_captain.y;
+    
     xf = xi;
     yf = yi;
-    if (abs(yf - enemy_captain.y) >= abs(xf - enemy_captain.x))
-      yf -= sign(own_captain.y - enemy_captain.y);
-    else
-      xf -= sign(own_captain.x - enemy_captain.x);
-    location new_loc;
-    if (zombies[xf * BOARD_SIZE + yf] != (1-color) && (enemy_captain.x != xf || enemy_captain.y != yf)) {
-      printf("%d %d %d %d\n", xi, yi, xf, yf);
-    } else {
-      xf = xi;
-      yf = yi;
+
+    xc = (BOARD_SIZE - 1)/2;
+    yc = (BOARD_SIZE - 1)/2;
+
+    int distance = 10 * dist(xi, yi, xe, ye) + dist(xi, yi, xc, yc);
+    // look for empty adjacent hex with smaller distance
+    get_adjacent_hexes(adjacent_hexes, &own_captain);
+    for (int i = 0; i < 6; i ++) {
+      int x = adjacent_hexes[i].x;
+      int y = adjacent_hexes[i].y;
+      if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
+      if (zombies [x * BOARD_SIZE + y] != -1) continue;
+      if ((xe == x) && (ye == y)) continue;
+      int new_dist = 10 * dist(x, y, xe, ye) + dist(x, y, xc, yc);
+      if (new_dist < distance) {
+        distance = new_dist;
+        xf = x;
+        yf = y;
+      }
     }
+    if (xi != xf || yi != yf)
+      printf("%d %d %d %d\n", xi, yi, xf, yf);
+    location new_loc;
     new_loc.x = xf;
     new_loc.y = yf;
 
@@ -238,11 +276,35 @@ int main() {
     }
     // spawn zombies on other adjacent locations
     // TODO: More elegant to check if there's actually money first
-    for (int i = 0; i < 6; i ++) {
-      int x = adjacent_hexes[i].x;
-      int y = adjacent_hexes[i].y;
-      if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
-      printf("1 %d %d\n", x, y);
+    int best_x, best_y;
+    for (int j = 0; j < 6; j++) {
+      best_x = -1;
+      int best_dist = BOARD_SIZE * 2;
+      for (int i = 0; i < 6; i ++) {
+        int x = adjacent_hexes[i].x;
+        int y = adjacent_hexes[i].y;
+        if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
+        if (zombies[x * BOARD_SIZE + y] != -1) continue;
+        if (x == xe && y == ye) continue;
+        // check new location to make sure it's safe
+        location new_neighbors[6];
+        get_adjacent_hexes(new_neighbors, adjacent_hexes + i);
+        int adjacent_zombies = 0;
+        for (int j = 0; j < 6; j ++) {
+          int nx = new_neighbors[j].x;
+          int ny = new_neighbors[j].y;
+          if (nx < 0 || nx >= BOARD_SIZE || ny < 0 || ny >= BOARD_SIZE) continue;
+          if (zombies[nx * BOARD_SIZE + ny] == 1 - color) adjacent_zombies ++;
+        }
+        if (adjacent_zombies >= 2) continue;
+        int new_dist = dist(x, y, xe, ye);
+        if (new_dist >= best_dist) continue;
+        best_dist = new_dist;
+        best_x = x;
+        best_y = y;
+      }
+      if (best_x == -1) break;
+      printf("1 %d %d\n", best_x, best_y);
     }
     printf("\n");
     fflush(stdout);

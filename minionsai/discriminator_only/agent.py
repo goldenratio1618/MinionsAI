@@ -15,12 +15,13 @@ def sigmoid(x):
 # TODO - make this class a subclass of GenDiscAgent
 # Hard part is getting save / load to work.
 class TrainedAgent(Agent):
-    def __init__(self, policy, translator, generator, rollouts_per_turn, verbose_level=0):
+    def __init__(self, policy, translator, generator, rollouts_per_turn, verbose_level=0, epsilon_greedy=0.0):
         self.translator = translator
         self.policy = policy
         self.generator = generator
         self.rollouts_per_turn = rollouts_per_turn
         self.verbose_level = verbose_level
+        self.epsilon_greedy = epsilon_greedy
     
     def act(self, game):
         action, _ = self.act_with_winprob(game)
@@ -43,6 +44,11 @@ class TrainedAgent(Agent):
         # Remove extra dimension
         disc_logprobs = disc_logprobs.squeeze(1)
         best_option_idx = np.argmax(disc_logprobs)
+        best_prob = sigmoid(disc_logprobs[best_option_idx]).item()
+        if np.random.random() < self.epsilon_greedy:
+            selected_idx = np.random.choice(len(options_obs))
+        else:
+            selected_idx = best_option_idx
         if self.verbose_level >= 2:
             # Find non-equivalent games
             equivalent_games = []
@@ -60,11 +66,10 @@ class TrainedAgent(Agent):
             print_n_games([options_final_states[i] for i in best_k_options])
             print("|".join([f"Opt {i:<3}: {sigmoid(disc_logprobs[i]).item():.1%}".ljust(15) 
                 for i in best_k_options]))
-        best_prob = sigmoid(disc_logprobs[best_option_idx]).item()
+
         if self.verbose_level >= 1:
-            print(f"Choosing option {best_option_idx}; win prob = {best_prob * 100:.1f}%")
-        best_option = options_action_list[best_option_idx]
-        return best_option, best_prob
+            print(f"Choosing option {selected_idx}; win prob = {sigmoid(disc_logprobs[selected_idx]).item():.1%}%")
+        return options_action_list[selected_idx], best_prob
 
     def save_instance(self, directory: str):
         th.save(self.policy.state_dict(), os.path.join(directory, 'weights.pt'))

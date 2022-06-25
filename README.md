@@ -17,6 +17,12 @@ Check that you can run the tests:
 > python -m pytest tests/
 ```
 
+If you want to run ML experiments, set up an experiments directory by making a file at `minionsai/local_config.py`, containing:
+```
+EXPERIMENTS_DIRECTORY = "/path/to/directory"
+```
+If you don't do this it will use your system's temp directory, which is also fine.
+
 ## Available scripts
 * `run_game.py`: Play a game between two random agents. Mostly just for testing.
 * `play_vs_agent.py`: Let's you play on the command line against a random agent (or any other agent if you have one).
