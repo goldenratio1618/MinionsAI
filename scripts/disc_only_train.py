@@ -10,6 +10,7 @@ import argparse
 from collections import defaultdict
 import random
 from minionsai.experiment_tooling import find_device, get_experiments_directory, setup_directory
+from minionsai.game_util import seed_everything
 from minionsai.gen_disc.agent import GenDiscAgent
 from minionsai.gen_disc.discriminators import ScriptedDiscriminator
 from minionsai.multiprocessing_rl.multiproc_rollouts import MultiProcessRolloutSource
@@ -73,15 +74,10 @@ game_kwargs = {'symmetrize': False}
 # Eval env registered in scoreboard_envs.py
 EVAL_ENV_NAME = 'zombies5x5'
 
-MAX_ITERATIONS = 400
+MAX_ITERATIONS = 200
 
 SEED = 12345
 
-def seed():
-    random.seed(SEED)
-    np.random.seed(SEED)
-    th.manual_seed(SEED)
-    th.cuda.manual_seed_all(SEED)
 
 def build_agent():
     generator = RandomAIAgent()
@@ -111,7 +107,7 @@ def eval_vs_other(agent, eval_agent, name):
     logger.info(f"Win rate vs {name} = {winrate}")  
 
 def main(run_name):
-    seed()
+    seed_everything(SEED)
     checkpoint_dir, code_dir = setup_directory(run_name)
     logger.info(f"Starting run {run_name}")
 

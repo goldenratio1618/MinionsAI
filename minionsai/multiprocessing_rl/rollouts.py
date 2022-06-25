@@ -35,11 +35,11 @@ class OptimizerRolloutSource(abc.ABC):
         metrics_logger.log_metrics(hparams)
 
         self.launch_rollouts(iteration, hparams)
-
-        for _ in tqdm.tqdm(range(self.episodes_per_iteration)):
+        print(f"Launching rollouts iteration {iteration}.")
+        for idx in tqdm.tqdm(range(self.episodes_per_iteration)):
             with metrics_logger.timing('single_episode'):
 
-                rollout_episode = self.next_rollout()
+                rollout_episode = self.next_rollout(iteration, idx)
                 disc_obs.extend(rollout_episode.disc_obs)
                 disc_labels.extend(rollout_episode.disc_labels)
                 gen_obs.extend(rollout_episode.gen_obs)
@@ -65,7 +65,7 @@ class OptimizerRolloutSource(abc.ABC):
         }
 
     @abc.abstractmethod
-    def next_rollout(self) -> RolloutEpisode:
+    def next_rollout(self, iteration, episode_idx) -> RolloutEpisode:
         raise NotImplementedError
 
     def launch_rollouts(self, iteration: int, hparams: Dict) -> None:
@@ -89,8 +89,8 @@ class InProcessRolloutSource(OptimizerRolloutSource):
         super().__init__(episodes_per_iteration, game_kwargs, lambda_until_episodes)
         self.runner = RolloutRunner(game_kwargs, agent)
 
-    def next_rollout(self) -> RolloutEpisode:
-        return self.runner.single_rollout()
+    def next_rollout(self, iteration, episode_idx) -> RolloutEpisode:
+        return self.runner.single_rollout(iteration, episode_idx)
 
     def launch_rollouts(self, iteration, hparams) -> None:
         self.runner.update(hparams)

@@ -10,16 +10,15 @@ import argparse
 from collections import defaultdict
 import random
 from minionsai.experiment_tooling import find_device, get_experiments_directory, setup_directory
+from minionsai.game_util import seed_everything
 from minionsai.gen_disc.agent import GenDiscAgent
 from minionsai.gen_disc.discriminators import QDiscriminator, ScriptedDiscriminator
 from minionsai.gen_disc.generator import AgentGenerator, QGenerator
 from minionsai.multiprocessing_rl.multiproc_rollouts import MultiProcessRolloutSource
 from minionsai.multiprocessing_rl.rollouts import InProcessRolloutSource
 from minionsai.run_game import run_n_games
-from minionsai.discriminator_only.agent import TrainedAgent
 from minionsai.discriminator_only.model import MinionsDiscriminator
 from minionsai.discriminator_only.translator import Translator
-from minionsai.engine import Game
 from minionsai.agent import Agent, RandomAIAgent
 from minionsai.scoreboard_envs import ENVS
 import torch as th
@@ -85,12 +84,6 @@ MAX_ITERATIONS = 400
 
 SEED = 12345
 
-def seed():
-    random.seed(SEED)
-    np.random.seed(SEED)
-    th.manual_seed(SEED)
-    th.cuda.manual_seed_all(SEED)
-
 def build_agent():
     logger.info("Creating generator...")
     if TRAIN_GENERATOR:
@@ -122,18 +115,20 @@ def eval_vs_other_by_path(agent, eval_agent_path):
     logger.info(f"Looking for eval agent at {eval_agent_path}...")
     if os.path.exists(eval_agent_path):
         agent_name = os.path.basename(eval_agent_path)
-        eval_agent = TrainedAgent.load(eval_agent_path)
+        eval_agent = Agent.load(eval_agent_path)
         eval_vs_other(agent, eval_agent, agent_name)
 
 def eval_vs_other(agent, eval_agent, name):
-    good_agent = TrainedAgent(agent.policy, agent.translator, agent.generator, ROLLOUTS_PER_TURN * EVAL_COMPUTE_BOOST)
-    wins, _metrics = run_n_games(ENVS[EVAL_ENV_NAME], [good_agent, eval_agent], n=EVAL_TRIALS)
+    # Hack to temporarily change the agent's rollouts_per_turn
+    agent.rollouts_per_turn = ROLLOUTS_PER_TURN * EVAL_COMPUTE_BOOST
+    wins, _metrics = run_n_games(ENVS[EVAL_ENV_NAME], [agent, eval_agent], n=EVAL_TRIALS)
+    agent.rollouts_per_turn = ROLLOUTS_PER_TURN
     winrate = wins[0] / EVAL_TRIALS
     metrics_logger.log_metrics({f"eval_winrate/{name}": winrate})
     logger.info(f"Win rate vs {name} = {winrate}")  
 
 def main(run_name):
-    seed()
+    seed_everything(SEED)
     checkpoint_dir, code_dir = setup_directory(run_name)
     logger.info(f"Starting run {run_name}")
 
