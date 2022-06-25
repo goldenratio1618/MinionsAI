@@ -16,10 +16,8 @@ from minionsai.gen_disc.generator import AgentGenerator, QGenerator
 from minionsai.multiprocessing_rl.multiproc_rollouts import MultiProcessRolloutSource
 from minionsai.multiprocessing_rl.rollouts import InProcessRolloutSource
 from minionsai.run_game import run_n_games
-from minionsai.discriminator_only.agent import TrainedAgent
 from minionsai.discriminator_only.model import MinionsDiscriminator
 from minionsai.discriminator_only.translator import Translator
-from minionsai.engine import Game
 from minionsai.agent import Agent, RandomAIAgent
 from minionsai.scoreboard_envs import ENVS
 import torch as th
@@ -41,7 +39,7 @@ GEN_SAMPLING_TEMPERATURE = 0.01
 # How many episodes of data do we collect each iteration, before running a few epochs of optimization?
 # Potentially good to use a few times bigger EPISODES_PER_ITERATION than BATCH_SIZE, to minimize correlation within batches
 EPISODES_PER_ITERATION = 256
-ROLLOUT_PROCS = 4
+ROLLOUT_PROCS = 1
 
 # Once we've collected the data, how many times do we go over it for optimization (within one iteration)?
 SAMPLE_REUSE = 2
@@ -122,12 +120,14 @@ def eval_vs_other_by_path(agent, eval_agent_path):
     logger.info(f"Looking for eval agent at {eval_agent_path}...")
     if os.path.exists(eval_agent_path):
         agent_name = os.path.basename(eval_agent_path)
-        eval_agent = TrainedAgent.load(eval_agent_path)
+        eval_agent = Agent.load(eval_agent_path)
         eval_vs_other(agent, eval_agent, agent_name)
 
 def eval_vs_other(agent, eval_agent, name):
-    good_agent = TrainedAgent(agent.policy, agent.translator, agent.generator, ROLLOUTS_PER_TURN * EVAL_COMPUTE_BOOST)
-    wins, _metrics = run_n_games(ENVS[EVAL_ENV_NAME], [good_agent, eval_agent], n=EVAL_TRIALS)
+    # Hack to temporarily change the agent's rollouts_per_turn
+    agent.rollouts_per_turn = ROLLOUTS_PER_TURN * EVAL_COMPUTE_BOOST
+    wins, _metrics = run_n_games(ENVS[EVAL_ENV_NAME], [agent, eval_agent], n=EVAL_TRIALS)
+    agent.rollouts_per_turn = ROLLOUTS_PER_TURN
     winrate = wins[0] / EVAL_TRIALS
     metrics_logger.log_metrics({f"eval_winrate/{name}": winrate})
     logger.info(f"Win rate vs {name} = {winrate}")  
