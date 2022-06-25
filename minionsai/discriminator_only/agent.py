@@ -24,7 +24,7 @@ class TrainedAgent(Agent):
         self.epsilon_greedy = epsilon_greedy
     
     def act(self, game):
-        action, _ = self.act_with_winprob(game)
+        action, _, _ = self.act_with_info(game)
         return action
 
     def act_with_info(self, game):
