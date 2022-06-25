@@ -1,5 +1,6 @@
 
-from minionsai.game_util import stack_dicts
+from minionsai.game_util import seed_everything, stack_dicts
+import torch as th
 import numpy as np
 import random
 
@@ -23,7 +24,10 @@ class RolloutRunner():
         game_kwargs["money"] = (random.randint(1, 4), random.randint(1, 4))
         return Game(**game_kwargs)
 
-    def single_rollout(self) -> RolloutEpisode:
+    def single_rollout(self, iteration, episode_idx) -> RolloutEpisode:
+        seed = iteration * 100000 + episode_idx
+        seed_everything(seed)
+
         game = self.make_game()
         disc_obs_buffers = [[], []]  # one for each player
         disc_label_buffers = [[], []]  # one for each player
@@ -68,7 +72,7 @@ class RolloutRunner():
         loser_disc_labels = disc_label_buffers[1 - winner][1:]
 
 
-        if self.hparams['lambda'] is not None:
+        if self.hparams.get('lambda', None) is not None:
             winner_disc_labels = smooth_labels(winner_disc_labels, self.hparams['lambda'])
             loser_disc_labels = smooth_labels(loser_disc_labels, self.hparams['lambda'])
 
