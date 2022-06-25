@@ -10,6 +10,7 @@ import argparse
 from collections import defaultdict
 import random
 from minionsai.experiment_tooling import find_device, get_experiments_directory, setup_directory
+from minionsai.game_util import seed_everything
 from minionsai.gen_disc.agent import GenDiscAgent
 from minionsai.gen_disc.discriminators import QDiscriminator, ScriptedDiscriminator
 from minionsai.gen_disc.generator import AgentGenerator, QGenerator
@@ -31,15 +32,15 @@ logger = logging.getLogger(__name__)
 TRAIN_GENERATOR = False
 
 # How many rollouts do we run of each turn before picking the best
-ROLLOUTS_PER_TURN = 64
+ROLLOUTS_PER_TURN = 2
 DISC_EPSILON_GREEDY = 0.1
 GEN_EPSILON_GREEDY = 0.1
 GEN_SAMPLING_TEMPERATURE = 0.01
 
 # How many episodes of data do we collect each iteration, before running a few epochs of optimization?
 # Potentially good to use a few times bigger EPISODES_PER_ITERATION than BATCH_SIZE, to minimize correlation within batches
-EPISODES_PER_ITERATION = 256
-ROLLOUT_PROCS = 1
+EPISODES_PER_ITERATION = 2
+ROLLOUT_PROCS = 2
 
 # Once we've collected the data, how many times do we go over it for optimization (within one iteration)?
 SAMPLE_REUSE = 2
@@ -82,12 +83,6 @@ EVAL_ENV_NAME = 'zombies5x5'
 MAX_ITERATIONS = 400
 
 SEED = 12345
-
-def seed():
-    random.seed(SEED)
-    np.random.seed(SEED)
-    th.manual_seed(SEED)
-    th.cuda.manual_seed_all(SEED)
 
 def build_agent():
     logger.info("Creating generator...")
@@ -133,7 +128,7 @@ def eval_vs_other(agent, eval_agent, name):
     logger.info(f"Win rate vs {name} = {winrate}")  
 
 def main(run_name):
-    seed()
+    seed_everything(SEED)
     checkpoint_dir, code_dir = setup_directory(run_name)
     logger.info(f"Starting run {run_name}")
 
