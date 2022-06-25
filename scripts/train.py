@@ -32,15 +32,15 @@ logger = logging.getLogger(__name__)
 TRAIN_GENERATOR = False
 
 # How many rollouts do we run of each turn before picking the best
-ROLLOUTS_PER_TURN = 2
+ROLLOUTS_PER_TURN = 64
 DISC_EPSILON_GREEDY = 0.1
 GEN_EPSILON_GREEDY = 0.1
 GEN_SAMPLING_TEMPERATURE = 0.01
 
 # How many episodes of data do we collect each iteration, before running a few epochs of optimization?
 # Potentially good to use a few times bigger EPISODES_PER_ITERATION than BATCH_SIZE, to minimize correlation within batches
-EPISODES_PER_ITERATION = 2
-ROLLOUT_PROCS = 2
+EPISODES_PER_ITERATION = 256
+ROLLOUT_PROCS = 4
 
 # Once we've collected the data, how many times do we go over it for optimization (within one iteration)?
 SAMPLE_REUSE = 2
