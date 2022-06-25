@@ -33,4 +33,3 @@ def seed_everything(seed):
     np.random.seed(seed)
     th.manual_seed(seed)
     th.cuda.manual_seed_all(seed)
-    th.use_deterministic_algorithms(True)
