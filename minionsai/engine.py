@@ -13,9 +13,11 @@ BOARD_SIZE = 5
 def dist(xi, yi, xf, yf):
     return max(abs(yf - yi), abs(xf - xi) + (abs(yf - yi) if (xi > xf) == (yi > yf) else 0))
 
-# return an array of tuples of adjacent hexes
+# return a tuple of tuples of adjacent hexes
+# Important to return a tuple rather than a list, so that it's immutable
+# Otherwise scary stuff might happen when we cache it
 @lru_cache()
-def adjacent_hexes(x, y):
+def adjacent_hexes(x, y) -> Tuple:
     hex_list = []
     if x > 0: hex_list.append((x-1,y))
     if x < (BOARD_SIZE - 1): hex_list.append((x+1,y))
@@ -25,7 +27,7 @@ def adjacent_hexes(x, y):
     if y < (BOARD_SIZE - 1):
         hex_list.append((x,y+1))
         if x > 0: hex_list.append((x-1,y+1))
-    return hex_list
+    return tuple(hex_list)
 
 class Board():
     def __init__(self, water_locs, graveyard_locs):
