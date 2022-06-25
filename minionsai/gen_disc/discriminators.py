@@ -1,6 +1,6 @@
 import abc
 from audioop import reverse
-from typing import List
+from typing import Dict, List, Optional, Tuple
 
 from ..game_util import adjacent_zombies, equal_np_dicts, stack_dicts
 from ..unit_type import NECROMANCER, ZOMBIE, flexible_unit_type
@@ -11,7 +11,10 @@ import torch as th
 
 class BaseDiscriminator(abc.ABC):
     @abc.abstractmethod
-    def choose_option(self, games: List[Game]) -> int:
+    def choose_option(self, games: List[Game]) -> Tuple[int, Optional[Dict]]:
+        """
+        Return the best index, and optionally a dictionary of extra info.
+        """
         raise NotImplementedError()
 
     # @abc.abstractmethod
@@ -40,8 +43,8 @@ class ScriptedDiscriminator(BaseDiscriminator):
                     result -= dist_to_center * 0.4
         return result
 
-    def choose_option(self, games: List[Game]) -> int:
-        return np.argmax([self.score(g) for g in games])
+    def choose_option(self, games: List[Game]) -> Tuple[int, Optional[Dict]]:
+        return np.argmax([self.score(g) for g in games]), None
 
 class HumanDiscriminator(BaseDiscriminator):
     def __init__(self, ncols=8, nrows=2, filter_agent=None):
@@ -50,7 +53,7 @@ class HumanDiscriminator(BaseDiscriminator):
         self.n_options = ncols * nrows
         self.filter_agent = filter_agent
 
-    def choose_option(self, games: List[Game]) -> int:
+    def choose_option(self, games: List[Game]) -> Tuple[int, Optional[Dict]]:
         if self.filter_agent is not None:
             obs = [self.filter_agent.translator.translate(g) for g in games]
             stacked_obs = stack_dicts(obs)
@@ -67,19 +70,22 @@ class HumanDiscriminator(BaseDiscriminator):
                 if not copy:
                     equivalent_games.append(i)
 
-            sorted_idxes = sorted(equivalent_games, key=lambda i: logprobs[i], reverse=True)
+            sorted_idxes = sorted(equivalent_games, key=lambda i: i)
         else:
             sorted_idxes = list(range(len(games)))
             logprobs = [None] * len(games)
 
-        return self.display_and_choose(sorted_idxes, logprobs, games)
+        chosen = self.display_and_choose(sorted_idxes, logprobs, games)
+        print(f"Chosen option {chosen} with win prob {th.sigmoid(logprobs[chosen]).item():.1%}")
+        return chosen, None
 
     def display_and_choose(self, sorted_idxes, logprobs, games):
         for r in range(min(self.nrows, len(sorted_idxes) // self.ncols + 1)):
             print("-" * 16 * self.ncols)
             idxs = sorted_idxes[r * self.ncols : (r + 1) * self.ncols]
             print_n_games([games[i] for i in idxs])
-            print("".join([f"Opt {i:<3} ({th.sigmoid(logprobs[i]).item():.1%})".ljust(15)+"|" for i in idxs]))
+            if self.filter_agent is not None:
+                print("".join([f"Opt {i:<3}".ljust(15)+"|" for i in idxs]))
 
         print("-" * 16 * self.ncols)
         print(f"{len(sorted_idxes)} unique choices of {len(games)} total generated.")
@@ -109,4 +115,25 @@ class HumanDiscriminator(BaseDiscriminator):
         else:
             print("Invalid option")
             return self.display_and_choose(sorted_idxes, logprobs, games)
+
+class QDiscriminator(BaseDiscriminator):
+    def __init__(self, translator, model, epsilon_greedy):
+        self.translator = translator
+        self.model = model
+        self.epsilon_greedy = epsilon_greedy
+
+    def choose_option(self, games: List[Game]) -> Tuple[int, Optional[Dict]]:
+        obs_list = [self.translator.translate(g) for g in games]
+
+        obs = stack_dicts(obs_list)
+        logprobs = self.model(obs)
+        result = self.sample(logprobs)
+        max_winprob = th.sigmoid(th.max(logprobs)).item()
+        return result, {"max_winprob": max_winprob, "chosen_final_obs": obs_list[result], "all_windprobs": th.sigmoid(logprobs)}
+
+    def sample(self, logprobs):
+        if np.random.random() < self.epsilon_greedy:
+            return np.random.choice(len(logprobs))
+        else:
+            return th.argmax(logprobs).item()
 
