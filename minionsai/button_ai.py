@@ -9,8 +9,6 @@ import torch.nn.functional as F
 import torchvision.transforms as T
 from collections import namedtuple, deque
 
-n_actions = 700
-board_size = 4
 depth = 2
 d_model = 8
 
@@ -35,9 +33,9 @@ class ReplayMemory(object):
 
 class ButtonAI(th.nn.Module):
     # Network defined by the Deepmind paper
-    def __init__(self, d_model, depth, n_actions):
+    def __init__(self, d_model, depth, board_size):
         super().__init__()
-        self.board_embedding = th.nn.Embedding(board_size, d_model)
+        self.board_embedding = th.nn.Embedding(board_size ** 2, d_model)
         self.transformer = th.nn.TransformerEncoder(
             th.nn.TransformerEncoderLayer(d_model, 8, dim_feedforward=d_model, batch_first=True),
             num_layers=depth
@@ -50,7 +48,9 @@ class ButtonAI(th.nn.Module):
         self.input_linear1 = th.nn.Linear(d_model, d_model)
         self.input_linear2 = th.nn.Linear(d_model, d_model)
         self.value_linear1 = th.nn.Linear(d_model, d_model)
-        self.value_linear2 = th.nn.Linear(d_model, n_actions)
+        self.value_linear2 = th.nn.Linear(d_model, board_size ** 2)
+
+        self.board_size = board_size
 
     def to(self, device):
         super().to(device)
@@ -71,14 +71,10 @@ class ButtonAI(th.nn.Module):
 
     def process_output_into_scalar(self, trunk_out):
         # print(trunk_out)
-        flat, _ = th.max(trunk_out, dim=1)
-        # print(flat)
-        # flat = trunk_out
-        # flat, _ = th.max(trunk_out, dim=1)  # [batch, d_model]
-        x = self.value_linear1(flat)  # [batch, d_model]
-        x = th.nn.ReLU()(x)  # [batch, d_model]
-        logit = self.value_linear2(flat)  # [batch, 1]
-        return logit
+        transposed = trunk_out.transpose()  # shape [B, N, 128]
+        post_linear = self.value_linear2(trunk_out)
+        output = th.matmul(post_linear, transposed)   # shape [B, N, N]
+        return output
 
     def forward(self, state):
         # print("FORWARD")
@@ -110,10 +106,11 @@ EPS_START = 1.0#0.9
 EPS_END = 1.0#0.05
 EPS_DECAY = 200
 TARGET_UPDATE = 10
+BOARD_SIZE = 5
 
-policy_net = ButtonAI(d_model, depth, n_actions)
+policy_net = ButtonAI(d_model, depth, BOARD_SIZE)
 policy_net.to(device)
-target_net = ButtonAI(d_model, depth, n_actions)
+target_net = ButtonAI(d_model, depth, BOARD_SIZE)
 target_net.to(device)
 target_net.load_state_dict(policy_net.state_dict())
 target_net.eval()
@@ -137,14 +134,15 @@ def select_action(state, test=False):
             # second column on max result is index of where max element was
             # found, so we pick action with the larger expected reward.
             s = policy_net(state)
-            # print(s)
+            print(s)
             s_max = s.max(1)[1]
+            print(s_max)
             s_max = th.tensor([[s_max]], device=device, dtype=th.long)
             # print("Selected")
             # print(s_max)
             return s_max
     else:
-        s_rand = th.tensor([[random.randrange(n_actions)]], device=device, dtype=th.long)
+        s_rand = th.tensor([[random.randrange(BOARD_SIZE), random.randrange(BOARD_SIZE)]], device=device, dtype=th.long)
         # print("Random")
         return s_rand
 
@@ -211,8 +209,10 @@ def optimize_model():
     optimizer.step()
 
 def init_state():
-    win = np.random.choice(range(board_size))
-    state = win
+    win_x = np.random.choice(range(BOARD_SIZE))
+    win_y = np.random.choice(range(BOARD_SIZE))
+    state = np.zeros((BOARD_SIZE, BOARD_SIZE))
+
     state = th.from_numpy(np.array([[state]]))
     return state, win
 

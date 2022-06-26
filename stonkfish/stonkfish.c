@@ -8,7 +8,7 @@
 #define BOARD_SIZE 5
 
 // timeout (in sec)
-#define TIMEOUT 100
+#define TIMEOUT 10
 
 #define max(x,y) x > y ? x : y
 
@@ -66,8 +66,9 @@ int main() {
   location adjacent_hexes[6];
   int graveyards [BOARD_SIZE * BOARD_SIZE];
   int water [BOARD_SIZE * BOARD_SIZE] = {0};
+  int money [2];
 
-  // zombies on board (-1 for empty, 0/1 for color)
+  // zombies on board (-1 for empty, 0/1 for color, 2 for exhausted zombie of own color)
   int zombies [BOARD_SIZE * BOARD_SIZE];
   // damaged zombies (1 for damaged, 0 for absent or full health)
   int damaged_zombies [BOARD_SIZE * BOARD_SIZE];
@@ -94,6 +95,7 @@ int main() {
       char * graveyard = " True\n";
       fgets(line, 256, stdin);
       //fprintf(log, "%s", line);
+      //fflush(log);
       if (strcmp(line, "Your color\n") == 0) {
         fgets(line, 256, stdin);
         color = atoi(line);
@@ -124,6 +126,13 @@ int main() {
           enemy_captain.y = (int) y - (int) '0';
         }
       }
+      // find money
+      else if (strcmp(line, "Money\n") == 0) {
+        fgets(line, 256, stdin);
+        money[0] = atoi(line);
+        fgets(line, 256, stdin);
+        money[1] = atoi(line);
+      }
       else if (strcmp(line, "Game over!\n") == 0) {
         fclose(log);
         return 0;
@@ -147,6 +156,7 @@ int main() {
           if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
           if (damaged_zombies [x * BOARD_SIZE + y]) {
             printf("%d %d %d %d\n", xi, yi, x, y);
+            zombies[x * BOARD_SIZE + y] = -1;
             damaged_zombies[x * BOARD_SIZE + y] = 0;
             goto ZOMBIE_END;
           }
@@ -161,6 +171,8 @@ int main() {
               && zombies[x * BOARD_SIZE + y] == -1 
               && (enemy_captain.x != x || enemy_captain.y != y)
               && (own_captain.x != x || own_captain.y != y)) {
+            zombies[xi * BOARD_SIZE + yi] = -1;
+            zombies[x * BOARD_SIZE + y] = 2;
             printf("%d %d %d %d\n", xi, yi, x, y);
             goto ZOMBIE_END;
           }
@@ -203,6 +215,8 @@ int main() {
             }
             if (adjacent_zombies < 2) {
               printf("%d %d %d %d\n", xi, yi, x, y);
+              zombies[xi * BOARD_SIZE + yi] = -1;
+              zombies[x * BOARD_SIZE + y] = 2;
               goto ZOMBIE_END;
             }
           }
@@ -214,12 +228,29 @@ int main() {
     }
 
     // movement: charge enemy captain
-    int xi, yi, xf, yf, xe, ye, xc, yc;
+    // update: if there is >= 1 unoccupied graveyard, charge nearest one instead
+    int xi, yi, xf, yf, xe, ye, xt, yt, xc, yc;
     xi = own_captain.x;
     yi = own_captain.y;
     
-    xe = enemy_captain.x;
-    ye = enemy_captain.y;
+    xt = xe = enemy_captain.x;
+    yt = ye = enemy_captain.y;
+
+    // look for unoccupied graveyard and set nearest one to target
+    int min_dist = BOARD_SIZE * 2;
+    for (int x = 0; x < BOARD_SIZE; x ++) {
+      for (int y = 0; y < BOARD_SIZE; y ++) {
+        if (graveyards[x * BOARD_SIZE + y] && zombies[x * BOARD_SIZE + y] == -1
+            && (x != xi || y != yi) && (x != xe || y != ye)) {
+          int new_dist = dist(xi, yi, x, y);
+          if (new_dist < min_dist) {
+            min_dist = new_dist;
+            xt = x;
+            yt = y;
+          }
+        }
+      }
+    }
     
     xf = xi;
     yf = yi;
@@ -227,7 +258,7 @@ int main() {
     xc = (BOARD_SIZE - 1)/2;
     yc = (BOARD_SIZE - 1)/2;
 
-    int distance = 10 * dist(xi, yi, xe, ye) + dist(xi, yi, xc, yc);
+    int distance = 10 * dist(xi, yi, xt, yt) + dist(xi, yi, xc, yc);
     // look for empty adjacent hex with smaller distance
     get_adjacent_hexes(adjacent_hexes, &own_captain);
     for (int i = 0; i < 6; i ++) {
@@ -236,7 +267,7 @@ int main() {
       if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
       if (zombies [x * BOARD_SIZE + y] != -1) continue;
       if ((xe == x) && (ye == y)) continue;
-      int new_dist = 10 * dist(x, y, xe, ye) + dist(x, y, xc, yc);
+      int new_dist = 10 * dist(x, y, xt, yt) + dist(x, y, xc, yc);
       if (new_dist < distance) {
         distance = new_dist;
         xf = x;
@@ -256,6 +287,7 @@ int main() {
       int y = adjacent_hexes[i].y;
       if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
       if (zombies [x * BOARD_SIZE + y] == 1 - color) {
+        zombies[x * BOARD_SIZE + y] = -1;
         printf("%d %d %d %d\n", xf, yf, x, y);
         break;
       }
@@ -268,16 +300,21 @@ int main() {
     // spawn zombies on adjacent graveyards
     get_adjacent_hexes(adjacent_hexes, &new_loc);
     for (int i = 0; i < 6; i ++) {
+      if (money[color] < 2) break;
       int x = adjacent_hexes[i].x;
       int y = adjacent_hexes[i].y;
       if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
-      if (graveyards[x * BOARD_SIZE + y])
+      if (graveyards[x * BOARD_SIZE + y] && zombies[x * BOARD_SIZE + y] == -1) {
         printf("1 %d %d\n", x, y);
+        zombies[x * BOARD_SIZE + y] = color;
+        money[color] -= 2;
+      }
     }
     // spawn zombies on other adjacent locations
     // TODO: More elegant to check if there's actually money first
     int best_x, best_y;
     for (int j = 0; j < 6; j++) {
+      if (money[color] < 2) break;
       best_x = -1;
       int best_dist = BOARD_SIZE * 2;
       for (int i = 0; i < 6; i ++) {
@@ -305,6 +342,8 @@ int main() {
       }
       if (best_x == -1) break;
       printf("1 %d %d\n", best_x, best_y);
+      zombies[best_x * BOARD_SIZE + best_y] = color;
+      money[color] -= 2;
     }
     printf("\n");
     fflush(stdout);

@@ -1,10 +1,20 @@
 
 
 from functools import lru_cache
+from operator import truediv
+from tkinter.tix import MAX
+from turtle import end_fill
 from typing import List
-from ..engine import Game, BOARD_SIZE
-from ..unit_type import unitList
+from xmlrpc.client import Boolean
+
+from minionsai.action import AdvancePhaseAction, MoveAction, SpawnAction
+from ..engine import Game, BOARD_SIZE, Phase
+from ..unit_type import ZOMBIE, unitList, MAX_SPEED_OR_RANGE
+from collections import OrderedDict
 import numpy as np
+
+def convert_loc_to_pos(loc):
+    return (loc // BOARD_SIZE, loc % BOARD_SIZE)
 
 class ObservationEnum():
     def __init__(self, values: List, none_value=False):
@@ -32,21 +42,33 @@ class Translator():
     MAX_MONEY = 20
     MAX_SCORE_DIFF = 20
 
+    def __init__(self, mode):
+        self.mode = mode
+        self.num_things = BOARD_SIZE ** 2 + 4
+        if self.mode == "generator":
+            self.num_things += 1
+        self.possibly_legal_actions = self.get_possible_legal_actions()
+        self.spawn_pos = BOARD_SIZE ** 2
+
     def translate(self, game: Game):
         board_obs = [] # [num_hexes, 3 (location, terrain, unit_type)]
         for (i, j), hex in game.board.hexes():
             terrain = "graveyard" if hex.is_graveyard else "water" if hex.is_water else "none"
             if hex.unit is None:
                 unit_type = self.UNIT_TYPES.NULL
-            else:
+            elif self.mode == "discriminator":
                 unit_type = (hex.unit.type.name, hex.unit.color == game.active_player_color)
-            
+            elif self.mode == "generator":
+                unit_type = (hex.unit.type.name, hex.unit.color == game.active_player_color, hex.unit.hasMoved, hex.unit.remainingAttack == 0, hex.unit.curr_health)
+            else:
+                raise ValueError("Mode must be 'discriminator' or 'generator'.")
             board_obs.append([
                 self.HEXES.encode((i, j)),
                 self.TERRAIN_TYPES.encode(terrain),
                 self.UNIT_TYPES.encode(unit_type)
             ])
-
+        
+        phase = (game.phase == Phase.MOVE)
         remaining_turns = game.remaining_turns
         all_money = game.money
         scores = game.get_scores
@@ -57,13 +79,75 @@ class Translator():
         opp_money = min(all_money[1 - game.active_player_color], self.MAX_MONEY)
         score_diff = max(min(scores[game.active_player_color] - scores[game.inactive_player_color], self.MAX_SCORE_DIFF), -self.MAX_SCORE_DIFF) + self.MAX_SCORE_DIFF
         
-        return {
-            'board': np.array([board_obs]),  # shape is [batch, num_items=BOARD_SIZE^2]
-            'remaining_turns': np.array([[remaining_turns]]),  # shape is [batch, num_items=1]
-            'money': np.array([[money]]),
-            'opp_money': np.array([[opp_money]]),
-            'score_diff': np.array([[score_diff]])
-        }
+        d = OrderedDict()
+        d['board'] = np.array([board_obs])  # shape is [batch, num_items=BOARD_SIZE^2]
+        d['money'] = np.array([[money]])
+        d['remaining_turns'] = np.array([[remaining_turns]])  # shape is [batch, num_items=1]
+        d['opp_money'] = np.array([[opp_money]])
+        d['score_diff'] = np.array([[score_diff]])
+        if self.mode == "generator":
+            d['phase'] = phase
+            d['legal_actions'] = self.get_legal_actions(game)[0]
+        return d
+
+
+
+    def get_possible_legal_actions(self):
+        possibly_legal = np.zeros((self.num_things, self.num_things), bool)
+        for i in range(BOARD_SIZE ** 2 + 1):
+            for j in range(BOARD_SIZE ** 2 + 1):
+                # money -> board = spawn
+                # money -> money = advance phase
+                if i == self.spawn_pos:
+                    possibly_legal[i,j] = True
+                else:
+                    if j == self.spawn_pos:
+                        continue
+                    x1, y1 = convert_loc_to_pos(i)
+                    x2, y2 = convert_loc_to_pos(j)
+                    if abs(x1-x2) <= MAX_SPEED_OR_RANGE and abs(y1-y2) <= MAX_SPEED_OR_RANGE:
+                        possibly_legal[i,j] = True
+        return possibly_legal
+
+    def get_legal_actions(self, game: Game):
+        legal = np.zeros((self.num_things, self.num_things), bool)
+        actions = [[None for i in range(self.num_things)] for j in range(self.num_things)]
+        for i in range(self.num_things):
+            for j in range(self.num_things):
+                if self.possibly_legal_actions[i,j]:
+                    if i == self.spawn_pos:
+                        # advance phase action
+                        if j == self.spawn_pos:
+                            legal[i,j] = True
+                            actions[i,j] = AdvancePhaseAction()
+                        # wrong phase, action is illegal
+                        if game.phase == Phase.MOVE: 
+                            continue
+                        # spawn action
+                        x2, y2 = convert_loc_to_pos(j)
+                        act = SpawnAction(ZOMBIE, (x2,y2))
+                        if game.process_single_spawn(act, False)[0]:
+                            legal[i,j] = True
+                            actions[i,j] = act
+                    else:
+                        # wrong phase, action is illegal
+                        if game.phase == Phase.SPAWN:
+                            continue
+                        # move action
+                        x1, y1 = convert_loc_to_pos(i)
+                        x2, y2 = convert_loc_to_pos(j)
+                        act = MoveAction((x1,y1), (x2,y2))
+                        if game.process_single_move(act, False)[0]:
+                            legal[i,j] = True
+                            actions[i,j] = act
+        return legal, actions
+
+    def process_action(self, game, action):
+        game.process_single_action(action)
+        return 1
+
+
+
 
     @staticmethod
     def symmetries(obs):

@@ -213,6 +213,10 @@ class CLIAgent(Agent):
         print()
         game_copy.board.print_board_state()
         print()
+        print("Money")
+        print(game_copy.money[0])
+        print(game_copy.money[1])
+        print()
         print("Your turn")
         sys.stdout = self.original_stdout
 

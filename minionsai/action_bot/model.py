@@ -1,4 +1,7 @@
 from minionsai.discriminator_only.model import MinionsDiscriminator
+from minionsai.engine import BOARD_SIZE
+import torch as th
+from ..unit_type import unitList
 
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward'))
@@ -21,16 +24,17 @@ class ReplayMemory(object):
 class MinionsActionBot(MinionsDiscriminator):
     def __init__(self, d_model, depth, n_actions):
         super.__init__(d_model, depth)
+        self.num_things = BOARD_SIZE **2 + 5
         self.unit_embedding = th.nn.Embedding(len(unitList) * 2 * 2 * 2 * 7 + 1, d_model)
-        self.unit_embedding = th.nn.Embedding(len(unitList) * 2 + 1, d_model)
         self.location_embedding = th.nn.Embedding(BOARD_SIZE ** 2, d_model)
         self.hex_embedding = th.nn.Embedding(BOARD_SIZE ** 2, d_model)
+        self.money_embedding = th.nn.Embedding(21, d_model)
         self.phase_embedding = th.nn.Embedding(1, d_model)
         self.terrain_embedding = th.nn.Embedding(3, d_model)
         self.remaining_turns_embedding = th.nn.Embedding(21, d_model)
-        self.money_embedding = th.nn.Embedding(21, d_model)
         self.opp_money_embedding = th.nn.Embedding(21, d_model)
         self.score_diff_embedding = th.nn.Embedding(41, d_model)
+        self.legal_moves_embedding = th.nn.Embedding(self.num_things ** 2, d_model)
         self.input_linear1 = th.nn.Linear(d_model, d_model)
         self.input_linear2 = th.nn.Linear(d_model, d_model)
         # self.money_embedding = th.nn.Embedding(max_money_emb, d_model)
@@ -40,7 +44,7 @@ class MinionsActionBot(MinionsDiscriminator):
             num_layers=depth,
         )
         self.value_linear1 = th.nn.Linear(d_model, d_model)
-        self.value_linear2 = th.nn.Linear(d_model, n_actions)
+        self.value_linear2 = th.nn.Linear(d_model, self.num_things)
 
         self.d_model = d_model
         self.depth = depth
@@ -71,12 +75,13 @@ class MinionsActionBot(MinionsDiscriminator):
         unit_type_embs = self.unit_embedding(board_obs[:, :, 2])  # [batch, num_hexes, d_model]
         embs = th.cat([hex_embs + terrain_emb + unit_type_embs], dim=1)
         assert tuple(embs.shape[1:]) == (BOARD_SIZE ** 2, self.d_model), embs.shape
-        phase_emb = self.phase_embedding(obs['phase'])
-        remaining_turns_emb = self.remaining_turns_embedding(obs['remaining_turns'])
         money_emb = self.money_embedding(obs['money'])
+        remaining_turns_emb = self.remaining_turns_embedding(obs['remaining_turns'])
         opp_money_emb = self.opp_money_embedding(obs['opp_money'])
         score_diff_emb = self.score_diff_embedding(obs['score_diff'])
-        embs = th.cat([embs, phase_emb, remaining_turns_emb, money_emb, opp_money_emb, score_diff_emb], dim=1)
+        phase_emb = self.phase_embedding(obs['phase'])
+        legal_actions_emb = self.legal_moves_embedding(obs['legal_actions'])
+        embs = th.cat([embs, money_emb, remaining_turns_emb, opp_money_emb, score_diff_emb, phase_emb, legal_actions_emb], dim=1)
         return embs
 
     def process_output_into_scalar(self, trunk_out):

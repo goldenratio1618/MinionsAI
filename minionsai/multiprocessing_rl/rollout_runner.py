@@ -25,6 +25,9 @@ class RolloutRunner():
         return Game(**game_kwargs)
 
     def single_rollout(self, iteration, episode_idx) -> RolloutEpisode:
+        # TODO Make this seed a more reasonable function of iteration & episode_idx
+        # TODO Also make it depend on the original SEED set in the main script file, so that different main seeds 
+        # have different rollout games.
         seed = iteration * 100000 + episode_idx
         seed_everything(seed)
 

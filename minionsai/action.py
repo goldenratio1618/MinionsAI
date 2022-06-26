@@ -8,6 +8,7 @@ from .unit_type import UnitType
 class ActionType(enum.Enum):
     MOVE = "move"
     SPAWN = "spawn"
+    ADVANCE_PHASE = "advance_phase"
 
 class Action():
     def __init__(self, action_type: ActionType):
@@ -40,6 +41,16 @@ class SpawnAction(Action):
 
     def __repr__(self):
         return f"<SpawnAction {self.unit_type.name} @ {self.to_xy}>"
+
+class AdvancePhaseAction(Action):
+    """
+    Advance phase by one step. (Move phase to spawn phase, or spawn phase to end turn.)
+    """
+    def __init__(self):
+        super().__init__(ActionType.ADVANCE_PHASE)
+
+    def __repr__(self):
+        return "Advance phase."
 
 class ActionList():
     def __init__(self, move_phase: List[Action], spawn_phase: List[Action]):
