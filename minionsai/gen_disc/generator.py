@@ -79,7 +79,7 @@ class QGenerator(BaseGenerator):
             obs, valid_actions = self.translate_many(games)
             logits = self.model(obs).detach().cpu().numpy()  # shape = [n, num_things, num_things]
             assert logits.ndim == 3 and logits.shape[0] == n and logits.shape[1] == logits.shape[2], (n, logits.shape)
-            masked_logits = logits + (1 - valid_actions) * -np.inf  # shape = [n, num_things, num_things]
+            masked_logits = np.where(valid_actions, logits, -np.inf)  # shape = [n, num_things, num_things]
             assert masked_logits.shape == logits.shape, (masked_logits.shape, logits.shape)
             max_winprob = sigmoid(np.max(np.max(masked_logits, axis=1), axis=1))  # shape = [n]
             assert max_winprob.shape == (n,), max_winprob.shape
