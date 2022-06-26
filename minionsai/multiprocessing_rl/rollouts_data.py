@@ -12,6 +12,7 @@ class RolloutBatch:
     Output of a RolloutSource.
     """
     obs: Dict[str, np.array]
+    actions: np.array
     labels: np.array
     num_games: int
 

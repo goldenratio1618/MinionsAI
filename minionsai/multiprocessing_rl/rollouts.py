@@ -24,6 +24,7 @@ class OptimizerRolloutSource(abc.ABC):
 
         gen_obs = []
         gen_labels = []
+        gen_actions = []
 
         games = 0
         metrics_accumulated = (defaultdict(list), defaultdict(list))
@@ -44,6 +45,7 @@ class OptimizerRolloutSource(abc.ABC):
                 disc_labels.extend(rollout_episode.disc_labels)
                 gen_obs.append(rollout_episode.gen_obs)  # Append instead of extend here, since it's a dict. We'll deal with stacking them later.
                 gen_labels.extend(rollout_episode.gen_labels)
+                gen_actions.extend(rollout_episode.gen_actions)
                 games += 1
                 for color, this_color_metrics in enumerate(rollout_episode.metrics):
                     for key in set(metrics_accumulated[color].keys()).union(set(this_color_metrics.keys())):
@@ -57,13 +59,14 @@ class OptimizerRolloutSource(abc.ABC):
         # If we aren't training the generator, they're all empty
         if len(gen_obs[0]) > 0:
             gen_obs = {k: np.concatenate([s[k] for s in gen_obs], axis=0) for k in gen_obs[0]}
-            gen_obs, gen_labels = add_symmetries(gen_obs, gen_labels)
+            # TODO expand add_symmetries function to support actions.
+            # gen_obs, gen_labels = add_symmetries(gen_obs, gen_labels, gen_actions)
 
         for color in (0, 1):
             metrics_logger.log_metrics({k: sum(v)/self.episodes_per_iteration for k, v in metrics_accumulated[color].items()}, prefix=f'rollouts/game/{color}')
         return {
-            "discriminator": RolloutBatch(disc_obs, disc_labels, num_games=self.episodes_per_iteration),
-            "generator": RolloutBatch(gen_obs, gen_labels, num_games=self.episodes_per_iteration),
+            "discriminator": RolloutBatch(disc_obs, None, disc_labels, num_games=self.episodes_per_iteration),
+            "generator": RolloutBatch(gen_obs, gen_actions, gen_labels, num_games=self.episodes_per_iteration),
         }
 
     @abc.abstractmethod

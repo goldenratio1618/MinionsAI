@@ -44,10 +44,13 @@ class RolloutRunner():
             active_player = game.active_player_color
             actionlist, gen_info, disc_info = self.agent.act_with_info(game)
             game.full_turn(actionlist)
-            obs = disc_info["chosen_final_obs"]
-            max_winprob = disc_info["max_winprob"]
-            disc_obs_buffers[active_player].append(obs)
-            disc_label_buffers[active_player].append(max_winprob)
+            if "chosen_final_obs" in disc_info:
+                # In this case we're optimizing the discriminator.
+                # TODO have a better way to know if we're optimizing than checking info dict keys.
+                disc_obs = disc_info["chosen_final_obs"]
+                max_winprob = disc_info["max_winprob"]
+                disc_obs_buffers[active_player].append(disc_obs)
+                disc_label_buffers[active_player].append(max_winprob)
             if gen_info is not None:
                 # Then we're training the generator also
                 all_gen_obs.append(gen_info["obs"])
@@ -69,8 +72,9 @@ class RolloutRunner():
         winner = game.winner
 
         metrics = (game.get_metrics(0), game.get_metrics(1))
-        metrics[winner]["pfinal"] = disc_label_buffers[winner][-1]
-        metrics[1 - winner]["pfinal"] = 1 - disc_label_buffers[1 - winner][-1]
+        if len(disc_obs_buffers[0]) > 0:
+            metrics[winner]["pfinal"] = disc_label_buffers[winner][-1]
+            metrics[1 - winner]["pfinal"] = 1 - disc_label_buffers[1 - winner][-1]
 
         winner_obs = disc_obs_buffers[winner]
         loser_obs = disc_obs_buffers[1 - winner]
@@ -79,7 +83,6 @@ class RolloutRunner():
         disc_label_buffers[1 - winner].append(0)
         winner_disc_labels = disc_label_buffers[winner][1:]
         loser_disc_labels = disc_label_buffers[1 - winner][1:]
-
 
         if self.hparams.get('lambda', None) is not None:
             winner_disc_labels = smooth_labels(winner_disc_labels, self.hparams['lambda'])

@@ -195,8 +195,8 @@ def main(run_name):
                     agent.rollouts_per_turn = ROLLOUTS_PER_TURN
 
             metrics_logger.log_metrics(rollout_stats)
-            disc_param_norm = sum([th.norm(param, p=2) for param in disc_model.parameters()]).item()
             if TRAIN_DISCRIMINATOR:
+                disc_param_norm = sum([th.norm(param, p=2) for param in disc_model.parameters()]).item()
                 metrics_logger.log_metrics({
                         'disc/turns_optimized': turns_optimized, 
                         'disc/param_norm': disc_param_norm})
