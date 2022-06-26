@@ -157,6 +157,7 @@ int main() {
           if (damaged_zombies [x * BOARD_SIZE + y]) {
             printf("%d %d %d %d\n", xi, yi, x, y);
             zombies[x * BOARD_SIZE + y] = -1;
+            zombies[xi * BOARD_SIZE + yi] = 2;
             damaged_zombies[x * BOARD_SIZE + y] = 0;
             goto ZOMBIE_END;
           }
@@ -178,15 +179,26 @@ int main() {
           }
         }
 
-        // attack enemy zombies with other zombies
+        // attack enemy zombies that can be hit with a second zombie
         for (int i = 0; i < 6; i ++) {
           int x = adjacent_hexes[i].x;
           int y = adjacent_hexes[i].y;
           if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
           if (zombies [x * BOARD_SIZE + y] == 1 - color) {
-            printf("%d %d %d %d\n", xi, yi, x, y);
-            damaged_zombies[x * BOARD_SIZE + y] = 1;
-            goto ZOMBIE_END;
+            location new_neighbors[6];
+            get_adjacent_hexes(new_neighbors, adjacent_hexes + i);
+            for (int j = 0; j < 6; j ++) {
+              int nx = new_neighbors[j].x;
+              int ny = new_neighbors[j].y;
+              if (nx < 0 || nx >= BOARD_SIZE || ny < 0 || ny >= BOARD_SIZE) continue;
+              if (nx == xi && ny == yi) continue;
+              if (zombies[nx * BOARD_SIZE + ny] == color) {
+                printf("%d %d %d %d\n", xi, yi, x, y);
+                damaged_zombies[x * BOARD_SIZE + y] = 1;
+                zombies[xi * BOARD_SIZE + yi] = 2;
+                goto ZOMBIE_END;
+              }
+            }
           }
         }
 
