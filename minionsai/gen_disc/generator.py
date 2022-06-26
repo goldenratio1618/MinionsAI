@@ -119,10 +119,16 @@ class QGenerator(BaseGenerator):
 
         Returns an array of index-pairs; shape = [batch, 2]
         """
+        # Make a list of whether or not to be greedy for each entry inthe batch
         greedy = np.random.rand(*logits.shape[:-2]) < self.epsilon_greedy
-        greedy = np.expand_dims(greedy, axis=-1)
-        greedy = np.expand_dims(greedy, axis=-1)
-        greedified_logits = logits + greedy * 1000
+
+        # Implement greedy sampling by setting the logits to zero.
+        # Can't multiply by literally zero, because many entries are masked (set to -inf)
+        tiny_multiplier = self.sampling_temperature * 1e-6
+        greedy_multiplier = np.where(greedy, tiny_multiplier, 1)
+        greedy_multiplier = np.expand_dims(greedy_multiplier, axis=-1)
+        greedy_multiplier = np.expand_dims(greedy_multiplier, axis=-1)
+        greedified_logits = logits * greedy_multiplier
         return gumbel_sample(greedified_logits, self.sampling_temperature)
 
 
