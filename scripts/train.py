@@ -20,7 +20,7 @@ from minionsai.multiprocessing_rl.rollouts import InProcessRolloutSource
 from minionsai.run_game import run_n_games
 from minionsai.discriminator_only.model import MinionsDiscriminator
 from minionsai.discriminator_only.translator import Translator
-from minionsai.agent import Agent, RandomAIAgent
+from minionsai.agent import Agent, CLIAgent, RandomAIAgent
 from minionsai.scoreboard_envs import ENVS
 import torch as th
 import numpy as np
@@ -40,7 +40,7 @@ GEN_SAMPLING_TEMPERATURE = 0.01
 
 # How many episodes of data do we collect each iteration, before running a few epochs of optimization?
 # Potentially good to use a few times bigger EPISODES_PER_ITERATION than BATCH_SIZE, to minimize correlation within batches
-EPISODES_PER_ITERATION = 4#256
+EPISODES_PER_ITERATION = 256
 ROLLOUT_PROCS = 1
 
 # Once we've collected the data, how many times do we go over it for optimization (within one iteration)?
@@ -52,11 +52,12 @@ EVAL_EVERY = 8
 EVAL_VS_PAST_ITERS = []
 # Specific agent instances to eval vs
 EVAL_VS_AGENTS = [
+    RandomAIAgent()
     # GenDiscAgent(ScriptedDiscriminator(), RandomAIAgent(), rollouts_per_turn=16),
-    os.path.join(get_experiments_directory(), "conv_big", "checkpoints", "iter_200")
+    # os.path.join(get_experiments_directory(), "conv_big", "checkpoints", "iter_200")
 ]
 # Eval against random up until this iteration
-EVAL_VS_RANDOM_UNTIL = 5
+EVAL_VS_RANDOM_UNTIL = 0
 EVAL_TRIALS = 100
 
 # Frequency of storing a saved agent
@@ -136,7 +137,7 @@ def main(run_name):
     checkpoint_dir, code_dir = setup_directory(run_name)
     logger.info(f"Starting run {run_name}")
 
-    device = th.device('cpu')#find_device()
+    device = find_device()
 
     agent = build_agent()
     disc_model = agent.discriminator.model
