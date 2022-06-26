@@ -27,8 +27,8 @@ class OptimizerRolloutSource(abc.ABC):
         gen_actions = []
 
         games = 0
-        metrics_accumulated = (defaultdict(list), defaultdict(list))
-
+        player_metrics_accumulated = (defaultdict(list), defaultdict(list))
+        global_metrics_accumulated = defaultdict(list)
         # Early in training use td-lambda to reduce variance of gradients
         # Late in training, turn this off since it introduces a bias when epsilon-greedy actions are taken.
         lam = None if iteration * self.episodes_per_iteration >= self.lambda_until_episodes else 1 - iteration * self.episodes_per_iteration / self.lambda_until_episodes
@@ -48,9 +48,11 @@ class OptimizerRolloutSource(abc.ABC):
                 gen_labels.append(rollout_episode.gen_labels)
                 gen_actions.append(rollout_episode.gen_actions)
                 games += 1
-                for color, this_color_metrics in enumerate(rollout_episode.metrics):
-                    for key in set(metrics_accumulated[color].keys()).union(set(this_color_metrics.keys())):
-                        metrics_accumulated[color][key].append(this_color_metrics[key])
+                for color, this_color_metrics in enumerate(rollout_episode.player_metrics):
+                    for key in set(player_metrics_accumulated[color].keys()).union(set(this_color_metrics.keys())):
+                        player_metrics_accumulated[color][key].append(this_color_metrics[key])
+                for key in set(global_metrics_accumulated.keys()).union(set(rollout_episode.global_metrics.keys())):
+                    global_metrics_accumulated[key].append(rollout_episode.global_metrics[key])
         # convert from list of dicts of arrays to a single dict of arrays with large batch dimension
         if len(disc_obs) > 0:
             disc_obs = {k: np.concatenate([s[k] for s in disc_obs], axis=0) for k in disc_obs[0]}
@@ -65,9 +67,9 @@ class OptimizerRolloutSource(abc.ABC):
             assert gen_actions.shape == (gen_labels.shape[0], 2), gen_actions.shape
             # TODO expand add_symmetries function to support actions.
             # gen_obs, gen_labels = add_symmetries(gen_obs, gen_labels, gen_actions)
-
+        metrics_logger.log_metrics({k: sum(v)/self.episodes_per_iteration for k, v in global_metrics_accumulated.items()}, prefix=f'rollouts/game')
         for color in (0, 1):
-            metrics_logger.log_metrics({k: sum(v)/self.episodes_per_iteration for k, v in metrics_accumulated[color].items()}, prefix=f'rollouts/game/{color}')
+            metrics_logger.log_metrics({k: sum(v)/self.episodes_per_iteration for k, v in player_metrics_accumulated[color].items()}, prefix=f'rollouts/game/{color}')
         return {
             "discriminator": RolloutBatch(disc_obs, None, disc_labels, num_games=self.episodes_per_iteration),
             "generator": RolloutBatch(gen_obs, gen_actions, gen_labels, num_games=self.episodes_per_iteration),
