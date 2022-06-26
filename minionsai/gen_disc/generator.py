@@ -77,13 +77,14 @@ class QGenerator(BaseGenerator):
         recorded_actions = [[] for _ in range(n)]
         for i in range(self.actions_per_turn):
             obs, valid_actions = self.translate_many(games)
-            logits = self.model(obs).detach().cpu().numpy()  # shape = [n, num_things, num_things]
-            assert logits.ndim == 3 and logits.shape[0] == n and logits.shape[1] == logits.shape[2], (n, logits.shape)
-            masked_logits = np.where(valid_actions, logits, -np.inf)  # shape = [n, num_things, num_things]
-            assert masked_logits.shape == logits.shape, (masked_logits.shape, logits.shape)
-            max_winprob = sigmoid(np.max(np.max(masked_logits, axis=1), axis=1))  # shape = [n]
+            logits = self.model(obs)
+            winprobs = th.sigmoid(logits).detach().cpu().numpy()  # shape = [n, num_things, num_things]
+            assert winprobs.ndim == 3 and winprobs.shape[0] == n and winprobs.shape[1] == winprobs.shape[2], (n, winprobs.shape)
+            masked_winprobs = np.where(valid_actions, winprobs, -np.inf)  # shape = [n, num_things, num_things]
+            assert masked_winprobs.shape == winprobs.shape, (masked_winprobs.shape, winprobs.shape)
+            max_winprob = np.max(np.max(masked_winprobs, axis=1), axis=1)  # shape = [n]
             assert max_winprob.shape == (n,), max_winprob.shape
-            sampled_numpy_action = self.sample(masked_logits) # shape = [n, 2]
+            sampled_numpy_action = self.sample(masked_winprobs) # shape = [n, 2]
             assert sampled_numpy_action.shape == (n, 2), sampled_numpy_action.shape
             sampled_action = [self.translator.untranslate_action(action) for action in sampled_numpy_action]
             
