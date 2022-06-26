@@ -48,7 +48,7 @@ class ButtonAI(th.nn.Module):
         self.input_linear1 = th.nn.Linear(d_model, d_model)
         self.input_linear2 = th.nn.Linear(d_model, d_model)
         self.value_linear1 = th.nn.Linear(d_model, d_model)
-        self.value_linear2 = th.nn.Linear(d_model, board_size ** 2)
+        self.value_linear2 = th.nn.Linear(d_model, d_model)
 
         self.board_size = board_size
 
@@ -71,8 +71,11 @@ class ButtonAI(th.nn.Module):
 
     def process_output_into_scalar(self, trunk_out):
         # print(trunk_out)
-        transposed = trunk_out.transpose()  # shape [B, N, 128]
-        post_linear = self.value_linear2(trunk_out)
+        print(trunk_out.size()) # [B, N, 8]
+        transposed = th.transpose(trunk_out, 1, 2)  # [B, 8, N]
+        print(transposed.size())
+        post_linear = self.value_linear2(trunk_out) # [B, N, 8]
+        print(post_linear.size())
         output = th.matmul(post_linear, transposed)   # shape [B, N, N]
         return output
 
@@ -144,6 +147,7 @@ def select_action(state, test=False):
     else:
         s_rand = th.tensor([[random.randrange(BOARD_SIZE), random.randrange(BOARD_SIZE)]], device=device, dtype=th.long)
         # print("Random")
+        print("Random: " + str(s_rand))
         return s_rand
 
 
@@ -183,7 +187,7 @@ def optimize_model():
     # columns of actions taken. These are the actions which would've been taken
     # for each batch state according to policy_net
     state_action_values = policy_net(state_batch)
-    # print("state actions 1 = " + str(state_action_values))
+    print("state actions 1 = " + str(state_action_values.size()))
     state_action_values = state_action_values.gather(1, action_batch)
     # print("state actions 2 = " + str(state_action_values))
 
@@ -211,28 +215,29 @@ def optimize_model():
 def init_state():
     win_x = np.random.choice(range(BOARD_SIZE))
     win_y = np.random.choice(range(BOARD_SIZE))
-    state = np.zeros((BOARD_SIZE, BOARD_SIZE))
+    state = np.zeros(BOARD_SIZE ** 2, np.int32)
+    state[BOARD_SIZE*win_x + win_y] = 1
 
-    state = th.from_numpy(np.array([[state]]))
-    return state, win
+    state = th.from_numpy(np.array([state]))
+    return state, win_x, win_y
 
 num_episodes = 51
 durations = 500
 for i_episode in range(num_episodes):
     # Initialize the environment and state
-    state, win = init_state()
+    state, win_x, win_y = init_state()
 
     for t in range(durations):
         # Select and perform an action
 
         action = select_action(state)
-        reward = (action == win)
+        reward = (action[0][0] == win_x and action[0][1] == win_y)
         # print(str(reward) + " " + str(action) + " " + str(win))
         done = (t == durations)
         reward = th.tensor([reward], device=device)
 
         if not done:
-            next_state, next_win = init_state()
+            next_state, next_win_x, next_win_y = init_state()
         else:
             next_state = None
 
@@ -241,7 +246,8 @@ for i_episode in range(num_episodes):
 
         # Move to the next state
         state = next_state
-        win = next_win
+        win_x = next_win_x
+        win_y = next_win_y
 
         # Perform one step of the optimization (on the policy network)
         optimize_model()
@@ -255,11 +261,11 @@ for i_episode in range(num_episodes):
         target_net.save("/home/aaatanas/MinionsAI_tests/buttonAI/test3/"+ str(i_episode))
         n_success = 0
         for t in range(durations):
-            state, win = init_state()
+            state, win_x, win_y = init_state()
             # Select and perform an action
             action = select_action(state, True)
             # print(str(action) + ", " + str(win) + ": " + str(reward))
-            reward = (action == win)
+            reward = (action[0][0] == win_x and action[0][1] == win_y)
             done = False
             n_success += reward
         print("Iteration " + str(i_episode) + " success rate: " + str(n_success/durations))
