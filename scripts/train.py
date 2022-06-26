@@ -119,10 +119,13 @@ def eval_vs_other_by_path(agent, eval_agent_path):
         eval_vs_other(agent, eval_agent, agent_name)
 
 def eval_vs_other(agent, eval_agent, name):
-    # Hack to temporarily change the agent's rollouts_per_turn
+    # Hack to temporarily change the agent's rollouts_per_turn & epsilon greedy values
+    # TODO - make it easier to set an agent into "eval" mode.
     agent.rollouts_per_turn = ROLLOUTS_PER_TURN * EVAL_COMPUTE_BOOST
+    agent.discriminator.epsilon_greedy = 0.0
     wins, _metrics = run_n_games(ENVS[EVAL_ENV_NAME], [agent, eval_agent], n=EVAL_TRIALS)
     agent.rollouts_per_turn = ROLLOUTS_PER_TURN
+    agent.discriminator.epsilon_greedy = DISC_EPSILON_GREEDY
     winrate = wins[0] / EVAL_TRIALS
     metrics_logger.log_metrics({f"eval_winrate/{name}": winrate})
     logger.info(f"Win rate vs {name} = {winrate}")  
