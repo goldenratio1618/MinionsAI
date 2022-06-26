@@ -49,6 +49,7 @@ class RolloutRunner():
             disc_obs_buffers[active_player].append(obs)
             disc_label_buffers[active_player].append(max_winprob)
             if gen_info is not None:
+                print("Not null")
                 # Then we're training the generator also
                 all_gen_obs.append(gen_info["obs"])
 
@@ -87,6 +88,7 @@ class RolloutRunner():
 
         all_disc_obs = winner_obs + loser_obs
         all_disc_labels = np.concatenate([winner_disc_labels, loser_disc_labels])
+
 
         if len(all_gen_obs) > 0:
             total_turns = len(all_gen_labels) * self.agent.rollouts_per_turn * self.agent.generator.actions_per_turn

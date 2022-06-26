@@ -1,6 +1,3 @@
-from minionsai.discriminator_only.translator import MAX_SPEED_OR_RANGE
-
-
 class UnitType():
     def __init__(self, name, cost, rebate, attack, defense, speed=1, attack_range=1, persistent=False, immune=False, max_stack=1, spawn=False, blink=False, unsummoner=False, deadly=False, flurry=False, flying=False, lumbering=False, terrain_ability=0):
         self.name = name

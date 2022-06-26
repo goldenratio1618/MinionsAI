@@ -53,7 +53,7 @@ class OptimizerRolloutSource(abc.ABC):
             disc_obs = {k: np.concatenate([s[k] for s in disc_obs], axis=0) for k in disc_obs[0]}
             disc_obs, disc_labels = add_symmetries(disc_obs, disc_labels)
 
-        if len(gen_obs) > 0:
+        if len(gen_obs) > 0 and len(gen_obs[0]) > 0:
             gen_obs = {k: np.concatenate([s[k] for s in gen_obs], axis=0) for k in gen_obs[0]}
             gen_obs, gen_labels = add_symmetries(gen_obs, gen_labels)
 

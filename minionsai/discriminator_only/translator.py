@@ -47,8 +47,9 @@ class Translator():
         self.num_things = BOARD_SIZE ** 2 + 4
         if self.mode == "generator":
             self.num_things += 1
-        self.possibly_legal_actions = self.get_possible_legal_actions()
         self.spawn_pos = BOARD_SIZE ** 2
+        self.possibly_legal_actions = self.get_possible_legal_actions()
+
 
     def translate(self, game: Game):
         board_obs = [] # [num_hexes, 3 (location, terrain, unit_type)]
@@ -142,18 +143,18 @@ class Translator():
                             actions[i,j] = act
         return legal, actions
 
-    def process_action(self, game, action):
-        game.process_single_action(action)
-        return 1
-
-
-
+    # def process_action(self, game, action):
+    #     game.process_single_action(action)
+    #     return 1
 
     @staticmethod
     def symmetries(obs):
         # Takes an obs that came out of translator.translate()
         # and returns a list of symmetric observations
         # TODO(david) - this function really should be tested.
+        # print(obs)
+        # print("-----------------------------------")
+        # print(obs['board'])
         board = obs['board']
         num = board.shape[0]
         board = np.reshape(board, [num, BOARD_SIZE, BOARD_SIZE, 3])

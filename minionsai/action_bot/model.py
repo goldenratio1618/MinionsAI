@@ -3,37 +3,30 @@ from minionsai.engine import BOARD_SIZE
 import torch as th
 from ..unit_type import unitList
 
-Transition = namedtuple('Transition',
-                        ('state', 'action', 'next_state', 'reward'))
+# Transition = namedtuple('Transition',
+#                         ('state', 'action', 'next_state', 'reward'))
 
-class ReplayMemory(object):
-    def __init__(self, capacity):
-        self.memory = deque([],maxlen=capacity)
+# class ReplayMemory(object):
+#     def __init__(self, capacity):
+#         self.memory = deque([],maxlen=capacity)
 
-    def push(self, *args):
-        """Save a transition"""
-        self.memory.append(Transition(*args))
+#     def push(self, *args):
+#         """Save a transition"""
+#         self.memory.append(Transition(*args))
 
-    def sample(self, batch_size):
-        return random.sample(self.memory, batch_size)
+#     def sample(self, batch_size):
+#         return random.sample(self.memory, batch_size)
 
-    def __len__(self):
-        return len(self.memory)
+#     def __len__(self):
+#         return len(self.memory)
 
 
 class MinionsActionBot(MinionsDiscriminator):
-    def __init__(self, d_model, depth, n_actions):
-        super.__init__(d_model, depth)
+    def __init__(self, d_model, depth):
+        super().__init__(d_model, depth)
         self.num_things = BOARD_SIZE **2 + 5
         self.unit_embedding = th.nn.Embedding(len(unitList) * 2 * 2 * 2 * 7 + 1, d_model)
-        self.location_embedding = th.nn.Embedding(BOARD_SIZE ** 2, d_model)
-        self.hex_embedding = th.nn.Embedding(BOARD_SIZE ** 2, d_model)
-        self.money_embedding = th.nn.Embedding(21, d_model)
         self.phase_embedding = th.nn.Embedding(1, d_model)
-        self.terrain_embedding = th.nn.Embedding(3, d_model)
-        self.remaining_turns_embedding = th.nn.Embedding(21, d_model)
-        self.opp_money_embedding = th.nn.Embedding(21, d_model)
-        self.score_diff_embedding = th.nn.Embedding(41, d_model)
         self.legal_moves_embedding = th.nn.Embedding(self.num_things ** 2, d_model)
         self.input_linear1 = th.nn.Linear(d_model, d_model)
         self.input_linear2 = th.nn.Linear(d_model, d_model)
@@ -44,11 +37,6 @@ class MinionsActionBot(MinionsDiscriminator):
             num_layers=depth,
         )
         self.value_linear1 = th.nn.Linear(d_model, d_model)
-        self.value_linear2 = th.nn.Linear(d_model, self.num_things)
-
-        self.d_model = d_model
-        self.depth = depth
-        self._device = None
 
     def to(self, device):
         super().to(device)
@@ -73,48 +61,36 @@ class MinionsActionBot(MinionsDiscriminator):
         hex_embs = self.hex_embedding(board_obs[:, :, 0])  # [batch, num_hexes, d_model]
         terrain_emb = self.terrain_embedding(board_obs[:, :, 1])  # [batch, num_hexes, d_model]
         unit_type_embs = self.unit_embedding(board_obs[:, :, 2])  # [batch, num_hexes, d_model]
-        embs = th.cat([hex_embs + terrain_emb + unit_type_embs], dim=1)
-        assert tuple(embs.shape[1:]) == (BOARD_SIZE ** 2, self.d_model), embs.shape
+        board_embs = hex_embs + terrain_emb + unit_type_embs # [batch, num_hexes, d_model]
+        board_embs = self.activation(board_embs)
+
+        # Reshape to [batch, height, width, channels]
+        board_embs_conv = board_embs.view(board_embs.shape[0], BOARD_SIZE, BOARD_SIZE, self.d_model)
+        # But the conv wants [batch, channels, height, width]
+        board_embs_conv = board_embs_conv.permute(0, 3, 1, 2)
+        board_embs_conv = self.input_conv1(board_embs_conv)
+        board_embs_conv = board_embs_conv.permute(0, 2, 3, 1)  # [batch, height, width, d_model]
+        board_embs_conv = board_embs_conv.view(board_embs_conv.shape[0], BOARD_SIZE ** 2, self.d_model)
+        board_embs = board_embs + self.conv_ln(board_embs_conv)
+        
         money_emb = self.money_embedding(obs['money'])
         remaining_turns_emb = self.remaining_turns_embedding(obs['remaining_turns'])
         opp_money_emb = self.opp_money_embedding(obs['opp_money'])
         score_diff_emb = self.score_diff_embedding(obs['score_diff'])
         phase_emb = self.phase_embedding(obs['phase'])
         legal_actions_emb = self.legal_moves_embedding(obs['legal_actions'])
-        embs = th.cat([embs, money_emb, remaining_turns_emb, opp_money_emb, score_diff_emb, phase_emb, legal_actions_emb], dim=1)
+        embs = th.cat([board_embs, money_emb, remaining_turns_emb, opp_money_emb, score_diff_emb, phase_emb, legal_actions_emb], dim=1)
         return embs
 
     def process_output_into_scalar(self, trunk_out):
-        # print(trunk_out)
-        flat, _ = th.max(trunk_out, dim=1)
-        # print(flat)
-        # flat = trunk_out
-        # flat, _ = th.max(trunk_out, dim=1)  # [batch, d_model]
-        x = self.value_linear1(flat)  # [batch, d_model]
-        x = th.nn.ReLU()(x)  # [batch, d_model]
-        logit = self.value_linear2(flat)  # [batch, n_actions]
-        return logit
-
-    def forward(self, state):
-        # print("FORWARD")
-        # print(state)
-        obs = self.process_input(state)  # [batch, num_things, d_model]
-        # print(obs)
-        obs = self.input_linear1(obs)  # [batch, num_things, d_model]
-        # print(obs)
-        obs = th.nn.ReLU()(obs)  # [batch, num_things, d_model]
-        # print(obs)
-        obs = self.input_linear2(obs)  # [batch, num_things, d_model]
-        # print(obs)
-        trunk_out = self.transformer(obs)  # [batch, num_things, d_model]
-        # print(obs)
-        # trunk_out = obs
-        output = self.process_output_into_scalar(trunk_out)  # [batch, n_actions]
-        # print(output)
+        # print(trunk_out.size()) # [B, N, 8]
+        transposed = th.transpose(trunk_out, 1, 2)  # [B, 8, N]
+        # print(transposed.size())
+        post_linear = self.value_linear1(trunk_out) # [B, N, 8]
+        # print(post_linear.size())
+        output = th.matmul(post_linear, transposed)   # shape [B, N, N]
         return output
 
-    def save(self, checkpoint_path):
-        th.save(self.state_dict(), checkpoint_path)
 
-    def load(self, checkpoint_path):
-        self.load_state_dict(th.load(checkpoint_path, map_location=lambda storage, loc: storage))
+    def forward(self, state):
+        return super().forward(state)
