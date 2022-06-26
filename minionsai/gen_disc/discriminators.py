@@ -116,6 +116,9 @@ class HumanDiscriminator(BaseDiscriminator):
             print("Invalid option")
             return self.display_and_choose(sorted_idxes, logprobs, games)
 
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))
+
 class QDiscriminator(BaseDiscriminator):
     def __init__(self, translator, model, epsilon_greedy):
         self.translator = translator
@@ -126,14 +129,15 @@ class QDiscriminator(BaseDiscriminator):
         obs_list = [self.translator.translate(g) for g in games]
 
         obs = stack_dicts(obs_list)
-        logprobs = self.model(obs)
+        logprobs = self.model(obs).detach().cpu().numpy()
         result = self.sample(logprobs)
-        max_winprob = th.sigmoid(th.max(logprobs)).item()
-        return result, {"max_winprob": max_winprob, "chosen_final_obs": obs_list[result], "all_winprobs": th.sigmoid(logprobs)}
+        max_logprob = np.max(logprobs)
+        max_winprob = sigmoid(max_logprob).item()
+        return result, {"max_winprob": max_winprob, "chosen_final_obs": obs_list[result], "all_winprobs": sigmoid(logprobs)}
 
     def sample(self, logprobs):
         if np.random.random() < self.epsilon_greedy:
             return np.random.choice(len(logprobs))
         else:
-            return th.argmax(logprobs).item()
+            return np.argmax(logprobs).item()
 
