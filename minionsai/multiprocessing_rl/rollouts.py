@@ -44,7 +44,7 @@ class OptimizerRolloutSource(abc.ABC):
                 disc_obs.extend(rollout_episode.disc_obs)
                 disc_labels.extend(rollout_episode.disc_labels)
                 gen_obs.append(rollout_episode.gen_obs)
-                assert rollout_episode.gen_actions.shape == (rollout_episode.gen_labels.shape[0], 2)
+                assert rollout_episode.gen_actions == [] or rollout_episode.gen_actions.shape == (rollout_episode.gen_labels.shape[0], 2)
                 gen_labels.append(rollout_episode.gen_labels)
                 gen_actions.append(rollout_episode.gen_actions)
                 games += 1
