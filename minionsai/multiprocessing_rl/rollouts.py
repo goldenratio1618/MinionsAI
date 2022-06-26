@@ -19,8 +19,11 @@ class OptimizerRolloutSource(abc.ABC):
         self.lambda_until_episodes = lambda_until_episodes
 
     def get_rollouts(self, iteration: int) -> RolloutBatch:
-        obs = []
-        labels = []
+        disc_obs = []
+        disc_labels = []
+
+        gen_obs = []
+        gen_labels = []
 
         games = 0
         metrics_accumulated = (defaultdict(list), defaultdict(list))
@@ -32,26 +35,37 @@ class OptimizerRolloutSource(abc.ABC):
         metrics_logger.log_metrics(hparams)
 
         self.launch_rollouts(iteration, hparams)
-
-        for _ in tqdm.tqdm(range(self.episodes_per_iteration)):
+        print(f"Launching rollouts iteration {iteration}.")
+        for idx in tqdm.tqdm(range(self.episodes_per_iteration)):
             with metrics_logger.timing('single_episode'):
 
-                rollout_episode = self.next_rollout()
-                obs.extend(rollout_episode.obs)
-                labels.extend(rollout_episode.labels)
+                rollout_episode = self.next_rollout(iteration, idx)
+                disc_obs.extend(rollout_episode.disc_obs)
+                disc_labels.extend(rollout_episode.disc_labels)
+                gen_obs.extend(rollout_episode.gen_obs)
+                gen_labels.extend(rollout_episode.gen_labels)
                 games += 1
                 for color, this_color_metrics in enumerate(rollout_episode.metrics):
                     for key in set(metrics_accumulated[color].keys()).union(set(this_color_metrics.keys())):
                         metrics_accumulated[color][key].append(this_color_metrics[key])
         # convert from list of dicts of arrays to a single dict of arrays with large batch dimension
-        obs = {k: np.concatenate([s[k] for s in obs], axis=0) for k in obs[0]}
-        obs, labels = add_symmetries(obs, labels)
+        if len(disc_obs) > 0:
+            disc_obs = {k: np.concatenate([s[k] for s in disc_obs], axis=0) for k in disc_obs[0]}
+            disc_obs, disc_labels = add_symmetries(disc_obs, disc_labels)
+
+        if len(gen_obs) > 0:
+            gen_obs = {k: np.concatenate([s[k] for s in gen_obs], axis=0) for k in gen_obs[0]}
+            gen_obs, gen_labels = add_symmetries(gen_obs, gen_labels)
+
         for color in (0, 1):
             metrics_logger.log_metrics({k: sum(v)/self.episodes_per_iteration for k, v in metrics_accumulated[color].items()}, prefix=f'rollouts/game/{color}')
-        return RolloutBatch(obs, labels, num_games=self.episodes_per_iteration)
+        return {
+            "discriminator": RolloutBatch(disc_obs, disc_labels, num_games=self.episodes_per_iteration),
+            "generator": RolloutBatch(gen_obs, gen_labels, num_games=self.episodes_per_iteration),
+        }
 
     @abc.abstractmethod
-    def next_rollout(self) -> RolloutEpisode:
+    def next_rollout(self, iteration, episode_idx) -> RolloutEpisode:
         raise NotImplementedError
 
     def launch_rollouts(self, iteration: int, hparams: Dict) -> None:
@@ -75,8 +89,8 @@ class InProcessRolloutSource(OptimizerRolloutSource):
         super().__init__(episodes_per_iteration, game_kwargs, lambda_until_episodes)
         self.runner = RolloutRunner(game_kwargs, agent)
 
-    def next_rollout(self) -> RolloutEpisode:
-        return self.runner.single_rollout()
+    def next_rollout(self, iteration, episode_idx) -> RolloutEpisode:
+        return self.runner.single_rollout(iteration, episode_idx)
 
     def launch_rollouts(self, iteration, hparams) -> None:
         self.runner.update(hparams)

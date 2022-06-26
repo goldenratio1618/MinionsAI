@@ -33,6 +33,7 @@ class MetricsLogger():
         self._seen_keys = []
         self._last_seen_values = {}
         self._timings = defaultdict(list)
+        self._repeated_logging_okay = False
 
     def configure(self, path):
         self._csv_path = path
@@ -52,7 +53,7 @@ class MetricsLogger():
             prefix = prefix + "/"
         for key, value in metrics.items():
             full_key = prefix + key
-            if full_key in self._metrics_this_step:
+            if full_key in self._metrics_this_step and not self._repeated_logging_okay:
                 raise ValueError(f"Metric {full_key} already logged this step")
             self._metrics_this_step[full_key] = value
 
@@ -122,3 +123,6 @@ class MetricsLogger():
         self._metrics_this_step = {}
 
 metrics_logger = MetricsLogger()
+
+def allow_repeated_logging():
+    metrics_logger._repeated_logging_okay = True

@@ -24,10 +24,10 @@ class TrainedAgent(Agent):
         self.epsilon_greedy = epsilon_greedy
     
     def act(self, game):
-        action, _ = self.act_with_winprob(game)
+        action, _, _ = self.act_with_info(game)
         return action
 
-    def act_with_winprob(self, game):
+    def act_with_info(self, game):
         options_action_list = []
         options_obs = []
         options_final_states = []  # used for printing only
@@ -69,7 +69,10 @@ class TrainedAgent(Agent):
 
         if self.verbose_level >= 1:
             print(f"Choosing option {selected_idx}; win prob = {sigmoid(disc_logprobs[selected_idx]).item():.1%}%")
-        return options_action_list[selected_idx], best_prob
+        return options_action_list[selected_idx], None, {
+            "max_winprob": best_prob,
+            "chosen_final_obs": options_obs[selected_idx],
+        }
 
     def save_instance(self, directory: str):
         th.save(self.policy.state_dict(), os.path.join(directory, 'weights.pt'))

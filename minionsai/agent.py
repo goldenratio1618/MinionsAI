@@ -281,7 +281,7 @@ class RandomAIAgent(Agent):
                 necromancer_destination = dest
             if unit.type == NECROMANCER:
                 # Attack if possible
-                attack_targets = adjacent_hexes(*dest)
+                attack_targets = list(adjacent_hexes(*dest))
                 random.shuffle(attack_targets)
                 for (k, l) in attack_targets:
                     unit_there = game_copy.board.board[k][l].unit
@@ -294,7 +294,7 @@ class RandomAIAgent(Agent):
             game_copy.pretty_print()
             spawn_actions = []
         else:
-            adjacent_targets = adjacent_hexes(*necromancer_destination)
+            adjacent_targets = list(adjacent_hexes(*necromancer_destination))
             random.shuffle(adjacent_targets)
             spawn_actions = [
                 SpawnAction(ZOMBIE, dest)
@@ -302,7 +302,8 @@ class RandomAIAgent(Agent):
             ]
             # Also try spawning some spaces two away from the necromancer
             # in case he moved.
-            adjacent_targets = adjacent_hexes(*necromancer_destination)
+            adjacent_targets = list(adjacent_hexes(*necromancer_destination))
+            random.shuffle(adjacent_targets)
             spawn_actions += [
                 SpawnAction(ZOMBIE, dest)
                 for dest in random.sample(adjacent_targets, 2)

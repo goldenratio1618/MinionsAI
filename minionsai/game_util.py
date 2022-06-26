@@ -1,6 +1,8 @@
 from .engine import adjacent_hexes, Board
 from .unit_type import ZOMBIE
 import numpy as np
+import random
+import torch as th
 
 def adjacent_zombies(board: Board, loc, color):
         result = []
@@ -26,3 +28,8 @@ def equal_np_dicts(x, y):
     elif isinstance(x, dict):
         return all(k in y for k in x) and all(equal_np_dicts(x[k], y[k]) for k in x)
 
+def seed_everything(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    th.manual_seed(seed)
+    th.cuda.manual_seed_all(seed)
