@@ -37,15 +37,16 @@ TRAIN_DISCRIMINATOR = False
 ROLLOUTS_PER_TURN = 16
 DISC_EPSILON_GREEDY = 0.1
 GEN_EPSILON_GREEDY = 0.1
-GEN_SAMPLING_TEMPERATURE = 0.01
+GEN_SAMPLING_TEMPERATURE = 0.1
 
 # How many episodes of data do we collect each iteration, before running a few epochs of optimization?
 # Potentially good to use a few times bigger EPISODES_PER_ITERATION than BATCH_SIZE, to minimize correlation within batches
-EPISODES_PER_ITERATION = 16
+EPISODES_PER_ITERATION = 32
 ROLLOUT_PROCS = 4
 
 # Once we've collected the data, how many times do we go over it for optimization (within one iteration)?
 SAMPLE_REUSE = 2
+GEN_SAMPLE_REUSE = 1  # There is so much data, no need to reuse it.
 
 # Frequency of running evals
 EVAL_EVERY = 8
@@ -53,18 +54,18 @@ EVAL_EVERY = 8
 EVAL_VS_PAST_ITERS = []
 # Specific agent instances to eval vs
 EVAL_VS_AGENTS = [
-    # GenDiscAgent(ScriptedDiscriminator(), RandomAIAgent(), rollouts_per_turn=16),
+    GenDiscAgent(ScriptedDiscriminator(), AgentGenerator(RandomAIAgent()), rollouts_per_turn=16),
     # os.path.join(get_experiments_directory(), "conv_big", "checkpoints", "iter_200")
 ]
 # Eval against random up until this iteration
-EVAL_VS_RANDOM_UNTIL = 20
+EVAL_VS_RANDOM_UNTIL = 10
 EVAL_TRIALS = 100
 
 # Frequency of storing a saved agent
 CHECKPOINT_EVERY = 4
 
 # During evals, run this many times extra rollouts compared to during rollout generation
-EVAL_COMPUTE_BOOST = 4
+EVAL_COMPUTE_BOOST = 1
 
 # Model Size
 DEPTH = 2
@@ -250,8 +251,8 @@ def main(run_name):
                 rollout_stats['gen/rollouts/actions'] += num_actions
                 with metrics_logger.timing('training/gen'):
                     logger.info("Starting training generator...")
-                    for epoch in range(1):  # Always use 1 epoch for generator since there's so much data.
-                        logger.info(f"  Epoch {epoch}/{SAMPLE_REUSE}...")
+                    for epoch in range(GEN_SAMPLE_REUSE):
+                        logger.info(f"  Epoch {epoch}/{GEN_SAMPLE_REUSE}...")
                         all_idxes = np.random.permutation(num_actions)
                         n_batches = num_actions // GEN_BATCH_SIZE
                         for idx in range(n_batches):
