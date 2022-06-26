@@ -51,13 +51,19 @@ class RolloutRunner():
             if gen_info is not None:
                 # Then we're training the generator also
                 all_gen_obs.append(gen_info["obs"])
-                gen_labels = gen_info["next_maxq"]  # This is shape [actions - 1, num_games]
-                ending_labels = disc_info["all_winprobs"]  # This is shape [num_games]
-                ending_labels.expand_dims(0)
+
+                gen_labels = gen_info["next_maxq"]  # This is shape [actions_per_turn - 1, rollouts_per_turn]
+                assert gen_labels.shape == (self.agent.generator.actions_per_turn - 1, self.agent.rollouts_per_turn), gen_labels.shape
+
+                ending_labels = disc_info["all_winprobs"]  # This is shape [rollouts_per_turn]
+                ending_labels = np.expand_dims(ending_labels, axis=0)  # [1, rollouts_per_turn]
+                assert ending_labels.shape == (1, self.agent.rollouts_per_turn), ending_labels.shape
+
                 gen_labels = np.concatenate([gen_labels, ending_labels], axis=0)
+                assert gen_labels.shape == (self.agent.generator.actions_per_turn, self.agent.rollouts_per_turn), gen_labels.shape
                 all_gen_labels.append(gen_labels)
 
-                all_gen_labels.append(gen_info["next_maxq"])
+                assert gen_info["numpy_actions"].shape == (self.agent.generator.actions_per_turn, self.agent.rollouts_per_turn, 2), gen_info["numpy_actions"].shape
                 all_gen_actions.append(gen_info["numpy_actions"])
             
         winner = game.winner
@@ -83,9 +89,13 @@ class RolloutRunner():
         all_disc_labels = np.concatenate([winner_disc_labels, loser_disc_labels])
 
         if len(all_gen_obs) > 0:
+            total_turns = len(all_gen_labels) * self.agent.rollouts_per_turn * self.agent.generator.actions_per_turn
             all_gen_obs = stack_dicts(all_gen_obs)
-            all_gen_labels = np.concatenate(all_gen_labels)
-            all_gen_actions = np.concatenate(all_gen_actions)
+            all_gen_obs = {k: v.reshape(total_turns, *v.shape[2:]) for k, v in all_gen_obs.items()}
+            all_gen_labels = np.concatenate(all_gen_labels)  # shape=[actions_per_turn * turns, rollouts_per_turn]
+            all_gen_labels = all_gen_labels.reshape(total_turns) 
+            all_gen_actions = np.concatenate(all_gen_actions)  # shape=[actions_per_turn * turns, rollouts_per_turn, 2]
+            all_gen_actions = all_gen_actions.reshape(total_turns, 2)
 
         result = RolloutEpisode(
             disc_obs=all_disc_obs, 

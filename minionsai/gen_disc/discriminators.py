@@ -2,7 +2,7 @@ import abc
 from audioop import reverse
 from typing import Dict, List, Optional, Tuple
 
-from ..game_util import adjacent_zombies, equal_np_dicts, stack_dicts
+from ..game_util import adjacent_zombies, equal_np_dicts, sigmoid, stack_dicts
 from ..unit_type import NECROMANCER, ZOMBIE, flexible_unit_type
 from ..engine import Game, dist, print_n_games
 
@@ -116,9 +116,6 @@ class HumanDiscriminator(BaseDiscriminator):
             print("Invalid option")
             return self.display_and_choose(sorted_idxes, logprobs, games)
 
-def sigmoid(x):
-    return 1 / (1 + np.exp(-x))
-
 class QDiscriminator(BaseDiscriminator):
     def __init__(self, translator, model, epsilon_greedy):
         self.translator = translator
@@ -129,7 +126,8 @@ class QDiscriminator(BaseDiscriminator):
         obs_list = [self.translator.translate(g) for g in games]
 
         obs = stack_dicts(obs_list)
-        logprobs = self.model(obs).detach().cpu().numpy()
+        logprobs = self.model(obs).detach().cpu().numpy()  # shape (n_options, 1)
+        logprobs = np.squeeze(logprobs)
         result = self.sample(logprobs)
         max_logprob = np.max(logprobs)
         max_winprob = sigmoid(max_logprob).item()
