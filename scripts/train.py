@@ -30,18 +30,18 @@ from minionsai.metrics_logger import metrics_logger
 
 logger = logging.getLogger(__name__)
 
-TRAIN_GENERATOR = False
-TRAIN_DISCRIMINATOR = True
+TRAIN_GENERATOR = True
+TRAIN_DISCRIMINATOR = False
 
 # How many rollouts do we run of each turn before picking the best
-ROLLOUTS_PER_TURN = 64
+ROLLOUTS_PER_TURN = 16
 DISC_EPSILON_GREEDY = 0.1
 GEN_EPSILON_GREEDY = 0.1
 GEN_SAMPLING_TEMPERATURE = 0.01
 
 # How many episodes of data do we collect each iteration, before running a few epochs of optimization?
 # Potentially good to use a few times bigger EPISODES_PER_ITERATION than BATCH_SIZE, to minimize correlation within batches
-EPISODES_PER_ITERATION = 256
+EPISODES_PER_ITERATION = 16
 ROLLOUT_PROCS = 4
 
 # Once we've collected the data, how many times do we go over it for optimization (within one iteration)?
@@ -73,8 +73,9 @@ GEN_DEPTH = 1
 GEN_D_MODEL = 64 * GEN_DEPTH
 
 # Optimizer hparams
-BATCH_SIZE = EPISODES_PER_ITERATION
+DISC_BATCH_SIZE = EPISODES_PER_ITERATION
 DISC_LR = 1e-4
+GEN_BATCH_SIZE = EPISODES_PER_ITERATION * 16
 GEN_LR = 1e-4
 
 # kwargs to create a game (passed to Game)
@@ -112,7 +113,7 @@ def build_agent():
     if TRAIN_DISCRIMINATOR:
         logger.info(f"Discriminator model total parameter count: {sum(p.numel() for p in disc_model.parameters() if p.requires_grad):,}")
     if TRAIN_GENERATOR:
-            logger.info(f"Generator model total parameter count: {sum(p.numel() for p in gen_model.parameters() if p.requires_grad):,}")
+        logger.info(f"Generator model total parameter count: {sum(p.numel() for p in gen_model.parameters() if p.requires_grad):,}")
 
     agent = GenDiscAgent(discriminator, generator, rollouts_per_turn=ROLLOUTS_PER_TURN)
     return agent
@@ -211,22 +212,23 @@ def main(run_name):
                 model_mode_eval()
 
                 rollout_batch = rollout_source.get_rollouts(iteration=iteration)
-                num_turns = rollout_batch['discriminator'].labels.shape[0]
                 model_mode_train()
                 rollout_stats['rollouts/games'] += rollout_batch['discriminator'].num_games
-                rollout_stats['rollouts/turns'] += num_turns
+
 
             if TRAIN_DISCRIMINATOR:
+                disc_rollout_batch = rollout_batch['discriminator']
+                num_turns = disc_rollout_batch.labels.shape[0]
+                rollout_stats['disc/rollouts/turns'] += num_turns
                 with metrics_logger.timing('training/disc'):
                     logger.info("Starting training discriminator...")
-                    disc_rollout_batch = rollout_batch['discriminator']
                     for epoch in range(SAMPLE_REUSE):
                         logger.info(f"  Epoch {epoch}/{SAMPLE_REUSE}...")
                         all_idxes = np.random.permutation(num_turns)
-                        n_batches = num_turns // BATCH_SIZE
+                        n_batches = num_turns // DISC_BATCH_SIZE
                         for idx in range(n_batches):
-                            with metrics_logger.timing('training_batch'):
-                                batch_idxes = all_idxes[idx * BATCH_SIZE: (idx + 1) * BATCH_SIZE]
+                            with metrics_logger.timing('disc/training_batch'):
+                                batch_idxes = all_idxes[idx * DISC_BATCH_SIZE: (idx + 1) * DISC_BATCH_SIZE]
                                 batch_obs = {}
                                 for key in disc_rollout_batch.obs:
                                     batch_obs[key] = disc_rollout_batch.obs[key][batch_idxes]
@@ -240,9 +242,49 @@ def main(run_name):
                                 disc_optimizer.step()
                                 if idx in [0, n_batches // 2, n_batches - 1]:
                                     max_batch_digits = len(str(n_batches))
-                                    metrics_logger.log_metrics({f"loss/epoch_{epoch}/batch_{idx:0>{max_batch_digits}}": loss.item()})
+                                    metrics_logger.log_metrics({f"disc/loss/epoch_{epoch}/batch_{idx:0>{max_batch_digits}}": loss.item()})
                                 turns_optimized += len(batch_idxes)
-            # TODO - train genereator here
+            if TRAIN_GENERATOR:
+                gen_rollout_batch = rollout_batch['generator']
+                num_actions = gen_rollout_batch.labels.shape[0]
+                rollout_stats['gen/rollouts/actions'] += num_actions
+                with metrics_logger.timing('training/gen'):
+                    logger.info("Starting training generator...")
+                    for epoch in range(1):  # Always use 1 epoch for generator since there's so much data.
+                        logger.info(f"  Epoch {epoch}/{SAMPLE_REUSE}...")
+                        all_idxes = np.random.permutation(num_actions)
+                        n_batches = num_actions // GEN_BATCH_SIZE
+                        for idx in range(n_batches):
+                            with metrics_logger.timing('gen/training_batch'):
+                                batch_idxes = all_idxes[idx * GEN_BATCH_SIZE: (idx + 1) * GEN_BATCH_SIZE]
+                                batch_obs = {}
+                                for key in gen_rollout_batch.obs:
+                                    batch_obs[key] = gen_rollout_batch.obs[key][batch_idxes]
+                                batch_labels = gen_rollout_batch.labels[batch_idxes]
+                                batch_labels = th.from_numpy(batch_labels).to(device)
+                                assert batch_labels.shape == (GEN_BATCH_SIZE,)
+                                batch_actions = gen_rollout_batch.actions[batch_idxes]
+                                batch_actions = th.from_numpy(batch_actions).to(device)  # [batch, 2]
+                                assert batch_actions.shape == (GEN_BATCH_SIZE, 2), batch_actions.shape
+                                gen_logits = gen_model(batch_obs) # [batch, N, N]
+                                assert gen_logits.shape[0] == GEN_BATCH_SIZE and gen_logits.shape[1] == gen_logits.shape[2], gen_logits.shape
+                                # Now we need to index the taken actions into the logits.
+                                # Seems torch can only do this if we flatten first.
+                                batch_actions = batch_actions[:, 0] * gen_logits.shape[1] + batch_actions[:, 1]
+                                batch_actions = th.unsqueeze(batch_actions, 1)
+                                gen_logits = gen_logits.view(GEN_BATCH_SIZE, -1)
+
+                                selected_logits = th.gather(gen_logits, 1, batch_actions)
+                                selected_logits = th.squeeze(selected_logits, 1)
+                                assert selected_logits.shape == (GEN_BATCH_SIZE, ), selected_logits.shape
+                                gen_optimizer.zero_grad()
+                                loss = th.nn.BCEWithLogitsLoss()(selected_logits, batch_labels)
+                                loss.backward()
+                                gen_optimizer.step()
+                                if idx in [0, n_batches // 2, n_batches - 1]:
+                                    max_batch_digits = len(str(n_batches))
+                                    metrics_logger.log_metrics({f"gen/loss/epoch_{epoch}/batch_{idx:0>{max_batch_digits}}": loss.item()})
+                                gen_actions_optimized += len(batch_idxes)
             logger.info(f"Iteration {iteration} complete.")
             iteration += 1
             # agent.epsilon_greedy = EPSILON_GREEEDY * (1 - 0.8 * iteration / MAX_ITERATIONS)

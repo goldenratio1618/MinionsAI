@@ -43,9 +43,10 @@ class OptimizerRolloutSource(abc.ABC):
                 rollout_episode = self.next_rollout(iteration, idx)
                 disc_obs.extend(rollout_episode.disc_obs)
                 disc_labels.extend(rollout_episode.disc_labels)
-                gen_obs.append(rollout_episode.gen_obs)  # Append instead of extend here, since it's a dict. We'll deal with stacking them later.
-                gen_labels.extend(rollout_episode.gen_labels)
-                gen_actions.extend(rollout_episode.gen_actions)
+                gen_obs.append(rollout_episode.gen_obs)
+                assert rollout_episode.gen_actions.shape == (rollout_episode.gen_labels.shape[0], 2)
+                gen_labels.append(rollout_episode.gen_labels)
+                gen_actions.append(rollout_episode.gen_actions)
                 games += 1
                 for color, this_color_metrics in enumerate(rollout_episode.metrics):
                     for key in set(metrics_accumulated[color].keys()).union(set(this_color_metrics.keys())):
@@ -59,6 +60,9 @@ class OptimizerRolloutSource(abc.ABC):
         # If we aren't training the generator, they're all empty
         if len(gen_obs[0]) > 0:
             gen_obs = {k: np.concatenate([s[k] for s in gen_obs], axis=0) for k in gen_obs[0]}
+            gen_labels = np.concatenate(gen_labels, axis=0)
+            gen_actions = np.concatenate(gen_actions, axis=0)
+            assert gen_actions.shape == (gen_labels.shape[0], 2), gen_actions.shape
             # TODO expand add_symmetries function to support actions.
             # gen_obs, gen_labels = add_symmetries(gen_obs, gen_labels, gen_actions)
 
