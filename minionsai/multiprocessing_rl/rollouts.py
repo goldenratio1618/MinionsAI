@@ -42,7 +42,7 @@ class OptimizerRolloutSource(abc.ABC):
                 rollout_episode = self.next_rollout(iteration, idx)
                 disc_obs.extend(rollout_episode.disc_obs)
                 disc_labels.extend(rollout_episode.disc_labels)
-                gen_obs.extend(rollout_episode.gen_obs)
+                gen_obs.append(rollout_episode.gen_obs)  # Append instead of extend here, since it's a dict. We'll deal with stacking them later.
                 gen_labels.extend(rollout_episode.gen_labels)
                 games += 1
                 for color, this_color_metrics in enumerate(rollout_episode.metrics):

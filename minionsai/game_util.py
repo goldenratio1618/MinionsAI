@@ -11,7 +11,7 @@ def adjacent_zombies(board: Board, loc, color):
                 result.append((i, j))
         return result
 
-def stack_dicts(dicts):
+def stack_dicts(dicts, add_new_axis=False):
     """
     Turns a list of dicts of numpy arrays into a single dict of arrays stacked along the first axis
     Assumes all entries have the same keys
@@ -19,7 +19,10 @@ def stack_dicts(dicts):
     keys = list(dicts[0].keys())
     result = {}
     for key in keys:
-        result[key] = np.concatenate([d[key] for d in dicts])
+        if add_new_axis:
+            result[key] = np.stack([d[key] for d in dicts], axis=0)
+        else:
+            result[key] = np.concatenate([d[key] for d in dicts])
     return result
 
 def equal_np_dicts(x, y):
@@ -33,3 +36,6 @@ def seed_everything(seed):
     np.random.seed(seed)
     th.manual_seed(seed)
     th.cuda.manual_seed_all(seed)
+    
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))

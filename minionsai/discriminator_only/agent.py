@@ -1,4 +1,4 @@
-from ..game_util import equal_np_dicts
+from ..game_util import equal_np_dicts, sigmoid
 from ..engine import print_n_games
 from ..experiment_tooling import find_device
 from .model import MinionsDiscriminator
@@ -8,9 +8,6 @@ import numpy as np
 from .translator import Translator
 import torch as th
 import json
-
-def sigmoid(x):
-    return 1 / (1 + np.exp(-x))
 
 # TODO - make this class a subclass of GenDiscAgent
 # Hard part is getting save / load to work.

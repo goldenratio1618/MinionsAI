@@ -59,3 +59,8 @@ class ActionList():
 
     def __repr__(self):
         return f"<ActionList Move Phase: {self.move_phase} ||||| Spawn Phase: {self.spawn_phase}>"
+
+    @staticmethod
+    def from_single_list(actions):
+        # TODO return ActionList from a list of single actions
+        return ActionList(actions, [])

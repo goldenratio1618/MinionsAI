@@ -3,7 +3,7 @@ import numpy as np
 from typing import Dict, List, Optional, Tuple
 import torch as th
 
-from ..game_util import stack_dicts
+from ..game_util import sigmoid, stack_dicts
 from ..engine import Game, print_n_games
 from ..action import ActionList
 from ..agent import Agent
@@ -29,6 +29,15 @@ class AgentGenerator(BaseGenerator):
             game.full_turn(action)
         return actions, games, None
 
+def argmax_last_two_indices(arr):
+    """
+    Given an array of shape [..., n, m], return the index of the maximum value in the last two dimensions.
+    Returns an int array of shape [..., 2]
+    """
+    flattened = arr.reshape(-1, arr.shape[-1] * arr.shape[-2])
+    flat_idx = np.argmax(flattened, axis=-1)
+    return np.stack([flat_idx // arr.shape[-1], flat_idx % arr.shape[-1]], axis=-1)
+
 def gumbel_sample(logits: np.ndarray, temperature) -> np.ndarray:
     """
     Sample from a Gumbel distribution.
@@ -37,12 +46,7 @@ def gumbel_sample(logits: np.ndarray, temperature) -> np.ndarray:
     Assumes the last two axes are the distribution, and any before that are batch dimensions.
     """
     argmax_from = logits - temperature * np.log(-np.log(np.random.uniform(size=logits.shape)))
-    # Now take the argmax over the last two axes
-    flattened = argmax_from.reshape(-1, logits.shape[-1] * logits.shape[-2])
-    flat_idx = np.argmax(flattened, axis=-1)
-    # now unravel to get the original idx
-    unraveled = np.unravel_index(flat_idx, logits.shape[:-2])
-    return unraveled
+    return argmax_last_two_indices(argmax_from)
 
 class QGenerator(BaseGenerator):
     def __init__(self, translator, model, sampling_temperature, epsilon_greedy, actions_per_turn=10) -> None:
@@ -73,15 +77,13 @@ class QGenerator(BaseGenerator):
         recorded_actions = [[] for _ in range(n)]
         for i in range(self.actions_per_turn):
             obs, valid_actions = self.translate_many(games)
-            logits = self.model(obs)  # shape = [n, num_things, num_things]
-            assert logits.rank == 3 and logits.shape[0] == n and logits.shape[-2] == logits.shape[-1], logits.shape
+            logits = self.model(obs).detach().cpu().numpy()  # shape = [n, num_things, num_things]
+            assert logits.ndim == 3 and logits.shape[0] == n and logits.shape[1] == logits.shape[2], (n, logits.shape)
             masked_logits = logits + (1 - valid_actions) * -np.inf  # shape = [n, num_things, num_things]
             assert masked_logits.shape == logits.shape, (masked_logits.shape, logits.shape)
-            max_winprob = th.sigmoid(th.max(th.max(masked_logits, axis=1), axis=1))  # shape = [n]
+            max_winprob = sigmoid(np.max(np.max(masked_logits, axis=1), axis=1))  # shape = [n]
             assert max_winprob.shape == (n,), max_winprob.shape
-            sampled_action_idx = self.sample(masked_logits) # shape = [n]
-            assert sampled_action_idx.shape == (n,), sampled_action_idx.shape
-            sampled_numpy_action = valid_actions[sampled_action_idx]  # shape = [n, 2]
+            sampled_numpy_action = self.sample(masked_logits) # shape = [n, 2]
             assert sampled_numpy_action.shape == (n, 2), sampled_numpy_action.shape
             sampled_action = [self.translator.untranslate_action(action) for action in sampled_numpy_action]
             
@@ -92,14 +94,16 @@ class QGenerator(BaseGenerator):
                 recorded_list.append(new_action)
                 game.process_single_action(new_action)
 
-        recorded_obs = stack_dicts(recorded_obs)  # dict of shapes [actions_per_turn, n, ...]
+        recorded_obs = stack_dicts(recorded_obs, add_new_axis=True)  # dict of shapes [actions_per_turn, n, ...]
         recorded_next_maxq = np.array(recorded_next_maxq)  # shape = [actions_per_turn, n]
         recorded_numpy_actions = np.array(recorded_numpy_actions)  # shape = [actions_per_turn, n, 2]
-        submit_actions = [ActionList(recorded) for recorded in recorded_actions]
+        submit_actions = [ActionList.from_single_list(recorded) for recorded in recorded_actions]
 
         # Shift next_maxq by 1 relative to obs, so it's properly aligned.
         recorded_next_maxq = recorded_next_maxq[1:]
 
+        for k, v in recorded_obs.items():
+            assert v.shape[:2] == (self.actions_per_turn, n), (k, v.shape)
         assert recorded_next_maxq.shape == (self.actions_per_turn - 1, n), recorded_next_maxq.shape
         assert recorded_numpy_actions.shape == (self.actions_per_turn, n, 2), recorded_numpy_actions.shape
 
@@ -115,9 +119,9 @@ class QGenerator(BaseGenerator):
 
         Returns an array of index-pairs; shape = [batch, 2]
         """
-        greedy = np.random.rand(logits.shape[:-2]) < self.epsilon_greedy
-        np.expand_dims(greedy, axis=-1)
-        np.expand_dims(greedy, axis=-1)
+        greedy = np.random.rand(*logits.shape[:-2]) < self.epsilon_greedy
+        greedy = np.expand_dims(greedy, axis=-1)
+        greedy = np.expand_dims(greedy, axis=-1)
         greedified_logits = logits + greedy * 1000
         return gumbel_sample(greedified_logits, self.sampling_temperature)
 
