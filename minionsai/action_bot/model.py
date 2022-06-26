@@ -1,7 +1,7 @@
 from minionsai.discriminator_only.model import MinionsDiscriminator
 from minionsai.engine import BOARD_SIZE
 import torch as th
-from ..unit_type import unitList
+from ..unit_type import MAX_UNIT_HEALTH, unitList
 
 # Transition = namedtuple('Transition',
 #                         ('state', 'action', 'next_state', 'reward'))
@@ -25,9 +25,9 @@ class MinionsActionBot(MinionsDiscriminator):
     def __init__(self, d_model, depth):
         super().__init__(d_model, depth)
         self.num_things = BOARD_SIZE **2 + 5
-        self.unit_embedding = th.nn.Embedding(len(unitList) * 2 * 2 * 2 * 7 + 1, d_model)
-        self.phase_embedding = th.nn.Embedding(1, d_model)
-        self.legal_moves_embedding = th.nn.Embedding(self.num_things ** 2, d_model)
+        self.unit_embedding = th.nn.Embedding(len(unitList) * 2 * 2 * 2 * MAX_UNIT_HEALTH + 1, d_model)
+        self.phase_embedding = th.nn.Embedding(2, d_model)
+        # self.legal_moves_embedding = th.nn.Embedding(self.num_things ** 2, d_model)
         self.input_linear1 = th.nn.Linear(d_model, d_model)
         self.input_linear2 = th.nn.Linear(d_model, d_model)
         # self.money_embedding = th.nn.Embedding(max_money_emb, d_model)
@@ -78,8 +78,8 @@ class MinionsActionBot(MinionsDiscriminator):
         opp_money_emb = self.opp_money_embedding(obs['opp_money'])
         score_diff_emb = self.score_diff_embedding(obs['score_diff'])
         phase_emb = self.phase_embedding(obs['phase'])
-        legal_actions_emb = self.legal_moves_embedding(obs['legal_actions'])
-        embs = th.cat([board_embs, money_emb, remaining_turns_emb, opp_money_emb, score_diff_emb, phase_emb, legal_actions_emb], dim=1)
+        # legal_actions_emb = self.legal_moves_embedding(obs['legal_actions'])
+        embs = th.cat([board_embs, money_emb, remaining_turns_emb, opp_money_emb, score_diff_emb, phase_emb], dim=1) # legal_actions_emb ?
         return embs
 
     def process_output_into_scalar(self, trunk_out):

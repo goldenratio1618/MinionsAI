@@ -49,7 +49,6 @@ class RolloutRunner():
             disc_obs_buffers[active_player].append(obs)
             disc_label_buffers[active_player].append(max_winprob)
             if gen_info is not None:
-                print("Not null")
                 # Then we're training the generator also
                 all_gen_obs.append(gen_info["obs"])
 

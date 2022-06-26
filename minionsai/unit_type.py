@@ -27,6 +27,7 @@ class UnitType():
 NECROMANCER = UnitType("Necromancer", 255, 0, 0, 7, persistent=True, immune=True, spawn=True, unsummoner=True)
 ZOMBIE = UnitType("Zombie", 2, 0, 1, 2, lumbering=True)
 MAX_SPEED_OR_RANGE = 1
+MAX_UNIT_HEALTH = 7
 
 unitList = [NECROMANCER, ZOMBIE]
 

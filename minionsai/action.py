@@ -62,5 +62,12 @@ class ActionList():
 
     @staticmethod
     def from_single_list(actions):
+        move_actions = []
+        spawn_actions = []
+        for action in actions:
+            if type(action) is MoveAction:
+                move_actions.append(action)
+            elif type(action) is SpawnAction:
+                spawn_actions.append(action)
         # TODO return ActionList from a list of single actions
-        return ActionList(actions, [])
+        return ActionList(move_actions, spawn_actions)

@@ -304,7 +304,7 @@ class Game():
             if action.action_type.name == ActionType.MOVE.name:
                 return self.process_single_move(action)
             elif action.action_type.name == ActionType.ADVANCE_PHASE.name:
-                self.phase = Phase.SPAWN
+                self.end_move_phase()
                 return True, None
             else:
                 raise ValueError(f"Wrong action type ({action.action_type}) for Move Phase. Did you forget to call game.end_spawn_phase() before moving on to the spawn_phase?")
@@ -312,12 +312,15 @@ class Game():
             if action.action_type.name == ActionType.SPAWN.name:
                 return self.process_single_spawn(action)
             elif action.action_type.name == ActionType.ADVANCE_PHASE.name:
-                self.phase = Phase.TURN_END
+                self.end_spawn_phase()
                 return True, None
             else:
                 raise ValueError(f"Wrong action type ({action.action_type}) for Spawn Phase.")
         elif self.phase == Phase.TURN_END:
-            raise ValueError("Tried to process actions during TURN_END phase. Did you forget to call game.next_turn() before the next player's actions?")
+            if action.action_type.name == ActionType.ADVANCE_PHASE.name:
+                return True, None
+            else:
+                raise ValueError("Tried to process actions during TURN_END phase. Did you forget to call game.next_turn() before the next player's actions?")
         else:
             raise ValueError(f"Wrong phase ({self.phase}) for processing actions.")
 
