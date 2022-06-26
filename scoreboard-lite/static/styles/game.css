@@ -1,0 +1,81 @@
+.hex {
+    float: left;
+    margin-left: 2px;
+    margin-bottom: -13px;
+}
+.hex .top {
+    width: 0;
+    border-bottom: 15px solid rgb(170, 170, 170);
+    border-left: 26px solid transparent;
+    border-right: 26px solid transparent;
+}
+.hex .middle {
+    width: 52px;
+    height: 30px;
+    background: rgb(170, 170, 170);
+}
+.hex .bottom {
+    width: 0;
+    border-top: 15px solid rgb(170, 170, 170);
+    border-left: 26px solid transparent;
+    border-right: 26px solid transparent;
+}
+
+.hex.water .top {
+    border-bottom: 15px solid rgb(59, 145, 225);
+}
+.hex.water .middle {
+    background: rgb(59, 145, 225);
+}
+.hex.water .bottom {
+    border-top: 15px solid rgb(59, 145, 225);
+}
+
+.hex.graveyard .top {
+    border-bottom: 15px solid rgb(28, 28, 28);
+}
+.hex.graveyard .middle {
+    background: rgb(28, 28, 28);
+}
+.hex.graveyard .bottom {
+    border-top: 15px solid rgb(28, 28, 28);
+}
+
+.hex.transparent .top {
+    border-bottom: 15px solid transparent;
+}
+.hex.transparent .middle {
+    text-align: center;
+    line-height: 30px;
+    background: transparent;
+}
+.hex.transparent .middle.color0 {
+    background: rgb(211, 183, 79);
+}
+.hex.transparent .middle.color1 {
+    background:rgb(187, 83, 183);
+}
+.hex.transparent .bottom {
+    border-top: 15px solid transparent;
+}
+
+.hex-row {
+    clear: left;
+}
+
+.hex-row.offset {
+    margin-left: 26px;
+}
+
+button {
+    width: 48px;
+    height: 30px;
+    margin-left: 2px;
+}
+
+.color0 {
+    background:rgb(211, 183, 79);
+}
+.color1 {
+    background:rgb(187, 83, 183);
+}
