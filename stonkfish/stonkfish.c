@@ -252,7 +252,8 @@ int main() {
     int min_dist = BOARD_SIZE * 2;
     for (int x = 0; x < BOARD_SIZE; x ++) {
       for (int y = 0; y < BOARD_SIZE; y ++) {
-        if (graveyards[x * BOARD_SIZE + y] && zombies[x * BOARD_SIZE + y] == -1
+        if (graveyards[x * BOARD_SIZE + y] 
+            && zombies[x * BOARD_SIZE + y] == -1
             && (x != xi || y != yi) && (x != xe || y != ye)) {
           int new_dist = dist(xi, yi, x, y);
           if (new_dist < min_dist) {
@@ -277,7 +278,7 @@ int main() {
       int x = adjacent_hexes[i].x;
       int y = adjacent_hexes[i].y;
       if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
-      if (zombies [x * BOARD_SIZE + y] != -1) continue;
+      if (zombies [x * BOARD_SIZE + y] != -1 && zombies [x * BOARD_SIZE + y] != color) continue;
       if ((xe == x) && (ye == y)) continue;
       int new_dist = 10 * dist(x, y, xt, yt) + dist(x, y, xc, yc);
       if (new_dist < distance) {
