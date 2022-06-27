@@ -228,7 +228,7 @@ def main(run_name):
                         all_idxes = np.random.permutation(num_turns)
                         n_batches = num_turns // DISC_BATCH_SIZE
                         for idx in range(n_batches):
-                            with metrics_logger.timing('disc/training_batch'):
+                            with metrics_logger.timing('training_batch/disc'):
                                 batch_idxes = all_idxes[idx * DISC_BATCH_SIZE: (idx + 1) * DISC_BATCH_SIZE]
                                 batch_obs = {}
                                 for key in disc_rollout_batch.obs:
@@ -256,7 +256,7 @@ def main(run_name):
                         all_idxes = np.random.permutation(num_actions)
                         n_batches = num_actions // GEN_BATCH_SIZE
                         for idx in range(n_batches):
-                            with metrics_logger.timing('gen/training_batch'):
+                            with metrics_logger.timing('training_batch/gen'):
                                 batch_idxes = all_idxes[idx * GEN_BATCH_SIZE: (idx + 1) * GEN_BATCH_SIZE]
                                 batch_obs = {}
                                 for key in gen_rollout_batch.obs:
