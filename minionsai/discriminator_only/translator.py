@@ -112,7 +112,7 @@ class Translator():
                         continue
                     x1, y1 = convert_loc_to_pos(i)
                     x2, y2 = convert_loc_to_pos(j)
-                    if abs(x1-x2) <= MAX_SPEED_OR_RANGE and abs(y1-y2) <= MAX_SPEED_OR_RANGE:
+                    if abs(x1-x2) <= MAX_SPEED_OR_RANGE and abs(y1-y2) <= MAX_SPEED_OR_RANGE and i != j:
                         possibly_legal[i,j] = True
         return possibly_legal
 
