@@ -1,9 +1,14 @@
 import pickle
+
+from ..engine import print_n_games
 from .generator import BaseGenerator
 from .discriminators import BaseDiscriminator
 from ..agent import Agent, RandomAIAgent
 import os
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 class GenDiscAgent(Agent):
     """
@@ -23,6 +28,18 @@ class GenDiscAgent(Agent):
         options_action_list, options_states, generator_info = self.generator.propose_n_actions(game, self.rollouts_per_turn)
 
         best_option_idx, discriminator_info = self.discriminator.choose_option(options_states)
+        if self.verbose_level >= 1:
+            print("Generated choices:")
+            print_n_games(options_states[:8])
+            print("|".join([f"  pwin={p:.1%}".ljust(15) for p in discriminator_info.get('all_winprobs', [0] * len(options_states))[:8]]))
+        if self.verbose_level >= 2 and len(options_states) > 8:
+            print_n_games(options_states[8:16])
+            print("|".join([f"  pwin={p:.1%}".ljust(15) for p in discriminator_info.get('all_winprobs', [0] * len(options_states))[8:16]]))
+
+        if self.verbose_level >= 1:
+            logger.info(f"Chosen option: {best_option_idx}")
+
+
         best_option = options_action_list[best_option_idx]
         return best_option, generator_info, discriminator_info
 
