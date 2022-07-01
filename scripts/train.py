@@ -27,17 +27,19 @@ import numpy as np
 import os
 import logging
 from minionsai.metrics_logger import metrics_logger
+import tqdm
 
 logger = logging.getLogger(__name__)
 
 TRAIN_GENERATOR = True
 TRAIN_DISCRIMINATOR = False
+LOAD_DISCRIMINAOTR_MODEL = os.path.join(get_experiments_directory(), "conv_big", "checkpoints", "iter_396", "agent", "weights.pt")
 
 # How many rollouts do we run of each turn before picking the best
 ROLLOUTS_PER_TURN = 16
 DISC_EPSILON_GREEDY = 0.1
-GEN_EPSILON_GREEDY = 0.1
-GEN_SAMPLING_TEMPERATURE = 0.1
+GEN_EPSILON_GREEDY = 0.04  # (1 - 0.04)^10 ~ 66%
+GEN_SAMPLING_TEMPERATURE = 0.03
 
 # How many episodes of data do we collect each iteration, before running a few epochs of optimization?
 # Potentially good to use a few times bigger EPISODES_PER_ITERATION than BATCH_SIZE, to minimize correlation within batches
@@ -77,7 +79,7 @@ GEN_D_MODEL = 64 * GEN_DEPTH
 DISC_BATCH_SIZE = EPISODES_PER_ITERATION
 DISC_LR = 1e-4
 GEN_BATCH_SIZE = EPISODES_PER_ITERATION * 16
-GEN_LR = 1e-4
+GEN_LR = 2e-4
 
 # kwargs to create a game (passed to Game)
 game_kwargs = {'symmetrize': False}
@@ -108,10 +110,18 @@ def build_agent():
 
         disc_translator = Translator("discriminator")
         discriminator = QDiscriminator(translator=disc_translator, model=disc_model, epsilon_greedy=DISC_EPSILON_GREEDY)
-    else:
+    elif LOAD_DISCRIMINAOTR_MODEL is None:
         discriminator = ScriptedDiscriminator()
+    else:
+        disc_model = MinionsDiscriminator(d_model=D_MODEL, depth=DEPTH)
+        disc_model.to(find_device())
+        disc_model.load_state_dict(th.load(LOAD_DISCRIMINAOTR_MODEL, map_location=find_device()))
+        discriminator = QDiscriminator(
+            model=disc_model, 
+            translator=Translator("discriminator"),
+            epsilon_greedy=0.0)
 
-    if TRAIN_DISCRIMINATOR:
+    if TRAIN_DISCRIMINATOR or LOAD_DISCRIMINAOTR_MODEL:
         logger.info(f"Discriminator model total parameter count: {sum(p.numel() for p in disc_model.parameters() if p.requires_grad):,}")
     if TRAIN_GENERATOR:
         logger.info(f"Generator model total parameter count: {sum(p.numel() for p in gen_model.parameters() if p.requires_grad):,}")
@@ -175,7 +185,8 @@ def main(run_name):
     if ROLLOUT_PROCS == 1:
         rollout_source = InProcessRolloutSource(EPISODES_PER_ITERATION, game_kwargs, agent)
     else:
-        rollout_source = MultiProcessRolloutSource(build_agent, agent, EPISODES_PER_ITERATION, game_kwargs, ROLLOUT_PROCS)
+        rollout_source = MultiProcessRolloutSource(build_agent, agent, EPISODES_PER_ITERATION, game_kwargs, ROLLOUT_PROCS, 
+                                    train_generator=TRAIN_GENERATOR, train_discriminator=TRAIN_DISCRIMINATOR)
 
     iteration = 0
     turns_optimized = 0
@@ -193,7 +204,9 @@ def main(run_name):
                     logger.info("Saving checkpoint...")
                     # Save with more rollouts_per_turn. TODO - clean up this hack.
                     agent.rollouts_per_turn = ROLLOUTS_PER_TURN * EVAL_COMPUTE_BOOST
+                    model_mode_eval()
                     agent.save(os.path.join(checkpoint_dir, f"iter_{iteration}"), copy_code_from=code_dir)
+                    model_mode_train()
                     agent.rollouts_per_turn = ROLLOUTS_PER_TURN
 
             metrics_logger.log_metrics(rollout_stats)
@@ -255,7 +268,7 @@ def main(run_name):
                         logger.info(f"  Epoch {epoch}/{GEN_SAMPLE_REUSE}...")
                         all_idxes = np.random.permutation(num_actions)
                         n_batches = num_actions // GEN_BATCH_SIZE
-                        for idx in range(n_batches):
+                        for idx in tqdm.tqdm(range(n_batches)):
                             with metrics_logger.timing('training_batch/gen'):
                                 batch_idxes = all_idxes[idx * GEN_BATCH_SIZE: (idx + 1) * GEN_BATCH_SIZE]
                                 batch_obs = {}
