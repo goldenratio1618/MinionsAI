@@ -122,6 +122,48 @@ location best_zombie_hex(int xi, int yi, int color, location enemy_captain, loca
   return best_hex;
 }
 
+location best_zombie_hex_spawn(int xi, int yi, int color, location enemy_captain, location own_captain,
+    int * graveyards, int * zombies) {
+  int xe = enemy_captain.x, ye = enemy_captain.y;
+  int best_x = -1, best_y = -1;
+
+  location zombie_loc;
+  zombie_loc.x = xi;
+  zombie_loc.y = yi;
+  location adjacent_hexes[6];
+  get_adjacent_hexes(adjacent_hexes, &zombie_loc);
+  
+  int best_dist = BOARD_SIZE * 2;
+
+  for (int i = 0; i < 6; i ++) {
+    int x = adjacent_hexes[i].x;
+    int y = adjacent_hexes[i].y;
+    if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
+    if (zombies[x * BOARD_SIZE + y] != -1) continue;
+    if (x == xe && y == ye) continue;
+    // check new location to make sure it's safe
+    location new_neighbors[6];
+    get_adjacent_hexes(new_neighbors, adjacent_hexes + i);
+    int adjacent_zombies = 0;
+    for (int j = 0; j < 6; j ++) {
+      int nx = new_neighbors[j].x;
+      int ny = new_neighbors[j].y;
+      if (nx < 0 || nx >= BOARD_SIZE || ny < 0 || ny >= BOARD_SIZE) continue;
+      if (zombies[nx * BOARD_SIZE + ny] == 1 - color) adjacent_zombies ++;
+    }
+    if (adjacent_zombies >= 2) continue;
+    int new_dist = dist(x, y, xe, ye);
+    if (new_dist >= best_dist) continue;
+    best_dist = new_dist;
+    best_x = x;
+    best_y = y;
+  }
+  location best_hex;
+  best_hex.x = best_x;
+  best_hex.y = best_y;
+  return best_hex;
+}
+
 // return score for given hex
 // metric: weighted sum of inverse distances to graveyards, enemy captain, and board center
 double evaluate_hex(int x, int y, location enemy_captain, location own_captain,
@@ -354,6 +396,7 @@ int main() {
     location new_loc;
     new_loc.x = xf;
     new_loc.y = yf;
+    own_captain = new_loc;
 
     // attack enemy zombies with captain
     get_adjacent_hexes(adjacent_hexes, &new_loc);
@@ -390,31 +433,9 @@ int main() {
     int best_x, best_y;
     for (int j = 0; j < 6; j++) {
       if (money[color] < 2) break;
-      best_x = -1;
-      int best_dist = BOARD_SIZE * 2;
-      for (int i = 0; i < 6; i ++) {
-        int x = adjacent_hexes[i].x;
-        int y = adjacent_hexes[i].y;
-        if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
-        if (zombies[x * BOARD_SIZE + y] != -1) continue;
-        if (x == xe && y == ye) continue;
-        // check new location to make sure it's safe
-        location new_neighbors[6];
-        get_adjacent_hexes(new_neighbors, adjacent_hexes + i);
-        int adjacent_zombies = 0;
-        for (int j = 0; j < 6; j ++) {
-          int nx = new_neighbors[j].x;
-          int ny = new_neighbors[j].y;
-          if (nx < 0 || nx >= BOARD_SIZE || ny < 0 || ny >= BOARD_SIZE) continue;
-          if (zombies[nx * BOARD_SIZE + ny] == 1 - color) adjacent_zombies ++;
-        }
-        if (adjacent_zombies >= 2) continue;
-        int new_dist = dist(x, y, xe, ye);
-        if (new_dist >= best_dist) continue;
-        best_dist = new_dist;
-        best_x = x;
-        best_y = y;
-      }
+      location target = best_zombie_hex(xf, yf, color, enemy_captain, own_captain, graveyards, zombies);
+      best_x = target.x;
+      best_y = target.y;
       if (best_x == -1) break;
       printf("1 %d %d\n", best_x, best_y);
       zombies[best_x * BOARD_SIZE + best_y] = color;
