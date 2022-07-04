@@ -1,3 +1,6 @@
+MAX_SPEED_OR_RANGE = 1
+MAX_UNIT_HEALTH = 7
+
 class UnitType():
     def __init__(self, name, cost, rebate, attack, defense, speed=1, attack_range=1, persistent=False, immune=False, max_stack=1, spawn=False, blink=False, unsummoner=False, deadly=False, flurry=False, flying=False, lumbering=False, terrain_ability=0):
         self.name = name
@@ -29,8 +32,7 @@ class UnitType():
 
 NECROMANCER = UnitType("Necromancer", 255, 0, 0, 7, persistent=True, immune=True, spawn=True, unsummoner=True)
 ZOMBIE = UnitType("Zombie", 2, 0, 1, 2, lumbering=True)
-MAX_SPEED_OR_RANGE = 1
-MAX_UNIT_HEALTH = 7
+
 
 unitList = [NECROMANCER, ZOMBIE]
 
