@@ -58,70 +58,6 @@ void set_value(int * board, int value) {
     board[i] = value;
 }
 
-location best_zombie_hex(int xi, int yi, int color, location enemy_captain, location own_captain,
-    int * graveyards, int * zombies) {
-  location zombie_loc;
-  zombie_loc.x = xi;
-  zombie_loc.y = yi;
-  location adjacent_hexes[6];
-  get_adjacent_hexes(adjacent_hexes, &zombie_loc);
-
-  int xe, ye, xt, yt, xf, yf, xc, yc;
-  xt = xe = enemy_captain.x;
-  yt = ye = enemy_captain.y;
-  xc = yc = (BOARD_SIZE - 1)/2;
-  xf = yf = -1;
-  // look for unoccupied graveyard and set nearest one to target
-  int min_dist = BOARD_SIZE * 2;
-  for (int x = 0; x < BOARD_SIZE; x ++) {
-    for (int y = 0; y < BOARD_SIZE; y ++) {
-      if (graveyards[x * BOARD_SIZE + y] 
-          && zombies[x * BOARD_SIZE + y] == -1
-          && (x != own_captain.x || y != own_captain.y) && (x != xe || y != ye)) {
-        int new_dist = dist(xi, yi, x, y);
-        if (new_dist < min_dist) {
-          min_dist = new_dist;
-          xt = x;
-          yt = y;
-        }
-      }
-    }
-  }
-  
-  int distance = 100 * BOARD_SIZE;
-  for (int i = 0; i < 6; i ++) {
-    int x = adjacent_hexes[i].x;
-    int y = adjacent_hexes[i].y;
-    if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
-    if (zombies[x * BOARD_SIZE + y] == -1 
-        && (enemy_captain.x != x || enemy_captain.y != y)
-        && (own_captain.x != x || own_captain.y != y)) {
-      // check new location to make sure it's safe
-      location new_neighbors[6];
-      get_adjacent_hexes(new_neighbors, adjacent_hexes + i);
-      int adjacent_zombies = 0;
-      for (int j = 0; j < 6; j ++) {
-        int nx = new_neighbors[j].x;
-        int ny = new_neighbors[j].y;
-        if (nx < 0 || nx >= BOARD_SIZE || ny < 0 || ny >= BOARD_SIZE) continue;
-        if (zombies[nx * BOARD_SIZE + ny] == 1 - color) adjacent_zombies ++;
-      }
-      if (adjacent_zombies < 2) {
-        int new_dist = 10 * dist(x, y, xt, yt) + dist(x, y, xc, yc);
-        if (new_dist < distance) {
-          distance = new_dist;
-          xf = x;
-          yf = y;
-        }
-      }
-    }
-  }
-  location best_hex;
-  best_hex.x = xf;
-  best_hex.y = yf;
-  return best_hex;
-}
-
 // return score for given hex
 // metric: weighted sum of inverse distances to graveyards, enemy captain, and board center
 double evaluate_hex(int x, int y, location enemy_captain, location own_captain,
@@ -129,7 +65,7 @@ double evaluate_hex(int x, int y, location enemy_captain, location own_captain,
   double graveyard_score = 1;
   double enemy_captain_score = 0.1;
   double own_captain_score = 0.0;
-  double center_score = 0.0;
+  double center_score = 0.01;
   double epsilon = 1e-1; // for regulating 1/0
 
   double score = 0;
@@ -152,6 +88,51 @@ double evaluate_hex(int x, int y, location enemy_captain, location own_captain,
   score += 1.0 / (dist(x, y, (BOARD_SIZE - 1) / 2, (BOARD_SIZE - 1)/2) + epsilon) * center_score;
 
   return score;
+}
+
+location best_zombie_hex(int xi, int yi, int color, location enemy_captain, location own_captain,
+    int * graveyards, int * zombies) {
+  location zombie_loc;
+  zombie_loc.x = xi;
+  zombie_loc.y = yi;
+  location adjacent_hexes[6];
+  get_adjacent_hexes(adjacent_hexes, &zombie_loc);
+
+  int xf, yf;
+  xf = yf = -1;
+  // look for unoccupied graveyard and set nearest one to target
+  double score = 0;
+  for (int i = 0; i < 6; i ++) {
+    int x = adjacent_hexes[i].x;
+    int y = adjacent_hexes[i].y;
+    if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
+    if (zombies[x * BOARD_SIZE + y] == -1 
+        && (enemy_captain.x != x || enemy_captain.y != y)
+        && (own_captain.x != x || own_captain.y != y)) {
+      // check new location to make sure it's safe
+      location new_neighbors[6];
+      get_adjacent_hexes(new_neighbors, adjacent_hexes + i);
+      int adjacent_zombies = 0;
+      for (int j = 0; j < 6; j ++) {
+        int nx = new_neighbors[j].x;
+        int ny = new_neighbors[j].y;
+        if (nx < 0 || nx >= BOARD_SIZE || ny < 0 || ny >= BOARD_SIZE) continue;
+        if (zombies[nx * BOARD_SIZE + ny] == 1 - color) adjacent_zombies ++;
+      }
+      if (adjacent_zombies < 2) {
+        double new_score = evaluate_hex(x, y, enemy_captain, own_captain, graveyards, zombies);
+        if (new_score > score) {
+          score = new_score;
+          xf = x;
+          yf = y;
+        }
+      }
+    }
+  }
+  location best_hex;
+  best_hex.x = xf;
+  best_hex.y = yf;
+  return best_hex;
 }
 
 int main() {
