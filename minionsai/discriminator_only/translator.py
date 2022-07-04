@@ -1,11 +1,7 @@
 
 
 from functools import lru_cache
-from operator import truediv
-from tkinter.tix import MAX
-from turtle import end_fill
 from typing import List
-from xmlrpc.client import Boolean
 
 from minionsai.action import AdvancePhaseAction, MoveAction, SpawnAction
 from ..engine import Game, BOARD_SIZE, Phase
@@ -130,8 +126,7 @@ class Translator():
                         if game.phase != Phase.SPAWN: 
                             continue
                         # spawn action
-                        x2, y2 = convert_loc_to_pos(j)
-                        act = SpawnAction(ZOMBIE, (x2,y2))
+                        act = self.untranslate_action((i,j))
                         if game.process_single_spawn(act, False)[0]:
                             legal[i,j] = True
                     else:
@@ -139,9 +134,7 @@ class Translator():
                         if game.phase != Phase.MOVE:
                             continue
                         # move action
-                        x1, y1 = convert_loc_to_pos(i)
-                        x2, y2 = convert_loc_to_pos(j)
-                        act = MoveAction((x1,y1), (x2,y2))
+                        act = self.untranslate_action((i,j))
                         if game.process_single_move(act, False)[0]:
                             legal[i,j] = True
         return legal
@@ -172,9 +165,6 @@ class Translator():
         assert not (untranslated_action is None)
         return untranslated_action
 
-    # def process_action(self, game, action):
-    #     game.process_single_action(action)
-    #     return 1
 
     @staticmethod
     def symmetries(obs):

@@ -50,7 +50,7 @@ class AdvancePhaseAction(Action):
         super().__init__(ActionType.ADVANCE_PHASE)
 
     def __repr__(self):
-        return "Advance phase."
+        return f"<AdvancePhaseAction>"
 
 class ActionList():
     def __init__(self, move_phase: List[Action], spawn_phase: List[Action]):
@@ -69,5 +69,4 @@ class ActionList():
                 move_actions.append(action)
             elif type(action) is SpawnAction:
                 spawn_actions.append(action)
-        # TODO return ActionList from a list of single actions
         return ActionList(move_actions, spawn_actions)

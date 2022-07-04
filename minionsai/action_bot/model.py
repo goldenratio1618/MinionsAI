@@ -24,10 +24,8 @@ from ..unit_type import MAX_UNIT_HEALTH, unitList
 class MinionsActionBot(MinionsDiscriminator):
     def __init__(self, d_model, depth):
         super().__init__(d_model, depth)
-        self.num_things = BOARD_SIZE **2 + 5
         self.unit_embedding = th.nn.Embedding(len(unitList) * 2 * 2 * 2 * MAX_UNIT_HEALTH + 1, d_model)
         self.phase_embedding = th.nn.Embedding(2, d_model)
-        # self.legal_moves_embedding = th.nn.Embedding(self.num_things ** 2, d_model)
         self.input_linear1 = th.nn.Linear(d_model, d_model)
         self.input_linear2 = th.nn.Linear(d_model, d_model)
         # self.money_embedding = th.nn.Embedding(max_money_emb, d_model)

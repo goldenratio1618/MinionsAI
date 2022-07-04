@@ -20,6 +20,9 @@ class UnitType():
         self.terrain_ability = terrain_ability
         self.cost = cost
         self.rebate = rebate
+        assert(self.speed <= MAX_SPEED_OR_RANGE)
+        assert(self.range <= MAX_SPEED_OR_RANGE)
+        assert(self.defense <= MAX_UNIT_HEALTH)
 
     def __eq__(self, __o: object) -> bool:
         return self.name == __o.name
