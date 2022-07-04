@@ -37,6 +37,7 @@ class RolloutRunner():
         all_gen_obs = []
         all_gen_labels = []
         all_gen_actions = []
+        unique_ending_labels = []
         while True:
             game.next_turn()
             if game.done:
@@ -44,10 +45,13 @@ class RolloutRunner():
             active_player = game.active_player_color
             actionlist, gen_info, disc_info = self.agent.act_with_info(game)
             game.full_turn(actionlist)
-            obs = disc_info["chosen_final_obs"]
-            max_winprob = disc_info["max_winprob"]
-            disc_obs_buffers[active_player].append(obs)
-            disc_label_buffers[active_player].append(max_winprob)
+            if "chosen_final_obs" in disc_info:
+                # In this case we're optimizing the discriminator.
+                # TODO have a better way to know if we're optimizing than checking info dict keys.
+                disc_obs = disc_info["chosen_final_obs"]
+                max_winprob = disc_info["max_winprob"]
+                disc_obs_buffers[active_player].append(disc_obs)
+                disc_label_buffers[active_player].append(max_winprob)
             if gen_info is not None:
                 # Then we're training the generator also
                 all_gen_obs.append(gen_info["obs"])
@@ -59,6 +63,12 @@ class RolloutRunner():
                 ending_labels = np.expand_dims(ending_labels, axis=0)  # [1, rollouts_per_turn]
                 assert ending_labels.shape == (1, self.agent.rollouts_per_turn), ending_labels.shape
 
+                # Count how amny unique states the discriminator chose from.
+                # We assume that different states would have slightly different win probabilities.
+                rounded_ending_labels = np.round(ending_labels, decimals=5)
+                this_unique_ending_labels = np.unique(rounded_ending_labels).size / rounded_ending_labels.size
+                unique_ending_labels.append(this_unique_ending_labels)
+
                 gen_labels = np.concatenate([gen_labels, ending_labels], axis=0)
                 assert gen_labels.shape == (self.agent.generator.actions_per_turn, self.agent.rollouts_per_turn), gen_labels.shape
                 all_gen_labels.append(gen_labels)
@@ -68,9 +78,10 @@ class RolloutRunner():
             
         winner = game.winner
 
-        metrics = (game.get_metrics(0), game.get_metrics(1))
-        metrics[winner]["pfinal"] = disc_label_buffers[winner][-1]
-        metrics[1 - winner]["pfinal"] = 1 - disc_label_buffers[1 - winner][-1]
+        player_metrics = (game.get_metrics(0), game.get_metrics(1))
+        if len(disc_obs_buffers[0]) > 0:
+            player_metrics[winner]["pfinal"] = disc_label_buffers[winner][-1]
+            player_metrics[1 - winner]["pfinal"] = 1 - disc_label_buffers[1 - winner][-1]
 
         winner_obs = disc_obs_buffers[winner]
         loser_obs = disc_obs_buffers[1 - winner]
@@ -79,7 +90,6 @@ class RolloutRunner():
         disc_label_buffers[1 - winner].append(0)
         winner_disc_labels = disc_label_buffers[winner][1:]
         loser_disc_labels = disc_label_buffers[1 - winner][1:]
-
 
         if self.hparams.get('lambda', None) is not None:
             winner_disc_labels = smooth_labels(winner_disc_labels, self.hparams['lambda'])
@@ -104,6 +114,7 @@ class RolloutRunner():
             gen_obs=all_gen_obs,
             gen_labels=all_gen_labels,
             gen_actions=all_gen_actions,
-            metrics=metrics)
+            global_metrics = {"unique_ending_labels": np.mean(unique_ending_labels)},
+            player_metrics=player_metrics)
 
         return result

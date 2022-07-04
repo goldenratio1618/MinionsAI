@@ -48,3 +48,15 @@ def test_gumbel_sample_t_medium():
         assert counts[(2, 0, j, 0)] > 0
     # Check we got more of the more likely thing:
     assert counts[(2, 0, 1, 0)] > counts[(2, 0, 2, 0)]
+
+def test_gumbel_sample_masks():
+    array = np.array([
+        [[-1], [1], [10]],
+        [[-4.2], [-np.inf], [-4]]])
+    counts = defaultdict(int)
+    for _ in range(100):
+        output = gumbel_sample(array, temperature=np.random.random())
+        counts[tuple(output.flatten())] += 1
+    # Check that we never sampled the inf in teh second row
+    for i in range(3):
+        assert counts[(i, 0, 1, 0)] == 0

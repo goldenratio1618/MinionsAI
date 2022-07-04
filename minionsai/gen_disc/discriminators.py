@@ -44,7 +44,8 @@ class ScriptedDiscriminator(BaseDiscriminator):
         return result
 
     def choose_option(self, games: List[Game]) -> Tuple[int, Optional[Dict]]:
-        return np.argmax([self.score(g) for g in games]), None
+        scores = [sigmoid(self.score(g)) for g in games]
+        return np.argmax(scores), {"all_winprobs": scores}
 
 class HumanDiscriminator(BaseDiscriminator):
     def __init__(self, ncols=8, nrows=2, filter_agent=None):
