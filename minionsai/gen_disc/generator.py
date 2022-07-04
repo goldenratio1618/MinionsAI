@@ -49,13 +49,16 @@ def gumbel_sample(logits: np.ndarray, temperature) -> np.ndarray:
     return argmax_last_two_indices(argmax_from)
 
 class QGenerator(BaseGenerator):
-    def __init__(self, translator, model, sampling_temperature, epsilon_greedy, actions_per_turn=10) -> None:
+    def __init__(self, translator, model, sampling_temperature, epsilon_greedy, actions_per_turn=10, epsilon_greedy_min=0.1, epsilon_greedy_update=0.99) -> None:
         super().__init__()
         self.model = model
         self.translator = translator
         self.sampling_temperature = sampling_temperature
         self.epsilon_greedy = epsilon_greedy
         self.actions_per_turn = actions_per_turn
+        self.epsilon_greedy_min = epsilon_greedy_min
+        self.epsilon_greedy_update = epsilon_greedy_update
+        self.iter = 0
 
     def translate_many(self, games):
         obs = []
@@ -114,6 +117,9 @@ class QGenerator(BaseGenerator):
             "numpy_actions": recorded_numpy_actions,
         }
 
+    def increment_iter(self):
+        self.iter += 1
+    
     def sample(self, logits: np.ndarray) -> int:
         """
         Samples an action from an array ([batch, things, things]) of q values
@@ -121,7 +127,7 @@ class QGenerator(BaseGenerator):
         Returns an array of index-pairs; shape = [batch, 2]
         """
         # Make a list of whether or not to be greedy for each entry inthe batch
-        greedy = np.random.rand(*logits.shape[:-2]) < self.epsilon_greedy
+        greedy = np.random.rand(*logits.shape[:-2]) < self.epsilon_greedy_min + (self.epsilon_greedy - self.epsilon_greedy_min) * (self.epsilon_greedy_update ** self.iter)
 
         # Implement greedy sampling by setting the logits to zero.
         # Can't multiply by literally zero, because many entries are masked (set to -inf)

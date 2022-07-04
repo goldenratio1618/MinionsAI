@@ -118,10 +118,13 @@ class HumanDiscriminator(BaseDiscriminator):
             return self.display_and_choose(sorted_idxes, logprobs, games)
 
 class QDiscriminator(BaseDiscriminator):
-    def __init__(self, translator, model, epsilon_greedy):
+    def __init__(self, translator, model, epsilon_greedy, epsilon_greedy_min=0.1, epsilon_greedy_update=0.99):
         self.translator = translator
         self.model = model
         self.epsilon_greedy = epsilon_greedy
+        self.epsilon_greedy_min = epsilon_greedy_min
+        self.epsilon_greedy_update = epsilon_greedy_update
+        self.iter = 0
 
     def choose_option(self, games: List[Game]) -> Tuple[int, Optional[Dict]]:
         obs_list = [self.translator.translate(g) for g in games]
@@ -134,8 +137,11 @@ class QDiscriminator(BaseDiscriminator):
         max_winprob = sigmoid(max_logprob).item()
         return result, {"max_winprob": max_winprob, "chosen_final_obs": obs_list[result], "all_winprobs": sigmoid(logprobs)}
 
+    def increment_iter(self):
+        self.iter += 1
+
     def sample(self, logprobs):
-        if np.random.random() < self.epsilon_greedy:
+        if np.random.random() < self.epsilon_greedy_min + (self.epsilon_greedy - self.epsilon_greedy_min) * (self.epsilon_greedy_update ** self.iter):
             return np.random.choice(len(logprobs))
         else:
             return np.argmax(logprobs).item()
