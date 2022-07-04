@@ -320,7 +320,7 @@ int main() {
 
     // movement: charge enemy captain
     // update: if there is >= 1 unoccupied graveyard, charge nearest one instead
-    int xi, yi, xf, yf, xe, ye, xc, yc;
+    int xi, yi, xf, yf, xe, ye;
     xi = own_captain.x;
     yi = own_captain.y;
     
@@ -329,9 +329,6 @@ int main() {
 
     xf = xi;
     yf = yi;
-
-    xc = (BOARD_SIZE - 1)/2;
-    yc = (BOARD_SIZE - 1)/2;
 
     double score = evaluate_hex(xi, yi, enemy_captain, own_captain, graveyards, zombies);
     // look for empty adjacent hex with smaller distance
