@@ -303,19 +303,28 @@ class Game():
             # which is technically a different enum type.
             if action.action_type.name == ActionType.MOVE.name:
                 return self.process_single_move(action)
+            elif action.action_type.name == ActionType.ADVANCE_PHASE.name:
+                self.end_move_phase()
+                return True, None
             else:
                 raise ValueError(f"Wrong action type ({action.action_type}) for Move Phase. Did you forget to call game.end_spawn_phase() before moving on to the spawn_phase?")
         elif self.phase == Phase.SPAWN:
             if action.action_type.name == ActionType.SPAWN.name:
                 return self.process_single_spawn(action)
+            elif action.action_type.name == ActionType.ADVANCE_PHASE.name:
+                self.end_spawn_phase()
+                return True, None
             else:
                 raise ValueError(f"Wrong action type ({action.action_type}) for Spawn Phase.")
         elif self.phase == Phase.TURN_END:
-            raise ValueError("Tried to process actions during TURN_END phase. Did you forget to call game.next_turn() before the next player's actions?")
+            if action.action_type.name == ActionType.ADVANCE_PHASE.name:
+                return True, None
+            else:
+                raise ValueError("Tried to process actions during TURN_END phase. Did you forget to call game.next_turn() before the next player's actions?")
         else:
             raise ValueError(f"Wrong phase ({self.phase}) for processing actions.")
 
-    def process_single_move(self, move_action: MoveAction) -> Tuple[bool, Optional[str]]:
+    def process_single_move(self, move_action: MoveAction, modify=True) -> Tuple[bool, Optional[str]]:
         # returns true if move is legal & succesful, false otherwise
         # Second entry is the error message if move is illegal
 
@@ -336,6 +345,8 @@ class Game():
             if distance > speed: return False, f"Move is too far ({distance} > {speed})"
             if self.board.board[xi][yi].unit.hasMoved: return False, "Unit has already moved"
             if not self.board.board[xi][yi].unit.type.flying and self.board.board[xf][yf].is_water: return False, "Unit is not flying and is trying to move to water"
+            if not modify:
+                return True, None
             self.board.board[xi][yi].unit.hasMoved = True
             if self.board.board[xi][yi].unit.type.lumbering:
                 self.board.board[xi][yi].unit.remainingAttack = 0
@@ -349,6 +360,8 @@ class Game():
             if self.board.board[xf][yf].unit.hasMoved: return False, "Swapping unit has already moved"
             if not self.board.board[xi][yi].unit.type.flying and self.board.board[xf][yf].is_water: return False, "Unit is not flying and is trying to move to water"
             if not self.board.board[xf][yf].unit.type.flying and self.board.board[xi][yi].is_water: return False, "Swapping unit is not flying and is trying to move to water"
+            if not modify:
+                return True, None
             self.board.board[xi][yi].unit.hasMoved = True
             self.board.board[xf][yf].unit.hasMoved = True
             if self.board.board[xi][yi].unit.type.lumbering:
@@ -365,6 +378,8 @@ class Game():
             if self.board.board[xi][yi].unit.remainingAttack == 0: return False, "Unit has no remaining attack"
             if distance > attack_range: return False, f"Attack is too far ({distance} > {attack_range})"
             # attacking prevents later movement
+            if not modify:
+                return True, None
             self.board.board[xi][yi].unit.hasMoved = True
             # unsummon removes non-persistent unit from board and refunds cost
             if self.board.board[xi][yi].unit.type.unsummoner and not self.board.board[xf][yf].unit.type.persistent:
@@ -390,7 +405,7 @@ class Game():
                 self.add_to_metric(self.active_player_color, "kills", 1)
         return True, None
 
-    def process_single_spawn(self, spawn_action: SpawnAction) -> Tuple[bool, Optional[str]]:
+    def process_single_spawn(self, spawn_action: SpawnAction, modify=True) -> Tuple[bool, Optional[str]]:
         # returns true if spawn is legal & succesful, false otherwise
 
         assert self.phase == Phase.SPAWN, f"Tried to spawn during phase {self.phase}"
@@ -410,6 +425,8 @@ class Game():
                     and self.board.board[ax][ay].unit.type.spawn:
                 adjacent_spawner = True
         if not adjacent_spawner: return False, "Not adjacent to spawner"
+        if not modify:
+            return True, None
         # purchase unit
         self.money[self.active_player_color] -= cost
         # add unit to board

@@ -20,12 +20,17 @@ class UnitType():
         self.terrain_ability = terrain_ability
         self.cost = cost
         self.rebate = rebate
+        assert(self.speed <= MAX_SPEED_OR_RANGE)
+        assert(self.range <= MAX_SPEED_OR_RANGE)
+        assert(self.defense <= MAX_UNIT_HEALTH)
 
     def __eq__(self, __o: object) -> bool:
         return self.name == __o.name
 
 NECROMANCER = UnitType("Necromancer", 255, 0, 0, 7, persistent=True, immune=True, spawn=True, unsummoner=True)
 ZOMBIE = UnitType("Zombie", 2, 0, 1, 2, lumbering=True)
+MAX_SPEED_OR_RANGE = 1
+MAX_UNIT_HEALTH = 7
 
 unitList = [NECROMANCER, ZOMBIE]
 

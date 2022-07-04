@@ -88,6 +88,7 @@ class RolloutRunner():
         all_disc_obs = winner_obs + loser_obs
         all_disc_labels = np.concatenate([winner_disc_labels, loser_disc_labels])
 
+
         if len(all_gen_obs) > 0:
             total_turns = len(all_gen_labels) * self.agent.rollouts_per_turn * self.agent.generator.actions_per_turn
             all_gen_obs = stack_dicts(all_gen_obs)

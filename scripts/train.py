@@ -9,6 +9,7 @@ Then agent checkpoints & logs are saved in <your experiments dir>/MinionsAI/my_r
 import argparse
 from collections import defaultdict
 import random
+from minionsai.action_bot.model import MinionsActionBot
 from minionsai.experiment_tooling import find_device, get_experiments_directory, setup_directory
 from minionsai.game_util import seed_everything
 from minionsai.gen_disc.agent import GenDiscAgent
@@ -19,7 +20,7 @@ from minionsai.multiprocessing_rl.rollouts import InProcessRolloutSource
 from minionsai.run_game import run_n_games
 from minionsai.discriminator_only.model import MinionsDiscriminator
 from minionsai.discriminator_only.translator import Translator
-from minionsai.agent import Agent, RandomAIAgent
+from minionsai.agent import Agent, CLIAgent, RandomAIAgent
 from minionsai.scoreboard_envs import ENVS
 import torch as th
 import numpy as np
@@ -29,7 +30,7 @@ from minionsai.metrics_logger import metrics_logger
 
 logger = logging.getLogger(__name__)
 
-TRAIN_GENERATOR = False
+TRAIN_GENERATOR = True
 
 # How many rollouts do we run of each turn before picking the best
 ROLLOUTS_PER_TURN = 64
@@ -40,7 +41,7 @@ GEN_SAMPLING_TEMPERATURE = 0.01
 # How many episodes of data do we collect each iteration, before running a few epochs of optimization?
 # Potentially good to use a few times bigger EPISODES_PER_ITERATION than BATCH_SIZE, to minimize correlation within batches
 EPISODES_PER_ITERATION = 256
-ROLLOUT_PROCS = 4
+ROLLOUT_PROCS = 1
 
 # Once we've collected the data, how many times do we go over it for optimization (within one iteration)?
 SAMPLE_REUSE = 2
@@ -51,11 +52,12 @@ EVAL_EVERY = 8
 EVAL_VS_PAST_ITERS = []
 # Specific agent instances to eval vs
 EVAL_VS_AGENTS = [
+    RandomAIAgent()
     # GenDiscAgent(ScriptedDiscriminator(), RandomAIAgent(), rollouts_per_turn=16),
-    os.path.join(get_experiments_directory(), "conv_big", "checkpoints", "iter_200")
+    # os.path.join(get_experiments_directory(), "conv_big", "checkpoints", "iter_200")
 ]
 # Eval against random up until this iteration
-EVAL_VS_RANDOM_UNTIL = 5
+EVAL_VS_RANDOM_UNTIL = 0
 EVAL_TRIALS = 100
 
 # Frequency of storing a saved agent
@@ -87,10 +89,10 @@ SEED = 12345
 def build_agent():
     logger.info("Creating generator...")
     if TRAIN_GENERATOR:
-        gen_model = MinionsDiscriminator(d_model=GEN_D_MODEL, depth=GEN_DEPTH)  # TODO - make generator model instead
+        gen_model = MinionsActionBot(d_model=GEN_D_MODEL, depth=GEN_DEPTH)  # TODO - make generator model instead
         logger.info("Generator model initialized:")
         logger.info(gen_model)
-        gen_translator = Translator()  # TODO - make gen translator
+        gen_translator = Translator("generator")  # TODO - make gen translator
         generator = QGenerator(model=gen_model, translator=gen_translator, sampling_temperature=GEN_SAMPLING_TEMPERATURE, epsilon_greedy=GEN_EPSILON_GREEDY)
     else:
         generator = AgentGenerator(RandomAIAgent())
@@ -101,7 +103,7 @@ def build_agent():
     logger.info(disc_model)
     logger.info(f"Discriminator model total parameter count: {sum(p.numel() for p in disc_model.parameters() if p.requires_grad):,}")
 
-    disc_translator = Translator()
+    disc_translator = Translator("discriminator")
     discriminator = QDiscriminator(translator=disc_translator, model=disc_model, epsilon_greedy=DISC_EPSILON_GREEDY)
 
     logger.info(f"Discriminator model total parameter count: {sum(p.numel() for p in disc_model.parameters() if p.requires_grad):,}")
