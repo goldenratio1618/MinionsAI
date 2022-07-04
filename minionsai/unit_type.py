@@ -24,7 +24,7 @@ class UnitType():
         self.cost = cost
         self.rebate = rebate
         assert(self.speed <= MAX_SPEED_OR_RANGE)
-        assert(self.range <= MAX_SPEED_OR_RANGE)
+        assert(self.attack_range <= MAX_SPEED_OR_RANGE)
         assert(self.defense <= MAX_UNIT_HEALTH)
 
     def __eq__(self, __o: object) -> bool:
