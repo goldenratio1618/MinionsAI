@@ -4,6 +4,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <signal.h>
+#include <stdbool.h>
 
 #define BOARD_SIZE 5
 
@@ -61,10 +62,11 @@ void set_value(int * board, int value) {
 // return score for given hex
 // metric: weighted sum of inverse distances to graveyards, enemy captain, and board center
 double evaluate_hex(int x, int y, location enemy_captain, location own_captain,
-    int * graveyards, int * zombies) {
+    int * graveyards, int * zombies, int ignore_captain) {
   double graveyard_score = 1;
   double enemy_captain_score = 0.1;
-  double own_captain_score = 0.0;
+  double own_captain_score = -0.01;
+  if (ignore_captain) own_captain_score = 0;
   double center_score = 0.01;
   double epsilon = 1e-1; // for regulating 1/0
 
@@ -120,7 +122,7 @@ location best_zombie_hex(int xi, int yi, int color, location enemy_captain, loca
         if (zombies[nx * BOARD_SIZE + ny] == 1 - color) adjacent_zombies ++;
       }
       if (adjacent_zombies < 2) {
-        double new_score = evaluate_hex(x, y, enemy_captain, own_captain, graveyards, zombies);
+        double new_score = evaluate_hex(x, y, enemy_captain, own_captain, graveyards, zombies, false);
         if (new_score > score) {
           score = new_score;
           xf = x;
@@ -311,7 +313,7 @@ int main() {
     xf = xi;
     yf = yi;
 
-    double score = evaluate_hex(xi, yi, enemy_captain, own_captain, graveyards, zombies);
+    double score = evaluate_hex(xi, yi, enemy_captain, own_captain, graveyards, zombies, true);
     // look for empty adjacent hex with smaller distance
     get_adjacent_hexes(adjacent_hexes, &own_captain);
     for (int i = 0; i < 6; i ++) {
@@ -320,7 +322,7 @@ int main() {
       if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
       if (zombies [x * BOARD_SIZE + y] != -1 && zombies [x * BOARD_SIZE + y] != color) continue;
       if ((xe == x) && (ye == y)) continue;
-      double new_score = evaluate_hex(x, y, enemy_captain, own_captain, graveyards, zombies);
+      double new_score = evaluate_hex(x, y, enemy_captain, own_captain, graveyards, zombies, false);
       if (new_score > score) {
         score = new_score;
         xf = x;
