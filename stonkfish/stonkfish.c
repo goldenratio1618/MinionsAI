@@ -313,7 +313,7 @@ int main() {
     xf = xi;
     yf = yi;
 
-    double score = evaluate_hex(xi, yi, enemy_captain, own_captain, graveyards, zombies, true);
+    double score = 0; //evaluate_hex(xi, yi, enemy_captain, own_captain, graveyards, zombies, true);
     // look for empty adjacent hex with smaller distance
     get_adjacent_hexes(adjacent_hexes, &own_captain);
     for (int i = 0; i < 6; i ++) {
@@ -322,7 +322,7 @@ int main() {
       if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
       if (zombies [x * BOARD_SIZE + y] != -1 && zombies [x * BOARD_SIZE + y] != color) continue;
       if ((xe == x) && (ye == y)) continue;
-      double new_score = evaluate_hex(x, y, enemy_captain, own_captain, graveyards, zombies, false);
+      double new_score = evaluate_hex(x, y, enemy_captain, own_captain, graveyards, zombies, true);
       if (new_score > score) {
         score = new_score;
         xf = x;
@@ -338,6 +338,18 @@ int main() {
 
     // attack enemy zombies with captain
     get_adjacent_hexes(adjacent_hexes, &new_loc);
+    // first remove zombies from graveyards
+    for (int i = 0; i < 6; i ++) {
+      int x = adjacent_hexes[i].x;
+      int y = adjacent_hexes[i].y;
+      if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
+      if (zombies [x * BOARD_SIZE + y] == 1 - color && graveyards[x * BOARD_SIZE + y]) {
+        zombies[x * BOARD_SIZE + y] = -1;
+        printf("%d %d %d %d\n", xf, yf, x, y);
+        goto CAPTAIN_END;
+      }
+    }
+    // then target other zombies
     for (int i = 0; i < 6; i ++) {
       int x = adjacent_hexes[i].x;
       int y = adjacent_hexes[i].y;
@@ -345,13 +357,14 @@ int main() {
       if (zombies [x * BOARD_SIZE + y] == 1 - color) {
         zombies[x * BOARD_SIZE + y] = -1;
         printf("%d %d %d %d\n", xf, yf, x, y);
-        break;
+        goto CAPTAIN_END;
       }
     }
 
     // end move phase
-    printf("\n");
-    fflush(stdout);
+    CAPTAIN_END:
+      printf("\n");
+      fflush(stdout);
 
     // spawn zombies on adjacent graveyards
     get_adjacent_hexes(adjacent_hexes, &new_loc);
