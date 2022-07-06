@@ -179,13 +179,13 @@ def main(run_name):
         disc_model = agent.discriminator.model
         disc_model.to(device)
         disc_optimizer = th.optim.Adam(disc_model.parameters(), lr=DISC_LR)
-        disc_scheduler = th.ExponentialLR(disc_optimizer, gamma=LR_UPDATE)
+        disc_scheduler = th.optim.lr_scheduler.ExponentialLR(disc_optimizer, gamma=LR_UPDATE)
 
     if TRAIN_GENERATOR:
         gen_model = agent.generator.model
         gen_model.to(device)
         gen_optimizer = th.optim.Adam(gen_model.parameters(), lr=GEN_LR)
-        gen_scheduler = th.ExponentialLR(gen_optimizer, gamma=LR_UPDATE)
+        gen_scheduler = th.optim.lr_scheduler.ExponentialLR(gen_optimizer, gamma=LR_UPDATE)
 
     def model_mode_eval():
         if TRAIN_DISCRIMINATOR:
