@@ -1,7 +1,6 @@
 from collections import defaultdict
 from typing import Tuple
 import multiprocessing as mp
-from minionsai.discriminator_only.agent import TrainedAgent
 
 import tqdm
 from .engine import Game
@@ -78,9 +77,6 @@ def run_n_games(game_fn, agents, n, num_threads=1, randomize_player_order=True, 
         agents = [Agent.load(agent) if isinstance(agent, str) else agent for agent in agents]
         results = [run_game_with_metrics(game_fn(), agents, randomize_player_order=randomize_player_order) for _ in iterator]
     else:
-        for agent in agents:
-            assert not isinstance(agent, TrainedAgent), "Sharing ML agents across processes is dangerous. Pass the agent path instead so that each thread will load it separately."
-
         results = []
         output_queue = mp.Queue()
         assert n % num_threads == 0, f"n must be divisible by num_threads, n={n}, num_threads={num_threads}"
