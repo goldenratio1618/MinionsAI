@@ -335,6 +335,11 @@ int main() {
     new_loc.x = xf;
     new_loc.y = yf;
     own_captain = new_loc;
+    // update map if new location contains one of your zombies
+    if (zombies[xf * BOARD_SIZE + yf] == color) {
+      zombies[xf * BOARD_SIZE + yf] = -1;
+      zombies[xi * BOARD_SIZE + yi] = 2;
+    }
 
     // attack enemy zombies with captain
     get_adjacent_hexes(adjacent_hexes, &new_loc);
@@ -366,21 +371,7 @@ int main() {
       printf("\n");
       fflush(stdout);
 
-    // spawn zombies on adjacent graveyards
-    get_adjacent_hexes(adjacent_hexes, &new_loc);
-    for (int i = 0; i < 6; i ++) {
-      if (money[color] < 2) break;
-      int x = adjacent_hexes[i].x;
-      int y = adjacent_hexes[i].y;
-      if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
-      if (graveyards[x * BOARD_SIZE + y] && zombies[x * BOARD_SIZE + y] == -1) {
-        printf("1 %d %d\n", x, y);
-        zombies[x * BOARD_SIZE + y] = color;
-        money[color] -= 2;
-      }
-    }
-    // spawn zombies on other adjacent locations
-    // TODO: More elegant to check if there's actually money first
+    // spawn zombies on adjacent locations
     int best_x, best_y;
     for (int j = 0; j < 6; j++) {
       if (money[color] < 2) break;
