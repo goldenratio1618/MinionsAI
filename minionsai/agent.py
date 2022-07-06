@@ -104,10 +104,13 @@ class Agent(abc.ABC):
             print(f"Loading from directory...")
             outer_dir = os.path.dirname(directory)
             print(f"  Temporarily adding to sys.path: {outer_dir}")
-            if not outer_dir in sys.path:
+            previously_in_sys_path = outer_dir in sys.path
+            if not previously_in_sys_path:
                 sys.path.append(outer_dir)
             module_name = os.path.basename(directory)
             module = importlib.import_module(module_name)
+            if not previously_in_sys_path:
+                sys.path.remove(outer_dir)
             return module.build_agent()
 
 class NullAgent(Agent):

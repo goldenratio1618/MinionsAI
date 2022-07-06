@@ -12,5 +12,5 @@ def test_saveload():
     th.manual_seed(1112)
     model = MinionsDiscriminator(d_model, depth)
     model.to('cpu')
-    agent = TrainedAgent(model, Translator(), RandomAIAgent(), 4)
+    agent = TrainedAgent(model, Translator(mode="discriminator"), RandomAIAgent(), 4)
     verify_all_modes(agent, Game, num_games=6)

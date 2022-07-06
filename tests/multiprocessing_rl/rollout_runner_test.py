@@ -11,7 +11,7 @@ def test_runner_determinism():
     generator = AgentGenerator(RandomAIAgent())
     disc_model = MinionsDiscriminator(depth=1, d_model=8)
     disc_model.to('cpu')
-    discriminator = QDiscriminator(Translator(), disc_model, epsilon_greedy=0.5)
+    discriminator = QDiscriminator(Translator(mode="discriminator"), disc_model, epsilon_greedy=0.5)
     agent = GenDiscAgent(discriminator, generator, rollouts_per_turn=2)
     game_kwargs = {'max_turns': 4}
     runner = RolloutRunner(game_kwargs, agent)

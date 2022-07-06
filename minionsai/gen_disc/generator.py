@@ -77,13 +77,14 @@ class QGenerator(BaseGenerator):
         recorded_actions = [[] for _ in range(n)]
         for i in range(self.actions_per_turn):
             obs, valid_actions = self.translate_many(games)
-            logits = self.model(obs).detach().cpu().numpy()  # shape = [n, num_things, num_things]
-            assert logits.ndim == 3 and logits.shape[0] == n and logits.shape[1] == logits.shape[2], (n, logits.shape)
-            masked_logits = np.where(valid_actions, logits, -np.inf)  # shape = [n, num_things, num_things]
-            assert masked_logits.shape == logits.shape, (masked_logits.shape, logits.shape)
-            max_winprob = sigmoid(np.max(np.max(masked_logits, axis=1), axis=1))  # shape = [n]
+            logits = self.model(obs)
+            winprobs = th.sigmoid(logits).detach().cpu().numpy()  # shape = [n, num_things, num_things]
+            assert winprobs.ndim == 3 and winprobs.shape[0] == n and winprobs.shape[1] == winprobs.shape[2], (n, winprobs.shape)
+            masked_winprobs = np.where(valid_actions, winprobs, -np.inf)  # shape = [n, num_things, num_things]
+            assert masked_winprobs.shape == winprobs.shape, (masked_winprobs.shape, winprobs.shape)
+            max_winprob = np.max(np.max(masked_winprobs, axis=1), axis=1)  # shape = [n]
             assert max_winprob.shape == (n,), max_winprob.shape
-            sampled_numpy_action = self.sample(masked_logits) # shape = [n, 2]
+            sampled_numpy_action = self.sample(masked_winprobs) # shape = [n, 2]
             assert sampled_numpy_action.shape == (n, 2), sampled_numpy_action.shape
             sampled_action = [self.translator.untranslate_action(action) for action in sampled_numpy_action]
             
@@ -119,10 +120,16 @@ class QGenerator(BaseGenerator):
 
         Returns an array of index-pairs; shape = [batch, 2]
         """
+        # Make a list of whether or not to be greedy for each entry inthe batch
         greedy = np.random.rand(*logits.shape[:-2]) < self.epsilon_greedy
-        greedy = np.expand_dims(greedy, axis=-1)
-        greedy = np.expand_dims(greedy, axis=-1)
-        greedified_logits = logits + greedy * 1000
+
+        # Implement greedy sampling by setting the logits to zero.
+        # Can't multiply by literally zero, because many entries are masked (set to -inf)
+        tiny_multiplier = self.sampling_temperature * 1e-6
+        greedy_multiplier = np.where(greedy, tiny_multiplier, 1)
+        greedy_multiplier = np.expand_dims(greedy_multiplier, axis=-1)
+        greedy_multiplier = np.expand_dims(greedy_multiplier, axis=-1)
+        greedified_logits = logits * greedy_multiplier
         return gumbel_sample(greedified_logits, self.sampling_temperature)
 
 

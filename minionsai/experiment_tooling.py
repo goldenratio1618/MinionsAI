@@ -16,6 +16,7 @@ def get_experiments_directory():
     except ImportError:
         return os.path.join(tempfile.gettempdir(), 'MinionsAI')
 
+@lru_cache()
 def find_device():
     logger.info("=========================")
     # set device to cpu or cuda

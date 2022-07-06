@@ -71,11 +71,13 @@ class MultiProcessRolloutSource(OptimizerRolloutSource):
     """
     Starts multiple worker processes to run rollouts in parallel
     """
-    def __init__(self, agent_fn, main_thread_agent, episodes_per_iteration, game_kwargs, num_procs=4, lambda_until_episodes=5000, device=None):
+    def __init__(self, agent_fn, main_thread_agent, episodes_per_iteration, game_kwargs, num_procs=4, lambda_until_episodes=5000, device=None, train_generator=False, train_discriminator=False):
         super().__init__(episodes_per_iteration, game_kwargs, lambda_until_episodes)
         if device is None:
             device = find_device()
         self.iteration = -1
+        self.train_generator = train_generator
+        self.train_discriminator = train_discriminator
 
         self.agent_fn = agent_fn
         self.main_thread_agent = main_thread_agent
@@ -133,10 +135,10 @@ class MultiProcessRolloutSource(OptimizerRolloutSource):
         elif isinstance(self.main_thread_agent, GenDiscAgent):
             # Hacketty hack hack
             agent_state = {}
-            if hasattr(self.main_thread_agent.discriminator, "model"):
+            if self.train_discriminator:
                 # Convert to cpu because it seems to get corrupted if you pass GPU tensors directly.
                 agent_state['discriminator'] = {k: v.cpu() for k, v in self.main_thread_agent.discriminator.model.state_dict().items()}
-            if hasattr(self.main_thread_agent.generator, "model"):
+            if self.train_generator:
                 agent_state['generator'] = {k: v.cpu() for k, v in self.main_thread_agent.generator.model.state_dict().items()}
         for q in self.iteration_info_queues:
             q.put((iteration, hparams, agent_state))
