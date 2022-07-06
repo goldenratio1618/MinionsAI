@@ -81,10 +81,11 @@ class Agent(abc.ABC):
 
         # Copy all of MinionsAI/ into directory, ignoring files that match ignore_patterns
         # In a cross-platform compatible way
-        
+        module_name = f'{os.path.basename(directory)}_module'
+
         if copy_code_from is None:
             copy_code_from = os.path.join(os.path.dirname(__file__), '..')
-        dest = os.path.join(directory, 'code')
+        dest = os.path.join(directory, module_name, 'code')
         shutil.copytree(copy_code_from, dest, ignore=shutil.ignore_patterns(*ignore_patterns))
 
         ####### 2. Make __init__.py #######
@@ -93,7 +94,7 @@ class Agent(abc.ABC):
             raise ValueError("It probably won't work to re-save a saved/loaded agent.")
             module = module.split("code")[-1]
         class_name = self.__class__.__name__
-        with open(os.path.join(directory, "__init__.py"), "w") as f:
+        with open(os.path.join(directory, module_name, "__init__.py"), "w") as f:
             init_contents = build_agent_init(module, class_name)
             f.write(init_contents)
 
@@ -102,19 +103,24 @@ class Agent(abc.ABC):
         os.makedirs(agent_dir)
         self.save_instance(agent_dir)
 
+    # class-level dict of {module_name: module_path} of all agents we've loaded so far.
+    loaded_agents = {}
+
     @staticmethod
-    def load(directory: str):
-            print(f"Loading from directory...")
-            outer_dir = os.path.dirname(directory)
-            print(f"  Temporarily adding to sys.path: {outer_dir}")
-            previously_in_sys_path = outer_dir in sys.path
-            if not previously_in_sys_path:
-                sys.path.append(outer_dir)
-            module_name = os.path.basename(directory)
-            module = importlib.import_module(module_name)
-            if not previously_in_sys_path:
-                sys.path.remove(outer_dir)
-            return module.build_agent()
+    def load(directory: str, already_in_path_ok=False):
+        name = os.path.split(directory)[-1]
+        if name in Agent.loaded_agents and Agent.loaded_agents[name] != directory:
+            raise ValueError(f"Can't load a second agent with the same name! (Loading {directory} but already loaded {Agent.loaded_agents[name]}.")
+        if name not in Agent.loaded_agents:
+            if directory in sys.path and not already_in_path_ok:
+                raise ValueError(f"Agent is already in sys.path somehow: {directory}.")
+            Agent.loaded_agents[name] = directory
+            sys.path.append(directory)
+
+        print(f"Loading {directory}...")
+        module_name = f"{os.path.basename(directory)}_module"
+        module = importlib.import_module(module_name)
+        return module.build_agent()
 
 class NullAgent(Agent):
     """
@@ -323,5 +329,5 @@ import os
 import json
 
 def build_agent():
-    return {class_name}.load_instance(os.path.join(os.path.dirname(__file__), 'agent'))
+    return {class_name}.load_instance(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'agent'))
 """
