@@ -313,7 +313,7 @@ int main() {
     xf = xi;
     yf = yi;
 
-    double score = 0; //evaluate_hex(xi, yi, enemy_captain, own_captain, graveyards, zombies, true);
+    double score = evaluate_hex(xi, yi, enemy_captain, own_captain, graveyards, zombies, true);
     // look for empty adjacent hex with smaller distance
     get_adjacent_hexes(adjacent_hexes, &own_captain);
     for (int i = 0; i < 6; i ++) {
