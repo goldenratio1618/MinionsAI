@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import List
 
-from minionsai.action import AdvancePhaseAction, MoveAction, SpawnAction
+from ..action import AdvancePhaseAction, MoveAction, SpawnAction
 from ..engine import Game, BOARD_SIZE, Phase
 from ..unit_type import MAX_UNIT_HEALTH, ZOMBIE, unitList, MAX_SPEED_OR_RANGE
 from collections import OrderedDict

@@ -1,5 +1,5 @@
-from minionsai.discriminator_only.model import MinionsDiscriminator
-from minionsai.engine import BOARD_SIZE
+from ..discriminator_only.model import MinionsDiscriminator
+from ..engine import BOARD_SIZE
 import torch as th
 from ..unit_type import MAX_UNIT_HEALTH, unitList
 

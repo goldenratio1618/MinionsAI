@@ -1,8 +1,8 @@
 from typing import Dict, Tuple
 import multiprocessing as mp
 
-from minionsai.discriminator_only.agent import TrainedAgent
-from minionsai.gen_disc.agent import GenDiscAgent
+from ..discriminator_only.agent import TrainedAgent
+from ..gen_disc.agent import GenDiscAgent
 
 from ..experiment_tooling import find_device
 from .rollout_runner import RolloutRunner
