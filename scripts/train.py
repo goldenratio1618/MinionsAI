@@ -43,7 +43,8 @@ DISC_EPSILON_GREEDY_UPDATE = 0.9
 GEN_EPSILON_GREEDY = 1.0
 GEN_EPSILON_GREEDY_MIN = 0.005
 GEN_EPSILON_GREEDY_UPDATE = 0.99
-GEN_SAMPLING_TEMPERATURE = 0.03
+GEN_SAMPLING_TEMPERATURE = 1e-4
+GEN_SAMPLING_INCREASE = 0.005
 
 # How many episodes of data do we collect each iteration, before running a few epochs of optimization?
 # Potentially good to use a few times bigger EPISODES_PER_ITERATION than BATCH_SIZE, to minimize correlation within batches
@@ -85,12 +86,14 @@ DISC_LR = 1e-4
 GEN_BATCH_SIZE = EPISODES_PER_ITERATION * 16
 GEN_LR = 2e-4
 
+LR_UPDATE = 0.995
+
 # kwargs to create a game (passed to Game)
 game_kwargs = {'symmetrize': False}
 # Eval env registered in scoreboard_envs.py
 EVAL_ENV_NAME = 'zombies5x5'
 
-MAX_ITERATIONS = 400
+MAX_ITERATIONS = 1000
 
 SEED = 12345
 
@@ -176,11 +179,13 @@ def main(run_name):
         disc_model = agent.discriminator.model
         disc_model.to(device)
         disc_optimizer = th.optim.Adam(disc_model.parameters(), lr=DISC_LR)
+        disc_scheduler = th.ExponentialLR(disc_optimizer, gamma=LR_UPDATE)
 
     if TRAIN_GENERATOR:
         gen_model = agent.generator.model
         gen_model.to(device)
         gen_optimizer = th.optim.Adam(gen_model.parameters(), lr=GEN_LR)
+        gen_scheduler = th.ExponentialLR(gen_optimizer, gamma=LR_UPDATE)
 
     def model_mode_eval():
         if TRAIN_DISCRIMINATOR:
@@ -271,6 +276,7 @@ def main(run_name):
                                     metrics_logger.log_metrics({f"disc/loss/epoch_{epoch}/batch_{idx:0>{max_batch_digits}}": loss.item()})
                                 turns_optimized += len(batch_idxes)
                 agent.discriminator.increment_iter()
+                disc_scheduler.step()
 
             if TRAIN_GENERATOR:
                 gen_rollout_batch = rollout_batch['generator']
@@ -314,6 +320,8 @@ def main(run_name):
                                     metrics_logger.log_metrics({f"gen/loss/epoch_{epoch}/batch_{idx:0>{max_batch_digits}}": loss.item()})
                                 gen_actions_optimized += len(batch_idxes)
                 agent.generator.increment_iter()
+                gen_scheduler.step()
+
 
             logger.info(f"Iteration {iteration} complete.")
             iteration += 1
