@@ -115,6 +115,9 @@ class Phase(str, enum.Enum):
     TURN_END = "turn_end"  # After spawn phase, but haven't yet run next_turn()
     GAME_OVER = "game_over"  # Game is done.
 
+    def __eq__(self, __x: object) -> bool:
+        return self.value == __x.value
+
 class Game():
     def __init__(self, 
                  money=(2, 4),
