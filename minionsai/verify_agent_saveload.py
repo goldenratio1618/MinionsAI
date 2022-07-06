@@ -1,3 +1,4 @@
+import pickle
 from typing import List, Tuple
 from .action import ActionList
 from .agent import Agent, NullAgent
@@ -14,7 +15,7 @@ def verify_agent_saveload(agent, game_fn, num_games=10, mode='full') -> List[Act
     game_fn: function that returns a game object playablke by this agent
     mode:
         * 'full': Test full save/load cycle including serializing all the code.
-        * 'save': Test only the save_instance() and load_instance() methods.
+        * 'save': Test only the save_extra() and load_extra() methods.
         * 'seed': Just check that the agent is deterministic after seeding.
     """
     
@@ -25,8 +26,9 @@ def verify_agent_saveload(agent, game_fn, num_games=10, mode='full') -> List[Act
         dir = tempfile.mkdtemp()
         print("Using temp dir: ", dir)
         try:
-            agent.save_instance(dir)
-            agent1 = agent.__class__.load_instance(dir)
+            agent.save_extra(dir)
+            agent1 = pickle.loads(pickle.dumps(agent))
+            agent1.load_extra(dir)
         except Exception as e:
             raise e
         finally:
@@ -61,10 +63,10 @@ def verify_all_modes(agent, game_fn, num_games=30):
 
     success = verify_agent_saveload(agent, game_fn, num_games, mode='save')
     if success:
-        print("Passed save_instance / load_instance test.")
+        print("Passed save_extra / load_extra test.")
     else:
         print("FAILURE!")
-        print("save_instance & load_instance are not faithful.")
+        print("save_extra & load_extra are not faithful.")
         print("Aborting saveload test.")
         return False
 

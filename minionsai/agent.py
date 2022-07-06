@@ -3,11 +3,16 @@ import random
 import subprocess
 import sys
 
+from minionsai.experiment_tooling import find_device
+
 from .game_util import adjacent_zombies
 from .action import ActionList, SpawnAction, MoveAction
 from .engine import Board, Game, Phase, adjacent_hexes
 from .unit_type import ZOMBIE, NECROMANCER, flexible_unit_type, unitList
 
+import torch as th
+import io
+import pickle
 import os
 import shutil
 import importlib
@@ -25,21 +30,21 @@ class Agent(abc.ABC):
     def act(self, game_copy: Game) -> ActionList:
         raise NotImplementedError()
 
-    def save_instance(self, directory):
+    def save_extra(self, directory):
         """
         Save any extra data into `directory` needed to build this agent instance.
         You should override `save` and `load` so that this is a noop:
 
         example_agent = ExampleAgent()
-        example_agent.save(dir)
-        example_agent = ExampleAgent.load(dir)
+        example_agent.save_extra(dir)
+        pickle.dumps(example_agent, "agent.pkl")
+        example_agent = pickle.loads("agent.pkl")
+        example_agent.load_extra(dir)
         """
         pass
 
-    @classmethod
-    def load_instance(cls, directory: str) -> "Agent":
-        print(f"Loading instance of agent {cls.__name__}")
-        return cls()
+    def load_extra(self, directory: str):
+        pass
 
     def seed(self, seed: int):
         """
@@ -50,16 +55,17 @@ class Agent(abc.ABC):
     def save(self, directory: str, exists_ok=False, copy_code_from=None):
         """
         Creates a snapshot of this agent that can be passed around and run on other codebases inside `directory`
-        It should expose an API like this:
-
-        from directory import build_agent()
-        agent = build_agent()  # gives back this Agent object.
+        It stores a pickle of the agent, along with the codebase needed to read that pickle.
 
         To do that we need to store 3 things:
-        1. The current codebase
-        2. A __init__.py file with build_agent() entry point
-        3. Your subclass may need to store other stuff as well to reproduce an instance;
-            you should do that by overriding save_instance().
+        agent_name/
+            agent.pkl                   # the pickle of the agent
+            agent_name_module/          # the codebase needed to load the agent. I think all these nested directories are actually needed, sadly.
+                __init__.py
+                code/
+                    minionsai/
+            agent/                      # Any class-specific stuff needed, saved in save_extra() and loaded in load_extra()
+                ...
 
         If `exists_ok` is True, then the directory will be overwritten if it exists.
         If `copy_code_from` is not None, then the codebase will be copied from that directory.
@@ -88,26 +94,38 @@ class Agent(abc.ABC):
         dest = os.path.join(directory, module_name, 'code')
         shutil.copytree(copy_code_from, dest, ignore=shutil.ignore_patterns(*ignore_patterns))
 
-        ####### 2. Make __init__.py #######
-        module = self.__module__
-        if "code" in module:
-            raise ValueError("It probably won't work to re-save a saved/loaded agent.")
-            module = module.split("code")[-1]
-        class_name = self.__class__.__name__
-        with open(os.path.join(directory, module_name, "__init__.py"), "w") as f:
-            init_contents = build_agent_init(module, class_name)
-            f.write(init_contents)
+        ####### 2. Make agent.pkl #######
+        pickle.dump(self, open(os.path.join(directory, 'agent.pkl'), 'wb'))
 
         ####### 3. Save extra data #######
         agent_dir = os.path.join(directory, 'agent')
         os.makedirs(agent_dir)
-        self.save_instance(agent_dir)
+        self.save_extra(agent_dir)
 
     # class-level dict of {module_name: module_path} of all agents we've loaded so far.
     loaded_agents = {}
 
     @staticmethod
+    def load_deprecated(directory: str, already_in_path_ok=False):
+        # TODO delete this once we have no old agents anymore.
+        name = os.path.split(directory)[-1]
+        if name in Agent.loaded_agents and Agent.loaded_agents[name] != directory:
+            raise ValueError(f"Can't load a second agent with the same name! (Loading {directory} but already loaded {Agent.loaded_agents[name]}.")
+        if name not in Agent.loaded_agents:
+            if directory in sys.path and not already_in_path_ok:
+                raise ValueError(f"Agent is already in sys.path somehow: {directory}.")
+            Agent.loaded_agents[name] = directory
+            sys.path.append(directory)
+
+        print(f"Loading legacy agent from {directory}")
+        module_name = f"{os.path.basename(directory)}_module"
+        module = importlib.import_module(module_name)
+        return module.build_agent()
+
+    @staticmethod
     def load(directory: str, already_in_path_ok=False):
+        if not os.path.exists(os.path.join(directory, 'agent.pkl')):
+            return Agent.load_deprecated(directory, already_in_path_ok)
         name = os.path.split(directory)[-1]
         if name in Agent.loaded_agents and Agent.loaded_agents[name] != directory:
             raise ValueError(f"Can't load a second agent with the same name! (Loading {directory} but already loaded {Agent.loaded_agents[name]}.")
@@ -118,9 +136,27 @@ class Agent(abc.ABC):
             sys.path.append(directory)
 
         print(f"Loading {directory}...")
-        module_name = f"{os.path.basename(directory)}_module"
-        module = importlib.import_module(module_name)
-        return module.build_agent()
+        outer_module_name = f'{os.path.basename(directory)}_module'
+        with open(os.path.join(directory, 'agent.pkl'), 'rb') as f:
+            agent = LocalCodeUnpickler(f, outer_module_name).load()
+        agent.load_extra(os.path.join(directory, "agent"))
+        return agent
+
+class LocalCodeUnpickler(pickle.Unpickler):
+    def __init__(self, file, outer_module_name):
+        super().__init__(file)
+        self.outer_module_name = outer_module_name
+    def find_class(self, module, name):
+        if 'minionsai' in module:
+            sub_minions_part = module.split('minionsai.')[-1]
+            new_module = f'{self.outer_module_name}.code.minionsai.{sub_minions_part}'
+            return super().find_class(new_module, name)      
+        
+        # Copied from https://stackoverflow.com/questions/57081727/load-pickle-file-obtained-from-gpu-to-cpu
+        if module == 'torch.storage' and name == '_load_from_bytes':
+            return lambda b: th.load(io.BytesIO(b), map_location=find_device())
+
+        return super().find_class(module, name)
 
 class NullAgent(Agent):
     """
@@ -237,23 +273,13 @@ class CLIAgent(Agent):
         spawn_actions = self.parse_input()
         return ActionList(move_actions, spawn_actions)
 
-    def save_instance(self, directory: str):
-        f = open(os.path.join(directory, "commands.txt"), "w")
-        for i in self.commands: f.write(i)
-        f.close()
-
-    @classmethod
-    def load_instance(cls, directory: str):
-        f = open(os.path.join(directory, "commands.txt"), "r")
-        commands = []
-        for i in f: commands.append(i)
+    def load_extra(self, directory: str):
         os.chdir(directory)
         os.chdir("../code")
         # set execution bit
         # we don't know which word of commands is file, so try all of them
-        for i in commands: os.system("chmod +x " + i)
-        agent = CLIAgent(commands)
-        return agent
+        for i in self.commands: os.system("chmod +x " + i)
+        self.__init__(self.commands)
 
 class RandomAIAgent(Agent):
     def act(self, game_copy: Game) -> ActionList:
@@ -321,13 +347,3 @@ class RandomAIAgent(Agent):
                 for dest in random.sample(adjacent_targets, 2)
             ]
         return ActionList(move_actions, spawn_actions)
-
-def build_agent_init(module, class_name):
-    return f"""
-from .code.{module} import {class_name}
-import os
-import json
-
-def build_agent():
-    return {class_name}.load_instance(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'agent'))
-"""
