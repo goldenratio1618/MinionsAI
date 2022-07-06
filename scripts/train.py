@@ -31,9 +31,10 @@ import tqdm
 
 logger = logging.getLogger(__name__)
 
-TRAIN_GENERATOR = True
+TRAIN_GENERATOR = False
 TRAIN_DISCRIMINATOR = True
-LOAD_DISCRIMINAOTR_MODEL = None#os.path.join(get_experiments_directory(), "conv_big", "checkpoints", "iter_396", "agent", "weights.pt")
+LOAD_DISCRIMINAOTR_MODEL = None  # os.path.join(get_experiments_directory(), "conv_big", "checkpoints", "iter_396", "agent", "weights.pt")
+LOAD_GENERATOR_MODEL = os.path.join(get_experiments_directory(), "gen_convbig396", "checkpoints", "iter_396_adapt")
 
 # How many rollouts do we run of each turn before picking the best
 ROLLOUTS_PER_TURN = 16
@@ -43,7 +44,7 @@ GEN_SAMPLING_TEMPERATURE = 0.03
 
 # How many episodes of data do we collect each iteration, before running a few epochs of optimization?
 # Potentially good to use a few times bigger EPISODES_PER_ITERATION than BATCH_SIZE, to minimize correlation within batches
-EPISODES_PER_ITERATION = 32
+EPISODES_PER_ITERATION = 256
 ROLLOUT_PROCS = 4
 
 # Once we've collected the data, how many times do we go over it for optimization (within one iteration)?
@@ -57,17 +58,17 @@ EVAL_VS_PAST_ITERS = []
 # Specific agent instances to eval vs
 EVAL_VS_AGENTS = [
     GenDiscAgent(ScriptedDiscriminator(), AgentGenerator(RandomAIAgent()), rollouts_per_turn=16),
-    # os.path.join(get_experiments_directory(), "conv_big", "checkpoints", "iter_200")
+    os.path.join(get_experiments_directory(), "conv_big", "dfarhi_0613_conveps_256rolls_iter400_adapt")
 ]
 # Eval against random up until this iteration
-EVAL_VS_RANDOM_UNTIL = 10
-EVAL_TRIALS = 100
+EVAL_VS_RANDOM_UNTIL = 3
+EVAL_TRIALS = 50
 
 # Frequency of storing a saved agent
 CHECKPOINT_EVERY = 4
 
 # During evals, run this many times extra rollouts compared to during rollout generation
-EVAL_COMPUTE_BOOST = 1
+EVAL_COMPUTE_BOOST = 4
 
 # Model Size
 DEPTH = 2
@@ -98,8 +99,13 @@ def build_agent():
         logger.info(gen_model)
         gen_translator = Translator("generator")  # TODO - make gen translator
         generator = QGenerator(model=gen_model, translator=gen_translator, sampling_temperature=GEN_SAMPLING_TEMPERATURE, epsilon_greedy=GEN_EPSILON_GREEDY)
-    else:
+    elif LOAD_GENERATOR_MODEL is None:
         generator = AgentGenerator(RandomAIAgent())
+    else:
+        generator_agent = Agent.load(LOAD_GENERATOR_MODEL, already_in_path_ok=True)  # ok if a thread loads this after main has already done so.
+        generator = generator_agent.generator
+        gen_model = generator.model
+        gen_model.to(find_device())
 
     logger.info("Creating discriminator...")
     if TRAIN_DISCRIMINATOR:
@@ -123,7 +129,7 @@ def build_agent():
 
     if TRAIN_DISCRIMINATOR or LOAD_DISCRIMINAOTR_MODEL:
         logger.info(f"Discriminator model total parameter count: {sum(p.numel() for p in disc_model.parameters() if p.requires_grad):,}")
-    if TRAIN_GENERATOR:
+    if TRAIN_GENERATOR or LOAD_GENERATOR_MODEL:
         logger.info(f"Generator model total parameter count: {sum(p.numel() for p in gen_model.parameters() if p.requires_grad):,}")
 
     agent = GenDiscAgent(discriminator, generator, rollouts_per_turn=ROLLOUTS_PER_TURN)
@@ -204,11 +210,22 @@ def main(run_name):
                     logger.info("Saving checkpoint...")
                     # Save with more rollouts_per_turn. TODO - clean up this hack.
                     agent.rollouts_per_turn = ROLLOUTS_PER_TURN * EVAL_COMPUTE_BOOST
+                    if TRAIN_DISCRIMINATOR:
+                        agent.discriminator.epsilon_greedy = 0.0
                     model_mode_eval()
                     agent.save(os.path.join(checkpoint_dir, f"iter_{iteration}"), copy_code_from=code_dir)
                     model_mode_train()
                     agent.rollouts_per_turn = ROLLOUTS_PER_TURN
+                    if TRAIN_DISCRIMINATOR:
+                        agent.discriminator.epsilon_greedy = DISC_EPSILON_GREEDY
 
+            # seed_everything(54321)
+            # model_mode_eval()
+            # agent.discriminator.epsilon_greedy = 0.0
+            # eval_vs_other_by_path(agent, os.path.join(get_experiments_directory(), "conv_big", "dfarhi_0613_conveps_256rolls_iter400_adapt"))
+            # recording = _play_n_recording_actions(ENVS[EVAL_ENV_NAME], [agent, agent], 1, seed=54321)
+            # pickle.dump(recording, open(os.path.join(checkpoint_dir, f"recording_{iteration}"), "wb"))
+            # import pdb; pdb.set_trace()
             metrics_logger.log_metrics(rollout_stats)
             if TRAIN_DISCRIMINATOR:
                 disc_param_norm = sum([th.norm(param, p=2) for param in disc_model.parameters()]).item()
