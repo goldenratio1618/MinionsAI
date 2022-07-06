@@ -108,13 +108,16 @@ class RolloutRunner():
             all_gen_actions = np.concatenate(all_gen_actions)  # shape=[actions_per_turn * turns, rollouts_per_turn, 2]
             all_gen_actions = all_gen_actions.reshape(total_turns, 2)
 
+        global_metrics = {}
+        if len(unique_ending_labels) > 0:
+            global_metrics["unique_ending_labels"] = np.mean(unique_ending_labels)
         result = RolloutEpisode(
             disc_obs=all_disc_obs, 
             disc_labels=all_disc_labels, 
             gen_obs=all_gen_obs,
             gen_labels=all_gen_labels,
             gen_actions=all_gen_actions,
-            global_metrics = {"unique_ending_labels": np.mean(unique_ending_labels)},
+            global_metrics = global_metrics,
             player_metrics=player_metrics)
 
         return result
