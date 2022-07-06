@@ -1,11 +1,15 @@
 import pickle
 
+from minionsai.experiment_tooling import find_device
+
 from ..engine import print_n_games
 from .generator import BaseGenerator
 from .discriminators import BaseDiscriminator
 from ..agent import Agent, RandomAIAgent
 import os
 import json
+import torch as th
+import io
 import logging
 
 logger = logging.getLogger(__name__)
@@ -66,8 +70,14 @@ class GenDiscAgent(Agent):
         code_dir = os.path.join(directory, "..", "code")
         with  open(os.path.join(discriminator_dir, "instance.pkl"), "rb") as file:
             discriminator = LocalCodeUnpickler(file, code_dir).load()
+            # Hacketty hack hack
+            if hasattr(discriminator, "model"):
+                discriminator.model.to(find_device())
         with  open(os.path.join(generator_dir, "instance.pkl"), "rb") as file:
             generator = LocalCodeUnpickler(file, code_dir).load()
+            # Hacketty hack hack
+            if hasattr(generator, "model"):
+                generator.model.to(find_device())
         return cls(discriminator, generator, rollouts_per_turn, 0)
 
 class LocalCodeUnpickler(pickle.Unpickler):
@@ -87,4 +97,10 @@ class LocalCodeUnpickler(pickle.Unpickler):
             if not previously_in_sys_path:
                 sys.path.remove(minionsai_path)
             return result
+        
+        # Copied from https://stackoverflow.com/questions/57081727/load-pickle-file-obtained-from-gpu-to-cpu
+        if module == 'torch.storage' and name == '_load_from_bytes':
+            print("Loading model to device.")
+            return lambda b: th.load(io.BytesIO(b), map_location=find_device())
+
         return super().find_class(module, name)
