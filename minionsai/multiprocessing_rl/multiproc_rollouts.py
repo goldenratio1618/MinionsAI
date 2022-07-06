@@ -1,7 +1,6 @@
 from typing import Dict, Tuple
 import multiprocessing as mp
 
-from ..discriminator_only.agent import TrainedAgent
 from ..gen_disc.agent import GenDiscAgent
 
 from ..experiment_tooling import find_device
@@ -26,11 +25,7 @@ class Worker():
         self.episodes_queue = episodes_queue
         self.iteration_info_queue = iteration_info_queue
         self.agent = agent_fn()
-        # TODO - remove all this dumb isinstance forking.
-        if isinstance(self.agent, TrainedAgent):
-            self.agent.policy.to(device)
-            self.agent.policy.eval()
-        elif isinstance(self.agent, GenDiscAgent):
+        if isinstance(self.agent, GenDiscAgent):
             for piece in [self.agent.discriminator, self.agent.generator]:
                 if hasattr(piece, "model"):
                     piece.model.to(device)
@@ -50,9 +45,7 @@ class Worker():
             # TODO this might not be an error; maybe we are just processing a stale request.
             raise ValueError(f"Worker {self.rank} received request for iteration {iteration} but found info for iteration {info_iter}")
         self.runner.update(hparams)
-        if isinstance(self.agent, TrainedAgent):
-            self.agent.policy.load_state_dict(models_state)
-        elif isinstance(self.agent, GenDiscAgent):
+        if isinstance(self.agent, GenDiscAgent):
             if "discriminator" in models_state:
                 self.agent.discriminator.model.load_state_dict(models_state["discriminator"])
             if "generator" in models_state:
@@ -130,9 +123,7 @@ class MultiProcessRolloutSource(OptimizerRolloutSource):
         assert self.local_data_reordering_buffer == {}
         self.iteration = iteration
 
-        if isinstance(self.main_thread_agent, TrainedAgent):
-            agent_state = {k: v.cpu() for k, v in self.main_thread_agent.policy.state_dict().items()}
-        elif isinstance(self.main_thread_agent, GenDiscAgent):
+        if isinstance(self.main_thread_agent, GenDiscAgent):
             # Hacketty hack hack
             agent_state = {}
             if self.train_discriminator:
