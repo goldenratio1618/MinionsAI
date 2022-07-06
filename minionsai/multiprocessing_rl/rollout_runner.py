@@ -1,5 +1,5 @@
 
-from minionsai.game_util import seed_everything, stack_dicts
+from ..game_util import seed_everything, stack_dicts
 import torch as th
 import numpy as np
 import random

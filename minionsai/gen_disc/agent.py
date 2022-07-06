@@ -1,6 +1,6 @@
 import pickle
 
-from minionsai.experiment_tooling import find_device
+from ..experiment_tooling import find_device
 
 from ..engine import print_n_games
 from .generator import BaseGenerator
