@@ -10,6 +10,7 @@ from tabulate import tabulate
 import csv
 
 from .agent import Agent
+from .agent_saveload import load
 from .run_game import AgentException, run_game
 from .engine import Game
 
@@ -86,7 +87,7 @@ class TrueskillWorker():
 
     def load_agent(self, agent_name: str) -> Optional[Agent]:
         try:
-            return Agent.load(os.path.join(self.directory, agent_name))
+            return load(os.path.join(self.directory, agent_name))
         except Exception as e:
             print(f"Error loading agent: {agent_name}")
             print(e)

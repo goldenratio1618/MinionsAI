@@ -1,6 +1,7 @@
 from collections import defaultdict
 from typing import Tuple
 import multiprocessing as mp
+from .agent_saveload import load
 
 import tqdm
 from .engine import Game
@@ -74,7 +75,7 @@ def run_n_games(game_fn, agents, n, num_threads=1, randomize_player_order=True, 
         iterator = tqdm.tqdm(iterator)
     if num_threads == 1:
         # if agents are a string, treat it as a path to a file containing the agent
-        agents = [Agent.load(agent) if isinstance(agent, str) else agent for agent in agents]
+        agents = [load(agent) if isinstance(agent, str) else agent for agent in agents]
         results = [run_game_with_metrics(game_fn(), agents, randomize_player_order=randomize_player_order) for _ in iterator]
     else:
         results = []
@@ -98,7 +99,7 @@ def run_n_games(game_fn, agents, n, num_threads=1, randomize_player_order=True, 
     return wins, metrics
 
 def _run_game_parallel_worker(game_fn, agents, num_games, output_queue, randomize_player_order=True):
-        agents = [Agent.load(agent) if isinstance(agent, str) else agent for agent in agents]
+        agents = [load(agent) if isinstance(agent, str) else agent for agent in agents]
         for _ in range(num_games):
             winner, metrics = run_game_with_metrics(game_fn(), agents, verbose=False, randomize_player_order=randomize_player_order)
             output_queue.put((winner, metrics))

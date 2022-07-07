@@ -112,10 +112,10 @@ Example lifetime:
 ```
 agent = ExampleAgent()  # User subclass
 train(agent)  # User training process
-agent.save(directory)  # Save the agent.
+agent_saveload.save(directory)  # Save the agent.
 
 # Now 3 days go by, codebase changes, but we want to compare this old agent to new one.
-agent = Agent.load(directory)  # Load the agent. Note that this will be an ExampleAgent, even though that class may no longer exist in the codebase.
+agent = agent_saveload.loaddirectory)  # Load the agent. Note that this will be an ExampleAgent, even though that class may no longer exist in the codebase.
 run_game(game, agent, newer_agent)
 ```
 
@@ -135,7 +135,7 @@ Once you have a good agent, you can submit it to the scoreboard at `minions-scor
 
 [Note: the scoreboard is incredibly janky, and if it's down poke David to fix it.]
 
-To submit an agent, run `agent.save(directory)`. Then rename the directory to `<agent_name>`, zip it into `<agent_name>.zip` and upload it to the scoreboard. 
+To submit an agent, run `agent_saveload.save(directory)`. Then rename the directory to `<agent_name>`, zip it into `<agent_name>.zip` and upload it to the scoreboard. 
 Make sure to give it a very unique name - recommend putting your name and the date in there at the very least.
 Note that (for me at least), the agent name winds up being the name fo teh directory pre-zipping, so make sure to rename first.
 
