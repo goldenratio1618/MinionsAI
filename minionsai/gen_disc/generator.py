@@ -27,7 +27,7 @@ class AgentGenerator(BaseGenerator):
         actions = [self.agent.act(game) for game in games]
         for game, action in zip(games, actions):
             game.full_turn(action)
-        return actions, games, None
+        return actions, games, {}
 
 def argmax_last_two_indices(arr):
     """

@@ -1,4 +1,6 @@
 
+from collections import defaultdict
+from minionsai.gen_disc.generator import QGenerator
 from ..game_util import seed_everything, stack_dicts
 import torch as th
 import numpy as np
@@ -37,7 +39,7 @@ class RolloutRunner():
         all_gen_obs = []
         all_gen_labels = []
         all_gen_actions = []
-        unique_ending_labels = []
+        gen_metrics = [defaultdict(list) for _ in self.agent.generators]  # one for each generator, dict of key: array of measured values.
         while True:
             game.next_turn()
             if game.done:
@@ -52,30 +54,34 @@ class RolloutRunner():
                 max_winprob = disc_info["max_winprob"]
                 disc_obs_buffers[active_player].append(disc_obs)
                 disc_label_buffers[active_player].append(max_winprob)
-            if gen_info is not None:
+            if "obs" in gen_info[0]:
                 # Then we're training the generator also
-                all_gen_obs.append(gen_info["obs"])
+                # TODO have a better way to know if we're optimizing than checking info dict keys.
 
-                gen_labels = gen_info["next_maxq"]  # This is shape [actions_per_turn - 1, rollouts_per_turn]
-                assert gen_labels.shape == (self.agent.generator.actions_per_turn - 1, self.agent.rollouts_per_turn), gen_labels.shape
+                # Assume we're always training the first generator in the list.
+                train_gen_info = gen_info[0]
+                train_generator, rollouts_per_turn = self.agent.generators[0]
+                all_gen_obs.append(train_gen_info["obs"])
 
-                ending_labels = disc_info["all_winprobs"]  # This is shape [rollouts_per_turn]
+                gen_labels = train_gen_info["next_maxq"]  # This is shape [actions_per_turn - 1, rollouts_per_turn]
+                assert gen_labels.shape == (train_generator.actions_per_turn - 1, rollouts_per_turn), gen_labels.shape
+
+                all_ending_labels = disc_info["all_winprobs"]  # This is shape [total rollouts_per_turn]
+                ending_labels = all_ending_labels[:rollouts_per_turn]
                 ending_labels = np.expand_dims(ending_labels, axis=0)  # [1, rollouts_per_turn]
                 assert ending_labels.shape == (1, self.agent.rollouts_per_turn), ending_labels.shape
-
-                # Count how amny unique states the discriminator chose from.
-                # We assume that different states would have slightly different win probabilities.
-                rounded_ending_labels = np.round(ending_labels, decimals=5)
-                this_unique_ending_labels = np.unique(rounded_ending_labels).size / rounded_ending_labels.size
-                unique_ending_labels.append(this_unique_ending_labels)
 
                 gen_labels = np.concatenate([gen_labels, ending_labels], axis=0)
                 assert gen_labels.shape == (self.agent.generator.actions_per_turn, self.agent.rollouts_per_turn), gen_labels.shape
                 all_gen_labels.append(gen_labels)
 
-                assert gen_info["numpy_actions"].shape == (self.agent.generator.actions_per_turn, self.agent.rollouts_per_turn, 2), gen_info["numpy_actions"].shape
-                all_gen_actions.append(gen_info["numpy_actions"])
+                assert train_gen_info["numpy_actions"].shape == (self.agent.generator.actions_per_turn, self.agent.rollouts_per_turn, 2), gen_info["numpy_actions"].shape
+                all_gen_actions.append(train_gen_info["numpy_actions"])
             
+                # Accumulate metrics from the generators
+                for accumulator, info in zip(gen_metrics, gen_info):
+                    for key, value in info["metrics"].items():
+                        accumulator[key].append(value)
         winner = game.winner
 
         player_metrics = (game.get_metrics(0), game.get_metrics(1))
@@ -109,8 +115,13 @@ class RolloutRunner():
             all_gen_actions = all_gen_actions.reshape(total_turns, 2)
 
         global_metrics = {}
-        if len(unique_ending_labels) > 0:
-            global_metrics["unique_ending_labels"] = np.mean(unique_ending_labels)
+        if len(gen_metrics[0]) > 0:
+            for i, metrics_dict in enumerate(gen_metrics):
+                for key, list_of_values in metrics_dict.items():
+                    # check that we have the right number
+                    assert len(list_of_values) == len(all_disc_labels)
+                    mean = sum(list_of_values) / len(list_of_values)
+                    global_metrics[f"rollouts/generators/i/{key}"] = mean
         result = RolloutEpisode(
             disc_obs=all_disc_obs, 
             disc_labels=all_disc_labels, 
