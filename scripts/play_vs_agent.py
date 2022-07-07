@@ -3,6 +3,7 @@ Play against an agent with
 > python play_vs_agent.py path/to/agent
 """
 from minionsai.agent import Agent, HumanCLIAgent, RandomAIAgent
+from minionsai.agent_saveload import load
 from minionsai.experiment_tooling import get_experiments_directory
 from minionsai.gen_disc.agent import GenDiscAgent
 from minionsai.gen_disc.discriminators import HumanDiscriminator
