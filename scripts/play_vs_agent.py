@@ -15,7 +15,7 @@ def main(agent_dir=None, disc_mode=False):
     if agent_dir is None:
         agent = RandomAIAgent()
     else:
-        agent = Agent.load(agent_dir)
+        agent = load(agent_dir)
         agent.verbose_level = 2
 
     if disc_mode:

@@ -14,6 +14,7 @@ import shutil
 
 from minionsai.trueskill_worker import read_scores
 from minionsai.agent import Agent, RandomAIAgent, NullAgent
+from minionsai.agent_saveload import load
 from minionsai.scoreboard_envs import ENVS
 
 UPLOAD_PASSWORD = 'shadowL0rd'
@@ -158,7 +159,7 @@ def agent_play(env_name, agent_name):
                 game.end_spawn_phase()
             game_prev_turn_str = game.pretty_print(do_print=False)
             game.next_turn()
-            agent = Agent.load(os.path.join(env_agents_dir(env_name), agent_name))
+            agent = load(os.path.join(env_agents_dir(env_name), agent_name))
             agent_actions = agent.act(game.copy())
             game.full_turn(agent_actions)
             game.next_turn()

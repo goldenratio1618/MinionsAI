@@ -21,6 +21,7 @@ from minionsai.run_game import run_n_games
 from minionsai.discriminator_only.model import MinionsDiscriminator
 from minionsai.discriminator_only.translator import Translator
 from minionsai.agent import Agent, CLIAgent, RandomAIAgent
+from minionsai.agent_saveload import load, save
 from minionsai.scoreboard_envs import ENVS
 import torch as th
 import numpy as np
@@ -31,20 +32,20 @@ import tqdm
 
 logger = logging.getLogger(__name__)
 
-TRAIN_GENERATOR = False
-TRAIN_DISCRIMINATOR = True
-LOAD_DISCRIMINAOTR_MODEL = None  # os.path.join(get_experiments_directory(), "conv_big", "checkpoints", "iter_396", "agent", "weights.pt")
-LOAD_GENERATOR_MODEL = os.path.join(get_experiments_directory(), "gen_convbig396", "checkpoints", "iter_396_adapt")
+TRAIN_GENERATOR = True
+TRAIN_DISCRIMINATOR = False
+LOAD_DISCRIMINATOR_MODEL = os.path.join(get_experiments_directory(), "conveps_repro_0704", "checkpoints", "conveps_repro_iter_400_adapt")
+LOAD_GENERATOR_MODEL = None # os.path.join(get_experiments_directory(), "gen_convbig396", "checkpoints", "iter_396_adapt")
 
 # How many rollouts do we run of each turn before picking the best
 ROLLOUTS_PER_TURN = 16
 DISC_EPSILON_GREEDY = 0.1
 GEN_EPSILON_GREEDY = 0.04  # (1 - 0.04)^10 ~ 66%
-GEN_SAMPLING_TEMPERATURE = 0.03
+GEN_SAMPLING_TEMPERATURE = 0.02
 
 # How many episodes of data do we collect each iteration, before running a few epochs of optimization?
 # Potentially good to use a few times bigger EPISODES_PER_ITERATION than BATCH_SIZE, to minimize correlation within batches
-EPISODES_PER_ITERATION = 256
+EPISODES_PER_ITERATION = 32
 ROLLOUT_PROCS = 4
 
 # Once we've collected the data, how many times do we go over it for optimization (within one iteration)?
@@ -102,7 +103,7 @@ def build_agent():
     elif LOAD_GENERATOR_MODEL is None:
         generator = AgentGenerator(RandomAIAgent())
     else:
-        generator_agent = Agent.load(LOAD_GENERATOR_MODEL, already_in_path_ok=True)  # ok if a thread loads this after main has already done so.
+        generator_agent = load(LOAD_GENERATOR_MODEL, already_in_path_ok=True)  # ok if a thread loads this after main has already done so.
         generator = generator_agent.generator
         gen_model = generator.model
         gen_model.to(find_device())
@@ -116,18 +117,14 @@ def build_agent():
 
         disc_translator = Translator("discriminator")
         discriminator = QDiscriminator(translator=disc_translator, model=disc_model, epsilon_greedy=DISC_EPSILON_GREEDY)
-    elif LOAD_DISCRIMINAOTR_MODEL is None:
+    elif LOAD_DISCRIMINATOR_MODEL is None:
         discriminator = ScriptedDiscriminator()
     else:
-        disc_model = MinionsDiscriminator(d_model=D_MODEL, depth=DEPTH)
+        disc_agent = load(LOAD_DISCRIMINATOR_MODEL, already_in_path_ok=True)  # ok if a thread loads this after main has already done so.
+        discriminator = disc_agent.discriminator
+        disc_model = discriminator.model
         disc_model.to(find_device())
-        disc_model.load_state_dict(th.load(LOAD_DISCRIMINAOTR_MODEL, map_location=find_device()))
-        discriminator = QDiscriminator(
-            model=disc_model, 
-            translator=Translator("discriminator"),
-            epsilon_greedy=0.0)
-
-    if TRAIN_DISCRIMINATOR or LOAD_DISCRIMINAOTR_MODEL:
+    if TRAIN_DISCRIMINATOR or LOAD_DISCRIMINATOR_MODEL:
         logger.info(f"Discriminator model total parameter count: {sum(p.numel() for p in disc_model.parameters() if p.requires_grad):,}")
     if TRAIN_GENERATOR or LOAD_GENERATOR_MODEL:
         logger.info(f"Generator model total parameter count: {sum(p.numel() for p in gen_model.parameters() if p.requires_grad):,}")
@@ -139,7 +136,7 @@ def eval_vs_other_by_path(agent, eval_agent_path):
     logger.info(f"Looking for eval agent at {eval_agent_path}...")
     if os.path.exists(eval_agent_path):
         agent_name = os.path.basename(eval_agent_path)
-        eval_agent = Agent.load(eval_agent_path)
+        eval_agent = load(eval_agent_path)
         eval_vs_other(agent, eval_agent, agent_name)
 
 def eval_vs_other(agent, eval_agent, name):
@@ -213,19 +210,12 @@ def main(run_name):
                     if TRAIN_DISCRIMINATOR:
                         agent.discriminator.epsilon_greedy = 0.0
                     model_mode_eval()
-                    agent.save(os.path.join(checkpoint_dir, f"iter_{iteration}"), copy_code_from=code_dir)
+                    save(agent, os.path.join(checkpoint_dir, f"iter_{iteration}"), copy_code_from=code_dir)
                     model_mode_train()
                     agent.rollouts_per_turn = ROLLOUTS_PER_TURN
                     if TRAIN_DISCRIMINATOR:
                         agent.discriminator.epsilon_greedy = DISC_EPSILON_GREEDY
 
-            # seed_everything(54321)
-            # model_mode_eval()
-            # agent.discriminator.epsilon_greedy = 0.0
-            # eval_vs_other_by_path(agent, os.path.join(get_experiments_directory(), "conv_big", "dfarhi_0613_conveps_256rolls_iter400_adapt"))
-            # recording = _play_n_recording_actions(ENVS[EVAL_ENV_NAME], [agent, agent], 1, seed=54321)
-            # pickle.dump(recording, open(os.path.join(checkpoint_dir, f"recording_{iteration}"), "wb"))
-            # import pdb; pdb.set_trace()
             metrics_logger.log_metrics(rollout_stats)
             if TRAIN_DISCRIMINATOR:
                 disc_param_norm = sum([th.norm(param, p=2) for param in disc_model.parameters()]).item()

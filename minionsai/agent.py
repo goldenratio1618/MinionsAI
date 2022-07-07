@@ -3,19 +3,12 @@ import random
 import subprocess
 import sys
 
-from minionsai.experiment_tooling import find_device
-
 from .game_util import adjacent_zombies
 from .action import ActionList, SpawnAction, MoveAction
 from .engine import Board, Game, Phase, adjacent_hexes
 from .unit_type import ZOMBIE, NECROMANCER, flexible_unit_type, unitList
 
-import torch as th
-import io
-import pickle
 import os
-import shutil
-import importlib
 
 class Agent(abc.ABC):
     """
@@ -26,6 +19,8 @@ class Agent(abc.ABC):
         * You need to ultimately return an ActionList containing your entire turn,
             but you can use game.process_single_action() to see what happens after each single action within the turn.
     """
+    SAMPLE_GAMES_SEED = 8888  # Don't change this, or else loading past agents will appear to be broken even though it isn't.
+
     @abc.abstractmethod
     def act(self, game_copy: Game) -> ActionList:
         raise NotImplementedError()
@@ -51,112 +46,6 @@ class Agent(abc.ABC):
         Seeds any relevant random number generators.
         """
         pass
-
-    def save(self, directory: str, exists_ok=False, copy_code_from=None):
-        """
-        Creates a snapshot of this agent that can be passed around and run on other codebases inside `directory`
-        It stores a pickle of the agent, along with the codebase needed to read that pickle.
-
-        To do that we need to store 3 things:
-        agent_name/
-            agent.pkl                   # the pickle of the agent
-            agent_name_module/          # the codebase needed to load the agent. I think all these nested directories are actually needed, sadly.
-                __init__.py
-                code/
-                    minionsai/
-            agent/                      # Any class-specific stuff needed, saved in save_extra() and loaded in load_extra()
-                ...
-
-        If `exists_ok` is True, then the directory will be overwritten if it exists.
-        If `copy_code_from` is not None, then the codebase will be copied from that directory.
-            That directory should be equivalent to MinionsAI/
-        """
-        print(f"Saving agent into {directory}")
-        if os.path.exists(directory):
-            if exists_ok:
-                shutil.rmtree(directory)
-            else:
-                raise ValueError(f"Save failed - directory {directory} already exists")
-        else:
-            os.makedirs(directory)
-
-        ####### 1. Store the codebase #######
-        # No recursive copying
-        ignore_patterns = [".git", "__pycache__", "scoreboard*", "tests", "scripts"]
-        ignore_patterns.append("*" + os.path.split(directory)[-1]+"*")
-
-        # Copy all of MinionsAI/ into directory, ignoring files that match ignore_patterns
-        # In a cross-platform compatible way
-        module_name = f'{os.path.basename(directory)}_module'
-
-        if copy_code_from is None:
-            copy_code_from = os.path.join(os.path.dirname(__file__), '..')
-        dest = os.path.join(directory, module_name, 'code')
-        shutil.copytree(copy_code_from, dest, ignore=shutil.ignore_patterns(*ignore_patterns))
-
-        ####### 2. Make agent.pkl #######
-        pickle.dump(self, open(os.path.join(directory, 'agent.pkl'), 'wb'))
-
-        ####### 3. Save extra data #######
-        agent_dir = os.path.join(directory, 'agent')
-        os.makedirs(agent_dir)
-        self.save_extra(agent_dir)
-
-    # class-level dict of {module_name: module_path} of all agents we've loaded so far.
-    loaded_agents = {}
-
-    @staticmethod
-    def load_deprecated(directory: str, already_in_path_ok=False):
-        # TODO delete this once we have no old agents anymore.
-        name = os.path.split(directory)[-1]
-        if name in Agent.loaded_agents and Agent.loaded_agents[name] != directory:
-            raise ValueError(f"Can't load a second agent with the same name! (Loading {directory} but already loaded {Agent.loaded_agents[name]}.")
-        if name not in Agent.loaded_agents:
-            if directory in sys.path and not already_in_path_ok:
-                raise ValueError(f"Agent is already in sys.path somehow: {directory}.")
-            Agent.loaded_agents[name] = directory
-            sys.path.append(directory)
-
-        print(f"Loading legacy agent from {directory}")
-        module_name = f"{os.path.basename(directory)}_module"
-        module = importlib.import_module(module_name)
-        return module.build_agent()
-
-    @staticmethod
-    def load(directory: str, already_in_path_ok=False):
-        if not os.path.exists(os.path.join(directory, 'agent.pkl')):
-            return Agent.load_deprecated(directory, already_in_path_ok)
-        name = os.path.split(directory)[-1]
-        if name in Agent.loaded_agents and Agent.loaded_agents[name] != directory:
-            raise ValueError(f"Can't load a second agent with the same name! (Loading {directory} but already loaded {Agent.loaded_agents[name]}.")
-        if name not in Agent.loaded_agents:
-            if directory in sys.path and not already_in_path_ok:
-                raise ValueError(f"Agent is already in sys.path somehow: {directory}.")
-            Agent.loaded_agents[name] = directory
-            sys.path.append(directory)
-
-        print(f"Loading {directory}...")
-        outer_module_name = f'{os.path.basename(directory)}_module'
-        with open(os.path.join(directory, 'agent.pkl'), 'rb') as f:
-            agent = LocalCodeUnpickler(f, outer_module_name).load()
-        agent.load_extra(os.path.join(directory, "agent"))
-        return agent
-
-class LocalCodeUnpickler(pickle.Unpickler):
-    def __init__(self, file, outer_module_name):
-        super().__init__(file)
-        self.outer_module_name = outer_module_name
-    def find_class(self, module, name):
-        if 'minionsai' in module:
-            sub_minions_part = module.split('minionsai.')[-1]
-            new_module = f'{self.outer_module_name}.code.minionsai.{sub_minions_part}'
-            return super().find_class(new_module, name)      
-        
-        # Copied from https://stackoverflow.com/questions/57081727/load-pickle-file-obtained-from-gpu-to-cpu
-        if module == 'torch.storage' and name == '_load_from_bytes':
-            return lambda b: th.load(io.BytesIO(b), map_location=find_device())
-
-        return super().find_class(module, name)
 
 class NullAgent(Agent):
     """
