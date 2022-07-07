@@ -43,7 +43,7 @@ class TrueskillWorker():
         self.game_fn = game_fn
         self.choose_underevaluated_agents_prob = 0.5
         self.batch_size = batch_size
-        self.env = trueskill.TrueSkill(tau=0.02, draw_probability=0.0)
+        self.env = trueskill.TrueSkill(tau=0.01, draw_probability=0.0)
         self.dropped_agents = []
         self.max_crash_rate = 0.5
         self.scores_file = scores_file or os.path.join(directory, "scores.csv")
@@ -87,7 +87,7 @@ class TrueskillWorker():
 
     def load_agent(self, agent_name: str) -> Optional[Agent]:
         try:
-            return load(os.path.join(self.directory, agent_name))
+            return load(os.path.join(self.directory, agent_name), test_load_equivalence=self.num_games[agent_name] == 0)
         except Exception as e:
             print(f"Error loading agent: {agent_name}")
             print(e)
