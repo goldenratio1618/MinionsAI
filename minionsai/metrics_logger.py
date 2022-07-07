@@ -34,6 +34,7 @@ class MetricsLogger():
         self._last_seen_values = {}
         self._timings = defaultdict(list)
         self._repeated_logging_okay = False
+        self._creation_time = time.time()
 
     def configure(self, path):
         self._csv_path = path
@@ -95,6 +96,8 @@ class MetricsLogger():
         self._timings = defaultdict(list)
 
     def flush(self):
+        self._metrics_this_step["time/wall"] = time.time()
+        self._metrics_this_step["time/elapsed"] = self._metrics_this_step["time/wall"] - self._creation_time
         self._flush_timings()
         new_keys = list(set(self._metrics_this_step.keys()) - set(self._seen_keys))
         if len(new_keys) > 0:
