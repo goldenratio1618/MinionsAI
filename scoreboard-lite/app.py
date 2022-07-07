@@ -159,7 +159,7 @@ def agent_play(env_name, agent_name):
                 game.end_spawn_phase()
             game_prev_turn_str = game.pretty_print(do_print=False)
             game.next_turn()
-            agent = load(os.path.join(env_agents_dir(env_name), agent_name))
+            agent = load(os.path.join(env_agents_dir(env_name), agent_name), test_load_equivalence=False)
             agent_actions = agent.act(game.copy())
             game.full_turn(agent_actions)
             game.next_turn()
