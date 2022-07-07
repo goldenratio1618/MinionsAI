@@ -89,6 +89,9 @@ class Agent(abc.ABC):
 
         ####### 2. Make __init__.py #######
         module = self.__module__
+        if "code" in module:
+            raise ValueError("It probably won't work to re-save a saved/loaded agent.")
+            module = module.split("code")[-1]
         class_name = self.__class__.__name__
         with open(os.path.join(directory, "__init__.py"), "w") as f:
             init_contents = build_agent_init(module, class_name)
