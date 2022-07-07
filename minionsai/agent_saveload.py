@@ -72,6 +72,8 @@ def save(agent: Agent, directory: str, exists_ok=False, copy_code_from=None):
 _loaded_agents = {}
 
 def load(directory: str, already_in_path_ok=False, test_load_equivalence=True) -> Agent:
+    if not os.path.exists(directory):
+        raise ValueError(f"Can't load agent from {directory} - directory does not exist.")
     if not os.path.exists(os.path.join(directory, 'agent.pkl')):
         return load_deprecated(directory, already_in_path_ok)
     name = os.path.split(directory)[-1]
