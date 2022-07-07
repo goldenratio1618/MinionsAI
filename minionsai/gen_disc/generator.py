@@ -75,10 +75,14 @@ class QGenerator(BaseGenerator):
         recorded_next_maxq = []
         recorded_numpy_actions = []
         recorded_actions = [[] for _ in range(n)]
+        recorded_valid_actions = []
+        recorded_winprobs = []
         for i in range(self.actions_per_turn):
             obs, valid_actions = self.translate_many(games)
+            recorded_valid_actions.append(valid_actions)
             logits = self.model(obs)
             winprobs = th.sigmoid(logits).detach().cpu().numpy()  # shape = [n, num_things, num_things]
+            recorded_winprobs.append(winprobs)
             assert winprobs.ndim == 3 and winprobs.shape[0] == n and winprobs.shape[1] == winprobs.shape[2], (n, winprobs.shape)
             masked_winprobs = np.where(valid_actions, winprobs, -np.inf)  # shape = [n, num_things, num_things]
             assert masked_winprobs.shape == winprobs.shape, (masked_winprobs.shape, winprobs.shape)
@@ -112,6 +116,8 @@ class QGenerator(BaseGenerator):
             "obs": recorded_obs,
             "next_maxq": recorded_next_maxq,
             "numpy_actions": recorded_numpy_actions,
+            "valid_actions": recorded_valid_actions,
+            "winprobs": recorded_winprobs,
         }
 
     def sample(self, logits: np.ndarray) -> int:
