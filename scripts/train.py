@@ -41,11 +41,11 @@ LOAD_GENERATOR_MODEL = None # os.path.join(get_experiments_directory(), "gen_con
 ROLLOUTS_PER_TURN = 16
 DISC_EPSILON_GREEDY = 0.1
 GEN_EPSILON_GREEDY = 0.04  # (1 - 0.04)^10 ~ 66%
-GEN_SAMPLING_TEMPERATURE = 0.02
+GEN_SAMPLING_TEMPERATURE = 0.03
 
 # How many episodes of data do we collect each iteration, before running a few epochs of optimization?
 # Potentially good to use a few times bigger EPISODES_PER_ITERATION than BATCH_SIZE, to minimize correlation within batches
-EPISODES_PER_ITERATION = 32
+EPISODES_PER_ITERATION = 256
 ROLLOUT_PROCS = 4
 
 # Once we've collected the data, how many times do we go over it for optimization (within one iteration)?
@@ -69,7 +69,7 @@ EVAL_TRIALS = 50
 CHECKPOINT_EVERY = 4
 
 # During evals, run this many times extra rollouts compared to during rollout generation
-EVAL_COMPUTE_BOOST = 4
+EVAL_COMPUTE_BOOST = 16
 
 # Model Size
 DEPTH = 2
@@ -80,7 +80,7 @@ GEN_D_MODEL = 64 * GEN_DEPTH
 # Optimizer hparams
 DISC_BATCH_SIZE = EPISODES_PER_ITERATION
 DISC_LR = 1e-4
-GEN_BATCH_SIZE = EPISODES_PER_ITERATION * 16
+GEN_BATCH_SIZE = EPISODES_PER_ITERATION * 2
 GEN_LR = 2e-4
 
 # kwargs to create a game (passed to Game)
