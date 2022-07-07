@@ -49,13 +49,17 @@ def gumbel_sample(logits: np.ndarray, temperature) -> np.ndarray:
     return argmax_last_two_indices(argmax_from)
 
 class QGenerator(BaseGenerator):
-    def __init__(self, translator, model, sampling_temperature, epsilon_greedy, actions_per_turn=10) -> None:
+    def __init__(self, translator, model, sampling_temperature, epsilon_greedy, actions_per_turn=10, epsilon_greedy_min=0.1, epsilon_greedy_update=0.99, sampling_increase=0.01) -> None:
         super().__init__()
         self.model = model
         self.translator = translator
         self.sampling_temperature = sampling_temperature
+        self.sampling_increase = sampling_increase
         self.epsilon_greedy = epsilon_greedy
         self.actions_per_turn = actions_per_turn
+        self.epsilon_greedy_min = epsilon_greedy_min
+        self.epsilon_greedy_update = epsilon_greedy_update
+        self.iter = 0
 
     def translate_many(self, games):
         obs = []
@@ -84,7 +88,7 @@ class QGenerator(BaseGenerator):
             assert masked_winprobs.shape == winprobs.shape, (masked_winprobs.shape, winprobs.shape)
             max_winprob = np.max(np.max(masked_winprobs, axis=1), axis=1)  # shape = [n]
             assert max_winprob.shape == (n,), max_winprob.shape
-            sampled_numpy_action = self.sample(masked_winprobs) # shape = [n, 2]
+            sampled_numpy_action = self.sample(masked_winprobs, self.sampling_temperature + i * self.sampling_increase) # shape = [n, 2]
             assert sampled_numpy_action.shape == (n, 2), sampled_numpy_action.shape
             sampled_action = [self.translator.untranslate_action(action) for action in sampled_numpy_action]
             
@@ -114,23 +118,26 @@ class QGenerator(BaseGenerator):
             "numpy_actions": recorded_numpy_actions,
         }
 
-    def sample(self, logits: np.ndarray) -> int:
+    def increment_iter(self):
+        self.iter += 1
+    
+    def sample(self, logits: np.ndarray, sampling_temperature) -> int:
         """
         Samples an action from an array ([batch, things, things]) of q values
 
         Returns an array of index-pairs; shape = [batch, 2]
         """
         # Make a list of whether or not to be greedy for each entry inthe batch
-        greedy = np.random.rand(*logits.shape[:-2]) < self.epsilon_greedy
+        greedy = np.random.rand(*logits.shape[:-2]) < self.epsilon_greedy_min + (self.epsilon_greedy - self.epsilon_greedy_min) * (self.epsilon_greedy_update ** self.iter)
 
         # Implement greedy sampling by setting the logits to zero.
         # Can't multiply by literally zero, because many entries are masked (set to -inf)
-        tiny_multiplier = self.sampling_temperature * 1e-6
+        tiny_multiplier = sampling_temperature * 1e-6
         greedy_multiplier = np.where(greedy, tiny_multiplier, 1)
         greedy_multiplier = np.expand_dims(greedy_multiplier, axis=-1)
         greedy_multiplier = np.expand_dims(greedy_multiplier, axis=-1)
         greedified_logits = logits * greedy_multiplier
-        return gumbel_sample(greedified_logits, self.sampling_temperature)
+        return gumbel_sample(greedified_logits, sampling_temperature)
 
 
 

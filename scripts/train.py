@@ -37,14 +37,19 @@ LOAD_DISCRIMINAOTR_MODEL = None#os.path.join(get_experiments_directory(), "conv_
 
 # How many rollouts do we run of each turn before picking the best
 ROLLOUTS_PER_TURN = 16
-DISC_EPSILON_GREEDY = 0.1
-GEN_EPSILON_GREEDY = 0.04  # (1 - 0.04)^10 ~ 66%
-GEN_SAMPLING_TEMPERATURE = 0.03
+DISC_EPSILON_GREEDY = 1.0
+DISC_EPSILON_GREEDY_MIN = 0.05
+DISC_EPSILON_GREEDY_UPDATE = 0.9
+GEN_EPSILON_GREEDY = 1.0
+GEN_EPSILON_GREEDY_MIN = 0.005
+GEN_EPSILON_GREEDY_UPDATE = 0.99
+GEN_SAMPLING_TEMPERATURE = 1e-4
+GEN_SAMPLING_INCREASE = 0.005
 
 # How many episodes of data do we collect each iteration, before running a few epochs of optimization?
 # Potentially good to use a few times bigger EPISODES_PER_ITERATION than BATCH_SIZE, to minimize correlation within batches
 EPISODES_PER_ITERATION = 32
-ROLLOUT_PROCS = 4
+ROLLOUT_PROCS = 1
 
 # Once we've collected the data, how many times do we go over it for optimization (within one iteration)?
 SAMPLE_REUSE = 2
@@ -60,7 +65,7 @@ EVAL_VS_AGENTS = [
     # os.path.join(get_experiments_directory(), "conv_big", "checkpoints", "iter_200")
 ]
 # Eval against random up until this iteration
-EVAL_VS_RANDOM_UNTIL = 10
+EVAL_VS_RANDOM_UNTIL = 300
 EVAL_TRIALS = 100
 
 # Frequency of storing a saved agent
@@ -81,12 +86,14 @@ DISC_LR = 1e-4
 GEN_BATCH_SIZE = EPISODES_PER_ITERATION * 16
 GEN_LR = 2e-4
 
+LR_UPDATE = 0.995
+
 # kwargs to create a game (passed to Game)
 game_kwargs = {'symmetrize': False}
 # Eval env registered in scoreboard_envs.py
 EVAL_ENV_NAME = 'zombies5x5'
 
-MAX_ITERATIONS = 400
+MAX_ITERATIONS = 1000
 
 SEED = 12345
 
@@ -97,7 +104,7 @@ def build_agent():
         logger.info("Generator model initialized:")
         logger.info(gen_model)
         gen_translator = Translator("generator")  # TODO - make gen translator
-        generator = QGenerator(model=gen_model, translator=gen_translator, sampling_temperature=GEN_SAMPLING_TEMPERATURE, epsilon_greedy=GEN_EPSILON_GREEDY)
+        generator = QGenerator(model=gen_model, translator=gen_translator, sampling_temperature=GEN_SAMPLING_TEMPERATURE, epsilon_greedy=GEN_EPSILON_GREEDY, epsilon_greedy_min=DISC_EPSILON_GREEDY_MIN, epsilon_greedy_update=GEN_EPSILON_GREEDY_UPDATE)
     else:
         generator = AgentGenerator(RandomAIAgent())
 
@@ -109,7 +116,7 @@ def build_agent():
         logger.info(f"Discriminator model total parameter count: {sum(p.numel() for p in disc_model.parameters() if p.requires_grad):,}")
 
         disc_translator = Translator("discriminator")
-        discriminator = QDiscriminator(translator=disc_translator, model=disc_model, epsilon_greedy=DISC_EPSILON_GREEDY)
+        discriminator = QDiscriminator(translator=disc_translator, model=disc_model, epsilon_greedy=DISC_EPSILON_GREEDY, epsilon_greedy_min=DISC_EPSILON_GREEDY_MIN, epsilon_greedy_update=DISC_EPSILON_GREEDY_UPDATE)
     elif LOAD_DISCRIMINAOTR_MODEL is None:
         discriminator = ScriptedDiscriminator()
     else:
@@ -142,10 +149,18 @@ def eval_vs_other(agent, eval_agent, name):
     agent.rollouts_per_turn = ROLLOUTS_PER_TURN * EVAL_COMPUTE_BOOST
     if TRAIN_DISCRIMINATOR:
         agent.discriminator.epsilon_greedy = 0.0
+        agent.discriminator.epsilon_greedy_min = 0.0
+    if TRAIN_GENERATOR:
+        agent.generator.epsilon_greedy = 0.0
+        agent.generator.epsilon_greedy_min = 0.0
     wins, _metrics = run_n_games(ENVS[EVAL_ENV_NAME], [agent, eval_agent], n=EVAL_TRIALS)
     agent.rollouts_per_turn = ROLLOUTS_PER_TURN
     if TRAIN_DISCRIMINATOR:
         agent.discriminator.epsilon_greedy = DISC_EPSILON_GREEDY
+        agent.discriminator.epsilon_greedy_min = DISC_EPSILON_GREEDY_MIN
+    if TRAIN_GENERATOR:
+        agent.generator.epsilon_greedy = GEN_EPSILON_GREEDY
+        agent.generator.epsilon_greedy_min = GEN_EPSILON_GREEDY_MIN
     winrate = wins[0] / EVAL_TRIALS
     metrics_logger.log_metrics({f"eval_winrate/{name}": winrate})
     logger.info(f"Win rate vs {name} = {winrate}")  
@@ -164,11 +179,13 @@ def main(run_name):
         disc_model = agent.discriminator.model
         disc_model.to(device)
         disc_optimizer = th.optim.Adam(disc_model.parameters(), lr=DISC_LR)
+        disc_scheduler = th.optim.lr_scheduler.ExponentialLR(disc_optimizer, gamma=LR_UPDATE)
 
     if TRAIN_GENERATOR:
         gen_model = agent.generator.model
         gen_model.to(device)
         gen_optimizer = th.optim.Adam(gen_model.parameters(), lr=GEN_LR)
+        gen_scheduler = th.optim.lr_scheduler.ExponentialLR(gen_optimizer, gamma=LR_UPDATE)
 
     def model_mode_eval():
         if TRAIN_DISCRIMINATOR:
@@ -258,6 +275,9 @@ def main(run_name):
                                     max_batch_digits = len(str(n_batches))
                                     metrics_logger.log_metrics({f"disc/loss/epoch_{epoch}/batch_{idx:0>{max_batch_digits}}": loss.item()})
                                 turns_optimized += len(batch_idxes)
+                agent.discriminator.increment_iter()
+                disc_scheduler.step()
+
             if TRAIN_GENERATOR:
                 gen_rollout_batch = rollout_batch['generator']
                 num_actions = gen_rollout_batch.labels.shape[0]
@@ -299,6 +319,10 @@ def main(run_name):
                                     max_batch_digits = len(str(n_batches))
                                     metrics_logger.log_metrics({f"gen/loss/epoch_{epoch}/batch_{idx:0>{max_batch_digits}}": loss.item()})
                                 gen_actions_optimized += len(batch_idxes)
+                agent.generator.increment_iter()
+                gen_scheduler.step()
+
+
             logger.info(f"Iteration {iteration} complete.")
             iteration += 1
             # agent.epsilon_greedy = EPSILON_GREEEDY * (1 - 0.8 * iteration / MAX_ITERATIONS)
