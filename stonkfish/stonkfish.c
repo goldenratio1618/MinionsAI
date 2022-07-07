@@ -329,17 +329,27 @@ int main() {
         yf = y;
       }
     }
-    if (xi != xf || yi != yf)
-      printf("%d %d %d %d\n", xi, yi, xf, yf);
     location new_loc;
     new_loc.x = xf;
     new_loc.y = yf;
     own_captain = new_loc;
-    // update map if new location contains one of your zombies
+    // if new location contains one of your zombies, move zombie somewhere else
     if (zombies[xf * BOARD_SIZE + yf] == color) {
+      location target = best_zombie_hex(xf, yf, color, enemy_captain, own_captain, graveyards, zombies);
       zombies[xf * BOARD_SIZE + yf] = -1;
-      zombies[xi * BOARD_SIZE + yi] = 2;
+      // if best square is old captain location, swap units
+      if (target.x == xi && target.y == yi || target.x == -1) {
+        zombies[xi * BOARD_SIZE + yi] = 2;
+      } else { // otherwise move zombie to new location
+        int xz, yz;
+        xz = target.x;
+        yz = target.y;
+        zombies[xz * BOARD_SIZE + yz] = 2;
+        printf("%d %d %d %d\n", xf, yf, xz, yz);
+      }
     }
+    if (xi != xf || yi != yf)
+      printf("%d %d %d %d\n", xi, yi, xf, yf);
 
     // attack enemy zombies with captain
     get_adjacent_hexes(adjacent_hexes, &new_loc);
