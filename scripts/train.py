@@ -58,7 +58,7 @@ EVAL_EVERY = 8
 EVAL_VS_PAST_ITERS = []
 # Specific agent instances to eval vs
 EVAL_VS_AGENTS = [
-    GenDiscAgent(ScriptedDiscriminator(), AgentGenerator(RandomAIAgent()), rollouts_per_turn=16),
+    GenDiscAgent(ScriptedDiscriminator(), [(AgentGenerator(RandomAIAgent()), 16)]),
     os.path.join(get_experiments_directory(), "conv_big", "dfarhi_0613_conveps_256rolls_iter400_adapt")
 ]
 # Eval against random up until this iteration
@@ -129,7 +129,7 @@ def build_agent():
     if TRAIN_GENERATOR or LOAD_GENERATOR_MODEL:
         logger.info(f"Generator model total parameter count: {sum(p.numel() for p in gen_model.parameters() if p.requires_grad):,}")
 
-    agent = GenDiscAgent(discriminator, generator, rollouts_per_turn=ROLLOUTS_PER_TURN)
+    agent = GenDiscAgent(discriminator, [(generator, ROLLOUTS_PER_TURN), (AgentGenerator(RandomAIAgent()), 64)])
     return agent
 
 def eval_vs_other_by_path(agent, eval_agent_path):
@@ -169,7 +169,9 @@ def main(run_name):
         disc_optimizer = th.optim.Adam(disc_model.parameters(), lr=DISC_LR)
 
     if TRAIN_GENERATOR:
-        gen_model = agent.generator.model
+        # Assume we train the first generator.
+        train_gen, rollouts_per_turn = agent.generators[0]
+        gen_model = train_gen.model
         gen_model.to(device)
         gen_optimizer = th.optim.Adam(gen_model.parameters(), lr=GEN_LR)
 

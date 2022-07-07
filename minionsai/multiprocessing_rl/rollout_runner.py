@@ -72,10 +72,10 @@ class RolloutRunner():
                 assert ending_labels.shape == (1, self.agent.rollouts_per_turn), ending_labels.shape
 
                 gen_labels = np.concatenate([gen_labels, ending_labels], axis=0)
-                assert gen_labels.shape == (self.agent.generator.actions_per_turn, self.agent.rollouts_per_turn), gen_labels.shape
+                assert gen_labels.shape == (train_generator.actions_per_turn, self.agent.rollouts_per_turn), gen_labels.shape
                 all_gen_labels.append(gen_labels)
 
-                assert train_gen_info["numpy_actions"].shape == (self.agent.generator.actions_per_turn, self.agent.rollouts_per_turn, 2), gen_info["numpy_actions"].shape
+                assert train_gen_info["numpy_actions"].shape == (train_generator.actions_per_turn, self.agent.rollouts_per_turn, 2), gen_info["numpy_actions"].shape
                 all_gen_actions.append(train_gen_info["numpy_actions"])
             
                 # Accumulate metrics from the generators
@@ -106,7 +106,7 @@ class RolloutRunner():
 
 
         if len(all_gen_obs) > 0:
-            total_turns = len(all_gen_labels) * self.agent.rollouts_per_turn * self.agent.generator.actions_per_turn
+            total_turns = len(all_gen_labels) * rollouts_per_turn * train_generator.actions_per_turn
             all_gen_obs = stack_dicts(all_gen_obs)
             all_gen_obs = {k: v.reshape(total_turns, *v.shape[2:]) for k, v in all_gen_obs.items()}
             all_gen_labels = np.concatenate(all_gen_labels)  # shape=[actions_per_turn * turns, rollouts_per_turn]
@@ -121,7 +121,7 @@ class RolloutRunner():
                     # check that we have the right number
                     assert len(list_of_values) == len(all_disc_labels)
                     mean = sum(list_of_values) / len(list_of_values)
-                    global_metrics[f"rollouts/generators/i/{key}"] = mean
+                    global_metrics[f"generators/{i}/{key}"] = mean
         result = RolloutEpisode(
             disc_obs=all_disc_obs, 
             disc_labels=all_disc_labels, 
