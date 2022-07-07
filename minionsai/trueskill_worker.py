@@ -87,7 +87,8 @@ class TrueskillWorker():
 
     def load_agent(self, agent_name: str) -> Optional[Agent]:
         try:
-            return load(os.path.join(self.directory, agent_name), test_load_equivalence=self.num_games[agent_name] == 0)
+            test_load_equivalence = self.num_games[agent_name] % 100 == 0
+            return load(os.path.join(self.directory, agent_name), test_load_equivalence=test_load_equivalence)
         except Exception as e:
             print(f"Error loading agent: {agent_name}")
             print(e)
