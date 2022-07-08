@@ -26,10 +26,13 @@ class Worker():
         self.iteration_info_queue = iteration_info_queue
         self.agent = agent_fn()
         if isinstance(self.agent, GenDiscAgent):
-            for piece in [self.agent.discriminator, self.agent.generator]:
-                if hasattr(piece, "model"):
-                    piece.model.to(device)
-                    piece.model.eval()
+            if hasattr(self.agent.discriminator, "model"):
+                self.agent.discriminator.model.to(device)
+                self.agent.discriminator.model.eval()
+            for generator, _ in self.agent.generators:
+                if hasattr(generator, "model"):
+                    generator.model.to(device)
+                    generator.model.eval()
         self.runner = RolloutRunner(game_kwargs, self.agent)
         self.iteration = -1
 
@@ -49,7 +52,9 @@ class Worker():
             if "discriminator" in models_state:
                 self.agent.discriminator.model.load_state_dict(models_state["discriminator"])
             if "generator" in models_state:
-                self.agent.generator.model.load_state_dict(models_state["generator"])
+                # Assume we only train the first generator
+                generator, _ = self.agent.generators[0]
+                generator.model.load_state_dict(models_state["generator"])
 
     def run(self):
         while True:
@@ -130,7 +135,8 @@ class MultiProcessRolloutSource(OptimizerRolloutSource):
                 # Convert to cpu because it seems to get corrupted if you pass GPU tensors directly.
                 agent_state['discriminator'] = {k: v.cpu() for k, v in self.main_thread_agent.discriminator.model.state_dict().items()}
             if self.train_generator:
-                agent_state['generator'] = {k: v.cpu() for k, v in self.main_thread_agent.generator.model.state_dict().items()}
+                train_generator, _ = self.main_thread_agent.generators[0]
+                agent_state['generator'] = {k: v.cpu() for k, v in train_generator.model.state_dict().items()}
         for q in self.iteration_info_queues:
             q.put((iteration, hparams, agent_state))
 

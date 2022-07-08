@@ -69,13 +69,13 @@ class RolloutRunner():
                 all_ending_labels = disc_info["all_winprobs"]  # This is shape [total rollouts_per_turn]
                 ending_labels = all_ending_labels[:rollouts_per_turn]
                 ending_labels = np.expand_dims(ending_labels, axis=0)  # [1, rollouts_per_turn]
-                assert ending_labels.shape == (1, self.agent.rollouts_per_turn), ending_labels.shape
+                assert ending_labels.shape == (1, rollouts_per_turn), ending_labels.shape
 
                 gen_labels = np.concatenate([gen_labels, ending_labels], axis=0)
-                assert gen_labels.shape == (train_generator.actions_per_turn, self.agent.rollouts_per_turn), gen_labels.shape
+                assert gen_labels.shape == (train_generator.actions_per_turn, rollouts_per_turn), gen_labels.shape
                 all_gen_labels.append(gen_labels)
 
-                assert train_gen_info["numpy_actions"].shape == (train_generator.actions_per_turn, self.agent.rollouts_per_turn, 2), gen_info["numpy_actions"].shape
+                assert train_gen_info["numpy_actions"].shape == (train_generator.actions_per_turn, rollouts_per_turn, 2), gen_info["numpy_actions"].shape
                 all_gen_actions.append(train_gen_info["numpy_actions"])
             
                 # Accumulate metrics from the generators
