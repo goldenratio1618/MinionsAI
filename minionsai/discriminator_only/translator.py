@@ -12,6 +12,9 @@ import numpy as np
 def convert_loc_to_pos(loc):
     return (loc // BOARD_SIZE, loc % BOARD_SIZE)
 
+def convert_pos_to_loc(i, j):
+    return i * BOARD_SIZE + j
+
 class ObservationEnum():
     def __init__(self, values: List, none_value=False):
         if none_value:
@@ -165,15 +168,27 @@ class Translator():
         assert not (untranslated_action is None)
         return untranslated_action
 
+    @staticmethod
+    def transpose_actions(actions: np.ndarray):
+        # actions is shape [N, 2]
+        # Where each of the 2 is an index into num_things;
+        # i.e. 
+        # flip is (i, j) -> (j, i)
+        i, j = convert_loc_to_pos(actions)
+        return np.where(actions < BOARD_SIZE ** 2, convert_pos_to_loc(j, i), actions)
+
 
     @staticmethod
-    def symmetries(obs):
+    def rotate_actions(actions: np.ndarray):
+        # rotate is (i, j) -> (4-i, 4-j)
+        i, j = convert_loc_to_pos(actions)
+        return np.where(actions < BOARD_SIZE ** 2, convert_pos_to_loc(4-i, 4-j), actions)
+
+    @staticmethod
+    def symmetries(obs, actions=None):
         # Takes an obs that came out of translator.translate()
         # and returns a list of symmetric observations
         # TODO(david) - this function really should be tested.
-        # print(obs)
-        # print("-----------------------------------")
-        # print(obs['board'])
         board = obs['board']
         num = board.shape[0]
         board = np.reshape(board, [num, BOARD_SIZE, BOARD_SIZE, 3])
@@ -181,6 +196,18 @@ class Translator():
         rotated_boards = [np.flip(np.flip(b, axis=1), axis=2) for b in all_boards]
         all_boards = all_boards + rotated_boards
         all_boards = [np.reshape(b, [num, BOARD_SIZE ** 2, 3]) for b in all_boards]
+
+        if actions is not None:
+            assert actions.shape == (num, 2)
+            transposed_actions = Translator.transpose_actions(actions)
+            all_actions = np.concatenate([actions, transposed_actions], axis=0)
+            assert all_actions.shape == (num * 2, 2), all_actions.shape
+            rotated_actions = Translator.rotate_actions(all_actions)
+            all_actions = np.concatenate([all_actions, rotated_actions], axis=0)
+            assert all_actions.shape == (num * 4, 2), all_actions.shape
+        else:
+            all_actions = None
+        
 
         new_obs = []
         for b in all_boards:
@@ -193,4 +220,4 @@ class Translator():
             if 'phase' in obs.keys():
                 d['phase'] = obs['phase']
             new_obs.append(d)
-        return new_obs
+        return new_obs, all_actions
