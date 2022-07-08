@@ -45,7 +45,7 @@ GEN_SAMPLING_TEMPERATURE = 0.03
 
 # How many episodes of data do we collect each iteration, before running a few epochs of optimization?
 # Potentially good to use a few times bigger EPISODES_PER_ITERATION than BATCH_SIZE, to minimize correlation within batches
-EPISODES_PER_ITERATION = 128
+EPISODES_PER_ITERATION = 32
 ROLLOUT_PROCS = 4
 
 # Once we've collected the data, how many times do we go over it for optimization (within one iteration)?
@@ -80,7 +80,7 @@ GEN_D_MODEL = 64 * GEN_DEPTH
 # Optimizer hparams
 DISC_BATCH_SIZE = EPISODES_PER_ITERATION
 DISC_LR = 1e-4
-GEN_BATCH_SIZE = EPISODES_PER_ITERATION * 16
+GEN_BATCH_SIZE = EPISODES_PER_ITERATION * 64
 GEN_LR = 2e-4
 
 # kwargs to create a game (passed to Game)
