@@ -69,7 +69,7 @@ EVAL_TRIALS = 50
 CHECKPOINT_EVERY = 4
 
 # During evals, run this many times extra rollouts compared to during rollout generation
-EVAL_COMPUTE_BOOST = 16
+EVAL_COMPUTE_BOOST = 4
 
 # Model Size
 DEPTH = 2
@@ -142,11 +142,11 @@ def eval_vs_other_by_path(agent, eval_agent_path):
 def eval_vs_other(agent, eval_agent, name):
     # Hack to temporarily change the agent's rollouts_per_turn & epsilon greedy values
     # TODO - make it easier to set an agent into "eval" mode.
-    agent.rollouts_per_turn = ROLLOUTS_PER_TURN * EVAL_COMPUTE_BOOST
+    agent.generators = [(gen, num * EVAL_COMPUTE_BOOST) for gen, num in agent.generators]
     if TRAIN_DISCRIMINATOR:
         agent.discriminator.epsilon_greedy = 0.0
     wins, _metrics = run_n_games(ENVS[EVAL_ENV_NAME], [agent, eval_agent], n=EVAL_TRIALS)
-    agent.rollouts_per_turn = ROLLOUTS_PER_TURN
+    agent.generators = [(gen, num // EVAL_COMPUTE_BOOST) for gen, num in agent.generators]
     if TRAIN_DISCRIMINATOR:
         agent.discriminator.epsilon_greedy = DISC_EPSILON_GREEDY
     winrate = wins[0] / EVAL_TRIALS
@@ -208,13 +208,13 @@ def main(run_name):
                 with metrics_logger.timing('checkpointing'):
                     logger.info("Saving checkpoint...")
                     # Save with more rollouts_per_turn. TODO - clean up this hack.
-                    agent.rollouts_per_turn = ROLLOUTS_PER_TURN * EVAL_COMPUTE_BOOST
+                    agent.generators = [(gen, num * EVAL_COMPUTE_BOOST) for gen, num in agent.generators]
                     if TRAIN_DISCRIMINATOR:
                         agent.discriminator.epsilon_greedy = 0.0
                     model_mode_eval()
                     save(agent, os.path.join(checkpoint_dir, f"iter_{iteration}"), copy_code_from=code_dir)
                     model_mode_train()
-                    agent.rollouts_per_turn = ROLLOUTS_PER_TURN
+                    agent.generators = [(gen, num // EVAL_COMPUTE_BOOST) for gen, num in agent.generators]
                     if TRAIN_DISCRIMINATOR:
                         agent.discriminator.epsilon_greedy = DISC_EPSILON_GREEDY
 
