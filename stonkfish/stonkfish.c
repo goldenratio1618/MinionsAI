@@ -218,6 +218,71 @@ int main() {
         return 0;
       }
     }
+
+    // movement: charge enemy captain
+    // update: if there is >= 1 unoccupied graveyard, charge nearest one instead
+    int xi, yi, xf, yf, xe, ye;
+    int captain_moved = 0;
+    xi = own_captain.x;
+    yi = own_captain.y;
+    
+    xe = enemy_captain.x;
+    ye = enemy_captain.y;
+
+    xf = xi;
+    yf = yi;
+
+    double score = evaluate_hex(xi, yi, enemy_captain, own_captain, graveyards, zombies, true);
+    // look for empty adjacent hex with smaller distance
+    get_adjacent_hexes(adjacent_hexes, &own_captain);
+    for (int i = 0; i < 6; i ++) {
+      int x = adjacent_hexes[i].x;
+      int y = adjacent_hexes[i].y;
+      if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
+      if (zombies [x * BOARD_SIZE + y] != -1 && zombies [x * BOARD_SIZE + y] != color) continue;
+      if ((xe == x) && (ye == y)) continue;
+      double new_score = evaluate_hex(x, y, enemy_captain, own_captain, graveyards, zombies, true);
+      if (new_score > score) {
+        score = new_score;
+        xf = x;
+        yf = y;
+      }
+    }
+    // only move if best square has none of your zombies
+    if ((zombies[xf * BOARD_SIZE + yf] == -1) && (xi != xf || yi != yf)) {
+      captain_moved = 1;
+      printf("%d %d %d %d\n", xi, yi, xf, yf);
+      location new_loc;
+      new_loc.x = xf;
+      new_loc.y = yf;
+      own_captain = new_loc;
+      // attack enemy zombies with captain
+      get_adjacent_hexes(adjacent_hexes, &new_loc);
+      // first remove zombies from graveyards
+      for (int i = 0; i < 6; i ++) {
+        int x = adjacent_hexes[i].x;
+        int y = adjacent_hexes[i].y;
+        if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
+        if (zombies [x * BOARD_SIZE + y] == 1 - color && graveyards[x * BOARD_SIZE + y]) {
+          zombies[x * BOARD_SIZE + y] = -1;
+          printf("%d %d %d %d\n", xf, yf, x, y);
+          goto ZOMBIE_START;
+        }
+      }
+      // then target other zombies
+      for (int i = 0; i < 6; i ++) {
+        int x = adjacent_hexes[i].x;
+        int y = adjacent_hexes[i].y;
+        if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) continue;
+        if (zombies [x * BOARD_SIZE + y] == 1 - color) {
+          zombies[x * BOARD_SIZE + y] = -1;
+          printf("%d %d %d %d\n", xf, yf, x, y);
+          goto ZOMBIE_START;
+        }
+      }
+    }
+
+    ZOMBIE_START:
     
     // zombie movement
     for (int xi = 0; xi < BOARD_SIZE; xi ++) {
@@ -301,9 +366,8 @@ int main() {
       }
     }
 
-    // movement: charge enemy captain
-    // update: if there is >= 1 unoccupied graveyard, charge nearest one instead
-    int xi, yi, xf, yf, xe, ye;
+    // move captain if not already moved
+    if (captain_moved) goto CAPTAIN_END;
     xi = own_captain.x;
     yi = own_captain.y;
     
@@ -313,7 +377,7 @@ int main() {
     xf = xi;
     yf = yi;
 
-    double score = evaluate_hex(xi, yi, enemy_captain, own_captain, graveyards, zombies, true);
+    score = evaluate_hex(xi, yi, enemy_captain, own_captain, graveyards, zombies, true);
     // look for empty adjacent hex with smaller distance
     get_adjacent_hexes(adjacent_hexes, &own_captain);
     for (int i = 0; i < 6; i ++) {
