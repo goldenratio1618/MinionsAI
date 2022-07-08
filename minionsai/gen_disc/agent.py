@@ -101,5 +101,6 @@ class GenDiscAgent(Agent):
         # Hacketty hack hack
         if hasattr(self.discriminator, "model"):
             self.discriminator.model.to(find_device())
-        if hasattr(self.generator, "model"):
-            self.generator.model.to(find_device())
+        for gen, _ in self.generators:
+            if hasattr(gen, "model"):
+                gen.model.to(find_device())
