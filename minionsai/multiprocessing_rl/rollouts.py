@@ -56,7 +56,7 @@ class OptimizerRolloutSource(abc.ABC):
         # convert from list of dicts of arrays to a single dict of arrays with large batch dimension
         if len(disc_obs) > 0:
             disc_obs = {k: np.concatenate([s[k] for s in disc_obs], axis=0) for k in disc_obs[0]}
-            disc_obs, disc_labels = add_symmetries(disc_obs, disc_labels)
+            disc_obs, disc_labels, _ = add_symmetries(disc_obs, disc_labels, None)
 
         # gen_obs is a list of length episodes_per_iteration; 
         # If we aren't training the generator, they're all empty
@@ -65,8 +65,9 @@ class OptimizerRolloutSource(abc.ABC):
             gen_labels = np.concatenate(gen_labels, axis=0)
             gen_actions = np.concatenate(gen_actions, axis=0)
             assert gen_actions.shape == (gen_labels.shape[0], 2), gen_actions.shape
-            # TODO expand add_symmetries function to support actions.
-            # gen_obs, gen_labels = add_symmetries(gen_obs, gen_labels, gen_actions)
+            gen_obs, gen_labels, gen_actions = add_symmetries(gen_obs, gen_labels, gen_actions)
+            assert gen_actions.shape == (gen_labels.shape[0], 2), gen_actions.shape
+
         metrics_logger.log_metrics({k: sum(v)/self.episodes_per_iteration for k, v in global_metrics_accumulated.items()}, prefix=f'rollouts/game')
         for color in (0, 1):
             metrics_logger.log_metrics({k: sum(v)/self.episodes_per_iteration for k, v in player_metrics_accumulated[color].items()}, prefix=f'rollouts/game/{color}')
@@ -82,15 +83,15 @@ class OptimizerRolloutSource(abc.ABC):
     def launch_rollouts(self, iteration: int, hparams: Dict) -> None:
         pass
 
-def add_symmetries(obs, labels):
+def add_symmetries(obs, labels, actions=None):
     """
     Add symmetries to the observations and labels.
     """
-    symmetrized_obs = Translator.symmetries(obs)
+    symmetrized_obs, symmetrized_actions = Translator.symmetries(obs, actions)
     # Now combine them into one big states dict
     obs = {k: np.concatenate([s[k] for s in symmetrized_obs], axis=0) for k in obs}
     labels = np.concatenate([labels]*len(symmetrized_obs), axis=0)
-    return obs, labels
+    return obs, labels, symmetrized_actions
 
 class InProcessRolloutSource(OptimizerRolloutSource):
     """
