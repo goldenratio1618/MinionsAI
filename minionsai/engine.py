@@ -452,11 +452,14 @@ class Game():
         self.money[self.active_player_color] += income
 
         for unit, _ in self.units_with_locations():
-            unit.reset_turn_end()
+            unit.reset_spawn_phase_end()
 
     def end_move_phase(self):
         assert self.phase == Phase.MOVE, f"Tried to end move phase during phase {self.phase}"
         self.phase = Phase.SPAWN
+
+        for unit, _ in self.units_with_locations():
+            unit.reset_move_phase_end()
 
     def full_turn(self, action_list: ActionList, verbose=False):
         """
@@ -527,9 +530,11 @@ class Unit():
         self.isExhausted = False
         self.is_soulbound = False
     
-    def reset_turn_end(self):
+    def reset_move_phase_end(self):
         self.hasMoved = False
         self.remainingAttack = 0
+
+    def reset_spawn_phase_end(self):
         self.isExhausted = False
 
     def receive_attack(self, attack):
