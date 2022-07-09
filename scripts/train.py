@@ -57,7 +57,6 @@ EVAL_EVERY = 8
 EVAL_VS_PAST_ITERS = []
 # Specific agent instances to eval vs
 EVAL_VS_AGENTS = [
-    GenDiscAgent(ScriptedDiscriminator(), [(AgentGenerator(RandomAIAgent()), 16)]),
     os.path.join(get_experiments_directory(), "conv_big", "dfarhi_0613_conveps_256rolls_iter400_adapt")
 ]
 # Eval against random up until this iteration
@@ -144,10 +143,14 @@ def eval_vs_other(agent, eval_agent, name):
     agent.generators = [(gen, num * EVAL_COMPUTE_BOOST) for gen, num in agent.generators]
     if TRAIN_DISCRIMINATOR:
         agent.discriminator.epsilon_greedy = 0.0
+    if TRAIN_GENERATOR:
+        agent.generators[0][0].epsilon_greedy = 0.0
     wins, _metrics = run_n_games(ENVS[EVAL_ENV_NAME], [agent, eval_agent], n=EVAL_TRIALS)
     agent.generators = [(gen, num // EVAL_COMPUTE_BOOST) for gen, num in agent.generators]
     if TRAIN_DISCRIMINATOR:
         agent.discriminator.epsilon_greedy = DISC_EPSILON_GREEDY
+    if TRAIN_GENERATOR:
+        agent.generators[0][0].epsilon_greedy = GEN_EPSILON_GREEDY
     winrate = wins[0] / EVAL_TRIALS
     metrics_logger.log_metrics({f"eval_winrate/{name}": winrate})
     logger.info(f"Win rate vs {name} = {winrate}")  
@@ -210,12 +213,16 @@ def main(run_name):
                     agent.generators = [(gen, num * EVAL_COMPUTE_BOOST) for gen, num in agent.generators]
                     if TRAIN_DISCRIMINATOR:
                         agent.discriminator.epsilon_greedy = 0.0
+                    if TRAIN_GENERATOR:
+                        agent.generators[0][0].epsilon_greedy = 0.0
                     model_mode_eval()
                     save(agent, os.path.join(checkpoint_dir, f"iter_{iteration}"), copy_code_from=code_dir)
                     model_mode_train()
                     agent.generators = [(gen, num // EVAL_COMPUTE_BOOST) for gen, num in agent.generators]
                     if TRAIN_DISCRIMINATOR:
                         agent.discriminator.epsilon_greedy = DISC_EPSILON_GREEDY
+                    if TRAIN_GENERATOR:
+                        agent.generators[0][0].epsilon_greedy = GEN_EPSILON_GREEDY
 
             metrics_logger.log_metrics(rollout_stats)
             if TRAIN_DISCRIMINATOR:
