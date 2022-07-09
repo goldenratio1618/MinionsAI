@@ -10,43 +10,34 @@
    <h3>
       Playing vs <a href="view">{{agent_name}}</a> (Env: <a href="/env/{{env_name}}/view">{{env_name}}</a>)
    </h3>
+   {% if not game.done %}
    <div style="float: right;">
       <p>{{error_msg}}</p>
-      <div name="game" id="active" oncontextmenu="event.preventDefault();" style="width: 400px; margin-bottom:15px;">
+      <div style ="display: table;">
+      <div id="side_menu">
+         <h3>Spawn</h3>
+         <button id="zombie_spawn"><div class="color0"><h4>Zombie</h4></div></button>
+         <br/>
+         <br/>
+         <form id="the_form" method="post">
+            <input type="hidden" id="game_state" name="game_state" value="{{game_json}}">
+            <input type="hidden" id="game_reset_state" name="game_reset_state" value="{{game_reset_json}}">
+            <input type="hidden" name="game_prev_turn_str" value="{{game_prev_turn_str}}">
+            <input type="hidden" name="agent_actions_str" value="{{agent_actions_str}}">
+            <input type="submit" name="undo" value="Reset Turn">
+            <input type="submit" name="end" value="End Turn">
+            <input type="hidden" name="move_from_i">
+            <input type="hidden" name="move_from_j">
+            <input type="hidden" name="move_to_i">
+            <input type="hidden" name="move_to_j">
+            <input type="hidden" name="spawn_unit_type">
+            <input type="hidden" name="spawn_to_i">
+            <input type="hidden" name="spawn_to_j">
+         </form>
       </div>
+      <div name="game" id="active" oncontextmenu="event.preventDefault();" style="display: table-cell; width: 400px; margin-bottom:15px;"></div>
    </div>
-   {% if not game.done %}
-   <form id="the_form" method="post">
-      <input type="hidden" id="game_state" name="game_state" value="{{game_json}}">
-      <input type="hidden" id="game_reset_state" name="game_reset_state" value="{{game_reset_json}}">
-      <input type="hidden" name="game_prev_turn_str" value="{{game_prev_turn_str}}">
-      <input type="hidden" name="agent_actions_str" value="{{agent_actions_str}}">
-      <input type="submit" name="undo" value="Reset Turn">
-      <input type="submit" name="end" value="End Turn">
-      <table>
-         <tr>
-            <td>
-               <input type="submit" name="move" value="Move" {% if game.phase.value=="spawn" %} disabled {% endif %}>
-            </td>
-            <td>
-               (<input type="text" name="move_from_i" style="width:10px">,
-               <input type="text" name="move_from_j" style="width:10px">)
-               --->
-               (<input type="text" name="move_to_i" style="width:10px">,
-               <input type="text" name="move_to_j" style="width:10px">)
-         </tr>
-         <tr>
-            <td>
-               <input type="submit" name="spawn" value="Spawn">
-            </td>
-            <td>
-               <input type="text" name="spawn_unit_type" style="width:50px">
-               --->
-               (<input type="text" name="spawn_to_i" style="width:10px">,
-               <input type="text" name="spawn_to_j" style="width:10px">)
-         </tr>
-      </table>
-   </form>
+   </div>
    Start of this turn:
    <div name="game" id="reset" style="width: 200px; margin-bottom:15px; --hex-scale: 20px;">
    </div>

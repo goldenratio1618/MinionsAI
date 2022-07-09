@@ -23,26 +23,72 @@ function getCodeCoordinates(row, col) {
 // UI Setup
 //
 
-function clickButton(i, j, button) {
+var selectedButton = null;
+var action_in_progress = "";
+
+function clearActiveState() {
+    if (selectedButton != null) {
+        selectedButton.setAttribute("class", "");
+    }
+    action_in_progress = "";
+}
+
+function clickSpawnButton(unit, buttonId) {
+    clearActiveState();
+    selectedButton = document.getElementById(buttonId);
+    selectedButton.setAttribute("class", "selected");
+    action_in_progress = "spawn";
+
+    document.getElementsByName("spawn_unit_type")[0].value = unit;
+}
+
+function clickButton(i, j, mouseKey) {
     // Display coordinates
     document.getElementById("active").querySelectorAll("div.hex-row")[0].lastChild.children[1].innerText = i + ", " + j;
 
-    // Left click on unit
-    if (button == 0 && game_state.board[i][j].unit != null) {
-        document.getElementsByName("move_from_i")[0].value = i;
-        document.getElementsByName("move_from_j")[0].value = j;
-    }
-    if (button == 2) {  // Right click
-        document.getElementsByName("move_to_i")[0].value = i;
-        document.getElementsByName("move_to_j")[0].value = j;
+    // Find clicked element
+    const [r, c] = getUICoordinates(i, j);
+    console.log(r + " " + c);
+    const clickedHex = document.getElementById("active").querySelectorAll("div.hex-row")[r].querySelectorAll(".hex")[c];
+    console.log(clickedHex);
 
-        // Submit the form with a spoofed "move" action
-        var move = document.createElement("input");
-        move.value = "move";
-        move.setAttribute("type", "hidden");
-        move.setAttribute("name", "move");
-        document.getElementById("the_form").appendChild(move);
-        document.getElementById("the_form").submit();
+    // Handle left click
+    if (mouseKey == 0) {
+        clearActiveState();
+        if (game_state.board[i][j].unit != null &&
+            game_state.board[i][j].unit.color == 0) {
+            selectedButton = clickedHex.children[1].querySelector("button");
+            clickedHex.children[1].querySelector("button").setAttribute("class", "selected");
+            document.getElementsByName("move_from_i")[0].value = i;
+            document.getElementsByName("move_from_j")[0].value = j;
+            action_in_progress = "move";
+        }
+    }
+    // Handle right click
+    if (mouseKey == 2) {
+        if (action_in_progress == "move") {
+            document.getElementsByName("move_to_i")[0].value = i;
+            document.getElementsByName("move_to_j")[0].value = j;
+
+            // Submit the form with a spoofed "move" action
+            var move = document.createElement("input");
+            move.value = "move";
+            move.setAttribute("type", "hidden");
+            move.setAttribute("name", "move");
+            document.getElementById("the_form").appendChild(move);
+            document.getElementById("the_form").submit();
+        } else if (action_in_progress == "spawn") {
+            document.getElementsByName("spawn_to_i")[0].value = i;
+            document.getElementsByName("spawn_to_j")[0].value = j;
+
+            // Submit the form with a spoofed "spawn" action
+            var spawn = document.createElement("input");
+            spawn.value = "spawn";
+            spawn.setAttribute("type", "hidden");
+            spawn.setAttribute("name", "spawn");
+            document.getElementById("the_form").appendChild(spawn);
+            document.getElementById("the_form").submit();
+        }
     }
 }
 
@@ -60,6 +106,36 @@ function makeSpace(classname) {
     bottom.setAttribute("class", "bottom");
     space.appendChild(bottom);
     return space;
+}
+
+// Helper to make a unit to appear on a hex
+function makeUnitButton(interactive, unit, phase) {
+    var buttonWrapper = document.createElement("button");
+    buttonWrapper.setAttribute("class", "wrapper");
+    var unitButton = document.createElement("div");
+    if (interactive && unit.color == 0) {
+        var attackDiv = document.createElement("div");
+        if (phase == "move" && unit.remainingAttack > 0) {
+            attackDiv.innerText = "⚔️";
+        }
+        attackDiv.setAttribute("class", "stat");
+        unitButton.appendChild(attackDiv);
+    }
+    var nameDiv = document.createElement("div");
+    nameDiv.innerText = unit.type[0];
+    nameDiv.setAttribute("class", "unit-name");
+    unitButton.appendChild(nameDiv);
+    if (interactive && unit.color == 0) {
+        var moveDiv = document.createElement("div");
+        if (phase == "move" && !unit.hasMoved) {
+            moveDiv.innerText = "➜";
+        }
+        moveDiv.setAttribute("class", "stat");
+        unitButton.appendChild(moveDiv);
+    }
+    unitButton.setAttribute("class", "unit-button color" + unit.color);
+    buttonWrapper.appendChild(unitButton);
+    return buttonWrapper;
 }
 
 // Hex grid
@@ -87,33 +163,9 @@ function makeHexGrid(board) {
                 } else if (hex.is_water) {
                     space.setAttribute("class", "hex water");
                 }
-
                 if (hex.unit != null) {
-                    var buttonWrapper = document.createElement("button");
-                    var unitButton = document.createElement("div");
-                    if (interactive && hex.unit.color == 0) {
-                        var attackDiv = document.createElement("div");
-                        if (game.phase == "move" && hex.unit.remainingAttack > 0) {
-                            attackDiv.innerText = "⚔️";
-                        }
-                        attackDiv.setAttribute("class", "stat");
-                        unitButton.appendChild(attackDiv);
-                    }
-                    var nameDiv = document.createElement("div");
-                    nameDiv.innerText = hex.unit.type[0];
-                    nameDiv.setAttribute("class", "unit-name");
-                    unitButton.appendChild(nameDiv);
-                    if (interactive && hex.unit.color == 0) {
-                        var moveDiv = document.createElement("div");
-                        if (game.phase == "move" && !hex.unit.hasMoved) {
-                            moveDiv.innerText = "➜";
-                        }
-                        moveDiv.setAttribute("class", "stat");
-                        unitButton.appendChild(moveDiv);
-                    }
-                    unitButton.setAttribute("class", "unit-button color" + hex.unit.color);
-                    buttonWrapper.appendChild(unitButton);
-                    space.children[1].appendChild(buttonWrapper);
+                    var button = makeUnitButton(interactive, hex.unit, game.phase);
+                    space.children[1].appendChild(button);
                 }
                 if (interactive) {
                     space.children[1].addEventListener('mouseup', function (e) {
@@ -137,3 +189,7 @@ function makeHexGrid(board) {
 
 var games = document.getElementsByName("game");
 games.forEach(makeHexGrid);
+
+document.getElementById("zombie_spawn").addEventListener('click', function () {
+    clickSpawnButton("z", "zombie_spawn");
+}, false);
