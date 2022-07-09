@@ -2,6 +2,7 @@ import abc
 import random
 import subprocess
 import sys
+import glob
 
 from .game_util import adjacent_zombies
 from .action import ActionList, SpawnAction, MoveAction
@@ -162,9 +163,16 @@ class CLIAgent(Agent):
         spawn_actions = self.parse_input()
         return ActionList(move_actions, spawn_actions)
 
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        del state["proc"]
+        del state["original_stdout"]
+        return state
+        return {}
+
     def load_extra(self, directory: str):
         os.chdir(directory)
-        os.chdir("../code")
+        os.chdir(glob.glob("../*/code")[0])
         # set execution bit
         # we don't know which word of commands is file, so try all of them
         for i in self.commands: os.system("chmod +x " + i)
