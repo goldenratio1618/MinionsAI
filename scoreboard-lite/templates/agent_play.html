@@ -1,20 +1,24 @@
 <!DOCTYPE html>
-<html lang = "en">
+<html lang="en">
+
 <head>
-   <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles/game.css') }}">
+   <link rel="stylesheet" type="text/css" href="{{ url_for('static',filename='styles/game.css') }}">
 </head>
+
 <body>
 
    <h3>
       Playing vs <a href="view">{{agent_name}}</a> (Env: <a href="/env/{{env_name}}/view">{{env_name}}</a>)
    </h3>
-   <div id="game" style="float: right; width: 400px; margin-bottom:15px;"></div>
-   <pre>{{game.pretty_print(do_print=False)}}</pre>
-   {{error_msg}}
+   <div style="float: right;">
+      <p>{{error_msg}}</p>
+      <div name="game" id="active" oncontextmenu="event.preventDefault();" style="width: 400px; margin-bottom:15px;">
+      </div>
+   </div>
    {% if not game.done %}
-   <form method="post">
+   <form id="the_form" method="post">
       <input type="hidden" id="game_state" name="game_state" value="{{game_json}}">
-      <input type="hidden" name="game_reset_state" value="{{game_reset_json}}">
+      <input type="hidden" id="game_reset_state" name="game_reset_state" value="{{game_reset_json}}">
       <input type="hidden" name="game_prev_turn_str" value="{{game_prev_turn_str}}">
       <input type="hidden" name="agent_actions_str" value="{{agent_actions_str}}">
       <input type="submit" name="undo" value="Reset Turn">
@@ -22,7 +26,7 @@
       <table>
          <tr>
             <td>
-               <input type="submit" name="move" value="Move" {% if game.phase.value == "spawn" %} disabled {% endif %}>
+               <input type="submit" name="move" value="Move" {% if game.phase.value=="spawn" %} disabled {% endif %}>
             </td>
             <td>
                (<input type="text" name="move_from_i" style="width:10px">,
@@ -44,7 +48,8 @@
       </table>
    </form>
    Start of this turn:
-   <pre>{{game_reset.pretty_print(do_print=False)}}</pre>
+   <div name="game" id="reset" style="width: 200px; margin-bottom:15px; --hex-scale: 20px;">
+   </div>
    <br>
    Agent actions:
    {{agent_actions_str}}
@@ -59,4 +64,5 @@
 </body>
 
 <script src="{{ url_for('static',filename='game.js') }}"> </script>
+
 </html>
