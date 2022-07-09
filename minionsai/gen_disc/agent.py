@@ -60,6 +60,7 @@ class GenDiscAgent(Agent):
             have_best_action = max_winprob - my_max_winprob < 1e-4
 
             my_gen_info["metrics"] = {
+                "actual_num_rollouts": my_actual_num_rollouts,
                 "unique_options": my_unique_options,
                 "have_best_action": have_best_action,
                 "alone_have_best_action": False  # will be overwritten after the loop
