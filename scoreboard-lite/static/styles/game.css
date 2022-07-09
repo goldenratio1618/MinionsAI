@@ -79,6 +79,7 @@
 }
 
 button {
+    background: var(--team-0-color);
     padding: 0px 0px;
     border-width: 0px;
     margin-left: 2px;
@@ -91,6 +92,11 @@ button {
     font-size: calc(var(--hex-scale) / 2);
     border-width: 0px;
     padding: 0px 0px;
+}
+
+.selected {
+    border-width: 2px;
+    border-color: rgb(158, 236, 146);
 }
 
 .color0 {
@@ -114,4 +120,12 @@ button {
 
     width: calc((var(--hex-scale) - 4px) / 2);
     font-size: calc(var(--hex-scale) / 2);
+}
+
+div#side_menu {
+    display: table-cell;
+    width: 100px;
+    vertical-align: top;
+    text-align: center;
+    background: var(--boring-hex-color);
 }
