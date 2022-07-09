@@ -28,3 +28,9 @@ class RolloutEpisode:
     gen_labels: np.array  # Shape [N,]
     player_metrics: List[Dict]  # len 2, one per player
     global_metrics: Dict
+
+@dataclass
+class TrainingData:
+    obs: Dict[str, np.ndarray]
+    actions: np.ndarray
+    next_maxq: np.ndarray

@@ -1,8 +1,9 @@
 import abc
 import numpy as np
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 import torch as th
 
+from ..gen_disc.tree_search import DepthFirstTreeSearch, NodePointer
 from ..game_util import sigmoid, stack_dicts
 from ..engine import Game, print_n_games
 from ..action import ActionList
@@ -70,55 +71,8 @@ class QGenerator(BaseGenerator):
         return obs, valid_actions
 
     def propose_n_actions(self, game, n):
-        games = [game.copy() for _ in range(n)]
-        recorded_obs = []
-        recorded_next_maxq = []
-        recorded_numpy_actions = []
-        recorded_actions = [[] for _ in range(n)]
-        recorded_valid_actions = []
-        recorded_winprobs = []
-        for i in range(self.actions_per_turn):
-            obs, valid_actions = self.translate_many(games)
-            recorded_valid_actions.append(valid_actions)
-            logits = self.model(obs)
-            winprobs = th.sigmoid(logits).detach().cpu().numpy()  # shape = [n, num_things, num_things]
-            recorded_winprobs.append(winprobs)
-            assert winprobs.ndim == 3 and winprobs.shape[0] == n and winprobs.shape[1] == winprobs.shape[2], (n, winprobs.shape)
-            masked_winprobs = np.where(valid_actions, winprobs, -np.inf)  # shape = [n, num_things, num_things]
-            assert masked_winprobs.shape == winprobs.shape, (masked_winprobs.shape, winprobs.shape)
-            max_winprob = np.max(np.max(masked_winprobs, axis=1), axis=1)  # shape = [n]
-            assert max_winprob.shape == (n,), max_winprob.shape
-            sampled_numpy_action = self.sample(masked_winprobs) # shape = [n, 2]
-            assert sampled_numpy_action.shape == (n, 2), sampled_numpy_action.shape
-            sampled_action = [self.translator.untranslate_action(action) for action in sampled_numpy_action]
-            
-            recorded_obs.append(obs)
-            recorded_next_maxq.append(max_winprob)
-            recorded_numpy_actions.append(sampled_numpy_action)
-            for recorded_list, new_action, game in zip(recorded_actions, sampled_action, games):
-                recorded_list.append(new_action)
-                game.process_single_action(new_action)
-
-        recorded_obs = stack_dicts(recorded_obs, add_new_axis=True)  # dict of shapes [actions_per_turn, n, ...]
-        recorded_next_maxq = np.array(recorded_next_maxq)  # shape = [actions_per_turn, n]
-        recorded_numpy_actions = np.array(recorded_numpy_actions)  # shape = [actions_per_turn, n, 2]
-        submit_actions = [ActionList.from_single_list(recorded) for recorded in recorded_actions]
-
-        # Shift next_maxq by 1 relative to obs, so it's properly aligned.
-        recorded_next_maxq = recorded_next_maxq[1:]
-
-        for k, v in recorded_obs.items():
-            assert v.shape[:2] == (self.actions_per_turn, n), (k, v.shape)
-        assert recorded_next_maxq.shape == (self.actions_per_turn - 1, n), recorded_next_maxq.shape
-        assert recorded_numpy_actions.shape == (self.actions_per_turn, n, 2), recorded_numpy_actions.shape
-
-        return submit_actions, games, {
-            "obs": recorded_obs,
-            "next_maxq": recorded_next_maxq,
-            "numpy_actions": recorded_numpy_actions,
-            "valid_actions": recorded_valid_actions,
-            "winprobs": recorded_winprobs,
-        }
+        action_lists, final_game_states, trajectory_training_datas = self.tree_search(game, n)
+        return action_lists, final_game_states, trajectory_training_datas
 
     def sample(self, logits: np.ndarray) -> int:
         """
@@ -138,5 +92,46 @@ class QGenerator(BaseGenerator):
         greedified_logits = logits * greedy_multiplier
         return gumbel_sample(greedified_logits, self.sampling_temperature)
 
+    def tree_search(self, game, num_trajectories):
+        action_lists = []
+        final_game_states = []
+        training_datas = []
+        tree_search = DepthFirstTreeSearch(lambda: QGeneratorTreeSearchNode(game.copy(), self.translator, self.model))
+        for _ in range(num_trajectories):
+            numpy_actions, final_node, training_data = tree_search.run_trajectory(epsilon_greedy=self.epsilon_greedy)
+            if final_node is None:
+                break
+            action_lists.append(ActionList.from_single_list(
+                [self.translator.untranslate_action(action) for action in numpy_actions]
+            ))
+            final_game_states.append(final_node.game)
+            training_datas.append(training_data)
+        # print(sum([len(d.next_maxq) for d in training_datas]))
+        return action_lists, final_game_states, {"training_datas": training_datas}
 
+class QGeneratorTreeSearchNode(NodePointer):
+    def __init__(self, game, translator, model):
+        self.game = game
+        self.model = model
+        self.translator = translator
+
+    def hash_node(self):
+        return hash(self.game)
+
+    def evaluate_node(self) -> Tuple[Any, List[Any], List[float]]:
+        obs = self.translator.translate(self.game)
+        logits = self.model(obs)
+        winprobs = th.sigmoid(logits).detach().cpu().numpy()  # [1, 30, 30]
+        winprobs = np.squeeze(winprobs, axis=0)
+        valid_actions = self.translator.valid_actions(self.game)
+        # Convert that shape [N, N] bool array into a [K, 2] shape array of where it's True
+        # e.g. [[True, False], [False, True]] -> [[0, 0], [1, 1]]
+        valid_action_idxs = np.array(np.nonzero(valid_actions)).T
+        assert valid_action_idxs.shape[1] == 2
+        q_values = winprobs[valid_actions]
+        return obs, valid_action_idxs, q_values
+
+    def take_action(self, action) -> None:
+        untranslated_action = self.translator.untranslate_action(action)
+        self.game.process_single_action(untranslated_action)
 

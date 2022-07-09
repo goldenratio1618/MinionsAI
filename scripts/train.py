@@ -40,7 +40,7 @@ LOAD_GENERATOR_MODEL = None # os.path.join(get_experiments_directory(), "gen_con
 # How many rollouts do we run of each turn before picking the best
 ROLLOUTS_PER_TURN = 16
 DISC_EPSILON_GREEDY = 0.1
-GEN_EPSILON_GREEDY = 0.04  # (1 - 0.04)^10 ~ 66%
+GEN_EPSILON_GREEDY = 0.1
 GEN_SAMPLING_TEMPERATURE = 0.03
 
 # How many episodes of data do we collect each iteration, before running a few epochs of optimization?
@@ -304,7 +304,7 @@ def main(run_name):
                                 loss = th.nn.BCEWithLogitsLoss()(selected_logits, batch_labels)
                                 loss.backward()
                                 gen_optimizer.step()
-                                if idx in [0, n_batches // 2, n_batches - 1]:
+                                if idx in range(0, n_batches, 50):
                                     max_batch_digits = len(str(n_batches))
                                     metrics_logger.log_metrics({f"gen/loss/epoch_{epoch}/batch_{idx:0>{max_batch_digits}}": loss.item()})
                                 gen_actions_optimized += len(batch_idxes)

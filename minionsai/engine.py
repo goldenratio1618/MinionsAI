@@ -118,6 +118,9 @@ class Phase(str, enum.Enum):
     def __eq__(self, __x: object) -> bool:
         return self.value == __x.value
 
+    def __hash__(self) -> int:
+        return hash(self.value)
+
 class Game():
     def __init__(self, 
                  money=(2, 4),
@@ -212,6 +215,14 @@ class Game():
                 scores[unit.color] += unit.type.cost
         return scores
         
+    def __hash__(self):
+        board_tuple = tuple((
+            self.board.board[i][j].is_water, 
+            self.board.board[i][j].is_graveyard,
+            None if self.board.board[i][j].unit is None else hash(self.board.board[i][j].unit),
+            )
+            for i in range(BOARD_SIZE) for j in range(BOARD_SIZE))
+        return hash((board_tuple, tuple(self.money), self.active_player_color, self.phase, self.remaining_turns))
 
     @property
     def winner(self) -> int:
@@ -291,12 +302,6 @@ class Game():
             self.add_to_metric(self.winner, 'wins', 1)
             return
 
-        for row in self.board.board:
-            for square in row:
-                if square.unit != None and square.unit.color == self.active_player_color:
-                    square.unit.hasMoved = False
-                    square.unit.remainingAttack = square.unit.type.attack
-                    square.unit.curr_health = square.unit.type.defense
         self.phase = Phase.MOVE
 
     def process_single_action(self, action: Action) -> Tuple[bool, Optional[str]]:
@@ -446,6 +451,9 @@ class Game():
                 income += 1
         self.money[self.active_player_color] += income
 
+        for unit, _ in self.units_with_locations():
+            unit.reset_turn_end()
+
     def end_move_phase(self):
         assert self.phase == Phase.MOVE, f"Tried to end move phase during phase {self.phase}"
         self.phase = Phase.SPAWN
@@ -519,6 +527,11 @@ class Unit():
         self.isExhausted = False
         self.is_soulbound = False
     
+    def reset_turn_end(self):
+        self.hasMoved = False
+        self.remainingAttack = 0
+        self.isExhausted = False
+
     def receive_attack(self, attack):
         self.curr_health -= attack
         if self.curr_health <= 0:
@@ -557,6 +570,9 @@ class Unit():
         u.isExhausted = self.isExhausted
         u.is_soulbound = self.is_soulbound
         return u
+
+    def __hash__(self) -> int:
+        return hash((self.color, self.type.name, self.curr_health, self.hasMoved, self.remainingAttack, self.isExhausted, self.is_soulbound))
 
 def print_n_games(games):
     width = 15

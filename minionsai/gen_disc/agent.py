@@ -83,14 +83,14 @@ class GenDiscAgent(Agent):
         if self.verbose_level >= 2 and len(options_states) > 8:
             print_n_games(options_states[8:16])
             print("|".join([f"  pwin={p:.1%}".ljust(15) for p in discriminator_info.get('all_winprobs', [0] * len(options_states))[8:16]]))
-            if "metrics" in generator_info[0]:
-                keys = list(generator_info[0]["metrics"].keys())
-                data=[
-                    ["cls"] + [gen.__class__.__name__ for gen, _ in self.generators],
-                    ["num"] + [num_rollouts for _, num_rollouts in self.generators],
-                ]
-                data.extend([[k] + [info_dict["metrics"][k] for info_dict in generator_info] for k in keys])
-                print(tabulate.tabulate(data, headers=[""] + [f"gen {i}" for i in range(len(self.generators))]))
+        if self.verbose_level >= 2 and "metrics" in generator_info[0]:
+            keys = list(generator_info[0]["metrics"].keys())
+            data=[
+                ["cls"] + [gen.__class__.__name__ for gen, _ in self.generators],
+                ["num"] + [num_rollouts for _, num_rollouts in self.generators],
+            ]
+            data.extend([[k] + [info_dict["metrics"][k] for info_dict in generator_info] for k in keys])
+            print(tabulate.tabulate(data, headers=[""] + [f"gen {i}" for i in range(len(self.generators))]))
         if self.verbose_level >= 1:
             logger.info(f"Chosen option: {best_option_idx}")
 

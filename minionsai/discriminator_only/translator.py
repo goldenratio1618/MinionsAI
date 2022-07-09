@@ -117,6 +117,8 @@ class Translator():
 
     def valid_actions(self, game: Game):
         legal = np.zeros((self.num_things, self.num_things), bool)
+        if game.phase not in (Phase.MOVE, Phase.SPAWN):
+            return legal
         for i in range(self.num_things):
             for j in range(self.num_things):
                 if self.possibly_legal_actions[i,j]:
