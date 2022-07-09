@@ -29,11 +29,13 @@ class GenDiscAgent(Agent):
         options_action_list = []
         options_states = []
         generator_info = []
+        actual_num_rollouts = []  # Actual count of rollouts produced by each generator.
         for gen, num_rollouts in self.generators:
             this_options_action_list, this_options_states, this_generator_info = gen.propose_n_actions(game, num_rollouts)
             options_action_list.extend(this_options_action_list)
             options_states.extend(this_options_states)
             generator_info.append(this_generator_info)
+            actual_num_rollouts.append(len(this_options_action_list))
 
         best_option_idx, discriminator_info = self.discriminator.choose_option(options_states)
 
@@ -44,23 +46,21 @@ class GenDiscAgent(Agent):
         pointer = 0
         num_generators_who_contained_best_action = 0
         a_generator_who_contained_best_action = None
-        for (gen, num_rollouts), my_gen_info in zip(self.generators, generator_info):
-            my_ending_labels = all_ending_labels[pointer:pointer + num_rollouts]
-            pointer += num_rollouts
+        for (gen, _), my_gen_info, my_actual_num_rollouts in zip(self.generators, generator_info, actual_num_rollouts):
 
             # Count how many unique states each generator proposed.
             # We assume that different states would have slightly different win probabilities.
-            my_rounded_ending_labels = np.round(my_ending_labels, decimals=5)
-            my_unique_ending_labels = np.unique(my_rounded_ending_labels).size / my_rounded_ending_labels.size
+            my_game_hashes = [hash(game) for game in options_states[pointer:pointer + my_actual_num_rollouts]]
+            my_unique_options = np.unique(my_game_hashes).size / my_actual_num_rollouts
 
             # Check which generators proposed the chosen action (or one equivalent)
             # We again assume that different actions would have slightly different win probabilities.
-            rounded_max_winprob = np.round(max_winprob, decimals=5)
-            my_rounded_max_winprob = np.max(my_rounded_ending_labels)
-            have_best_action = rounded_max_winprob - my_rounded_max_winprob < 1e-4
+            my_ending_labels = all_ending_labels[pointer:pointer + my_actual_num_rollouts]
+            my_max_winprob = np.max(my_ending_labels)
+            have_best_action = max_winprob - my_max_winprob < 1e-4
 
             my_gen_info["metrics"] = {
-                "unique_ending_labels": my_unique_ending_labels,
+                "unique_options": my_unique_options,
                 "have_best_action": have_best_action,
                 "alone_have_best_action": False  # will be overwritten after the loop
             }
@@ -68,6 +68,7 @@ class GenDiscAgent(Agent):
             num_generators_who_contained_best_action += have_best_action
             if have_best_action:
                 a_generator_who_contained_best_action = my_gen_info["metrics"]
+            pointer += num_rollouts
 
         # Did only one generator contain the best action?
         if num_generators_who_contained_best_action == 0:
