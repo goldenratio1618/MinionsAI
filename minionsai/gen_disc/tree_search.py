@@ -48,7 +48,7 @@ class DepthFirstTreeSearch:
         if self._verbose:
             print(msg)
 
-    def run_trajectory(self, extra_training_data=None, epsilon_greedy=0.0):
+    def run_trajectory(self, extra_training_data=None, epsilon_greedy=0.0, max_retries=100):
         if extra_training_data is not None:
             training_data = extra_training_data
         else:
@@ -97,7 +97,10 @@ class DepthFirstTreeSearch:
                 else:
                     training_data['next_maxq'].append(maxq)
                 self._verbose_print(f"Found another way to duplicate node {current_node_hash}; trying again.")
-                return self.run_trajectory(extra_training_data=training_data, epsilon_greedy=epsilon_greedy)
+                if max_retries == 0:
+                    # print("Max retries reached.")
+                    return [], None, training_data
+                return self.run_trajectory(extra_training_data=training_data, epsilon_greedy=epsilon_greedy, max_retries=max_retries - 1)
             self._verbose_print(f"{current_node_hash} not in explored_nodes {self._explored_nodes}")
             
             current_node_actions = all_actions.copy()
