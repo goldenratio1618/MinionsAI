@@ -29,7 +29,7 @@ def test_saveload_with_qgen():
     gen_translator = Translator(mode='generator')
     gen_model = MinionsActionBot(D_MODEL, depth=DEPTH)
     gen_model.to(th.device('cpu'))
-    agent = GenDiscAgent(ScriptedDiscriminator(), QGenerator(gen_translator, gen_model, sampling_temperature=0.03, epsilon_greedy=0.04), 4)
+    agent = GenDiscAgent(ScriptedDiscriminator(), QGenerator(gen_translator, gen_model, epsilon_greedy=0.04), 4)
     verify_all_modes(agent, Game, num_games=3)
 
 def test_saveload_qgen_qdisc():
@@ -42,5 +42,5 @@ def test_saveload_qgen_qdisc():
     disc_translator = Translator(mode='discriminator')
     disc_model = MinionsDiscriminator(D_MODEL, depth=DEPTH)
     disc_model.to(th.device('cpu'))
-    agent = GenDiscAgent(QDiscriminator(disc_translator, disc_model, epsilon_greedy=0.1), QGenerator(gen_translator, gen_model, sampling_temperature=0.03, epsilon_greedy=0.04), 4)
+    agent = GenDiscAgent(QDiscriminator(disc_translator, disc_model, epsilon_greedy=0.1), QGenerator(gen_translator, gen_model, epsilon_greedy=0.04), 4)
     verify_all_modes(agent, Game, num_games=2)

@@ -41,7 +41,6 @@ LOAD_GENERATOR_MODEL = None # os.path.join(get_experiments_directory(), "gen_con
 ROLLOUTS_PER_TURN = 16
 DISC_EPSILON_GREEDY = 0.1
 GEN_EPSILON_GREEDY = 0.1
-GEN_SAMPLING_TEMPERATURE = 0.03
 
 # How many episodes of data do we collect each iteration, before running a few epochs of optimization?
 # Potentially good to use a few times bigger EPISODES_PER_ITERATION than BATCH_SIZE, to minimize correlation within batches
@@ -95,11 +94,11 @@ SEED = 12345
 def build_agent():
     logger.info("Creating generator...")
     if TRAIN_GENERATOR:
-        gen_model = MinionsActionBot(d_model=GEN_D_MODEL, depth=GEN_DEPTH)  # TODO - make generator model instead
+        gen_model = MinionsActionBot(d_model=GEN_D_MODEL, depth=GEN_DEPTH)
         logger.info("Generator model initialized:")
         logger.info(gen_model)
-        gen_translator = Translator("generator")  # TODO - make gen translator
-        generator = QGenerator(model=gen_model, translator=gen_translator, sampling_temperature=GEN_SAMPLING_TEMPERATURE, epsilon_greedy=GEN_EPSILON_GREEDY)
+        gen_translator = Translator("generator")
+        generator = QGenerator(model=gen_model, translator=gen_translator, epsilon_greedy=GEN_EPSILON_GREEDY)
     elif LOAD_GENERATOR_MODEL is None:
         generator = AgentGenerator(RandomAIAgent())
     else:
