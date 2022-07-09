@@ -54,30 +54,27 @@ class RolloutRunner():
                 max_winprob = disc_info["max_winprob"]
                 disc_obs_buffers[active_player].append(disc_obs)
                 disc_label_buffers[active_player].append(max_winprob)
-            if "obs" in gen_info[0]:
+            if "training_datas" in gen_info[0]:
                 # Then we're training the generator also
                 # TODO have a better way to know if we're optimizing than checking info dict keys.
 
                 # Assume we're always training the first generator in the list.
-                train_gen_info = gen_info[0]
+                training_datas = gen_info[0]["training_datas"]
                 train_generator, rollouts_per_turn = self.agent.generators[0]
-                all_gen_obs.append(train_gen_info["obs"])
-
-                gen_labels = train_gen_info["next_maxq"]  # This is shape [actions_per_turn - 1, rollouts_per_turn]
-                assert gen_labels.shape == (train_generator.actions_per_turn - 1, rollouts_per_turn), gen_labels.shape
 
                 all_ending_labels = disc_info["all_winprobs"]  # This is shape [total rollouts_per_turn]
                 ending_labels = all_ending_labels[:rollouts_per_turn]
-                ending_labels = np.expand_dims(ending_labels, axis=0)  # [1, rollouts_per_turn]
-                assert ending_labels.shape == (1, rollouts_per_turn), ending_labels.shape
+                assert ending_labels.shape == (rollouts_per_turn, ), ending_labels.shape
 
-                gen_labels = np.concatenate([gen_labels, ending_labels], axis=0)
-                assert gen_labels.shape == (train_generator.actions_per_turn, rollouts_per_turn), gen_labels.shape
+                for traj_training_data, label in zip(training_datas, ending_labels):
+                    traj_training_data.next_maxq.append(label)
+                all_gen_obs.append(stack_dicts([t.obs for t in training_datas]))
+
+                gen_labels = np.concatenate([np.array(t.next_maxq) for t in training_datas])
                 all_gen_labels.append(gen_labels)
 
-                assert train_gen_info["numpy_actions"].shape == (train_generator.actions_per_turn, rollouts_per_turn, 2), gen_info["numpy_actions"].shape
-                all_gen_actions.append(train_gen_info["numpy_actions"])
-            
+                all_gen_actions.append(np.concatenate([np.array(t.actions) for t in training_datas]))
+
                 # Accumulate metrics from the generators
                 for accumulator, info in zip(gen_metrics, gen_info):
                     for key, value in info["metrics"].items():
@@ -106,14 +103,14 @@ class RolloutRunner():
 
 
         if len(all_gen_obs) > 0:
-            total_turns = len(all_gen_labels) * rollouts_per_turn * train_generator.actions_per_turn
             all_gen_obs = stack_dicts(all_gen_obs)
-            all_gen_obs = {k: v.reshape(total_turns, *v.shape[2:]) for k, v in all_gen_obs.items()}
-            all_gen_labels = np.concatenate(all_gen_labels)  # shape=[actions_per_turn * turns, rollouts_per_turn]
-            all_gen_labels = all_gen_labels.reshape(total_turns) 
-            all_gen_actions = np.concatenate(all_gen_actions)  # shape=[actions_per_turn * turns, rollouts_per_turn, 2]
-            all_gen_actions = all_gen_actions.reshape(total_turns, 2)
-
+            all_gen_labels = np.concatenate(all_gen_labels)
+            all_gen_actions = np.concatenate(all_gen_actions)
+            num = len(all_gen_labels)
+            assert all_gen_labels.shape == (num,), all_gen_labels.shape
+            assert all_gen_actions.shape == (num, 2), all_gen_actions.shape
+            for key, value in all_gen_obs.items():
+                assert value.shape[0] == num, (key, value.shape) 
         global_metrics = {}
         if len(gen_metrics[0]) > 0:
             for i, metrics_dict in enumerate(gen_metrics):

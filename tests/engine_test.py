@@ -98,3 +98,21 @@ def test_game_encode_json():
 def test_print_n_games():
     games = [Game() for _ in range(10)]
     print_n_games(games)
+
+def test_game_hash():
+    game = Game()
+    game.board.board[1][1].unit = Unit(0, ZOMBIE)
+    game.next_turn()
+    game.process_single_action(MoveAction((1, 1), (2, 1)))
+    game_hash = hash(game)
+    second_game_hash = hash(game)
+    assert game_hash == second_game_hash
+    game_copy_hash = hash(game.copy())
+    assert game_hash == game_copy_hash
+
+    different_game = Game()
+    different_game.board.board[1][1].unit = Unit(0, ZOMBIE)
+    different_game.next_turn()
+    different_game.process_single_action(MoveAction((1, 1), (1, 2)))
+    different_game_hash = hash(different_game)
+    assert different_game_hash != game_hash

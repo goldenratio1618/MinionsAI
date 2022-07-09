@@ -117,6 +117,13 @@ class HumanDiscriminator(BaseDiscriminator):
             print("Invalid option")
             return self.display_and_choose(sorted_idxes, logprobs, games)
 
+class HashDiscriminiator(BaseDiscriminator):
+    def choose_option(self, games: List[Game]) -> Tuple[int, Optional[Dict]]:
+        scores = np.array([hash(g) for g in games])
+        # Convert them to between 0 and 1
+        scores = ((scores / np.max(np.abs(scores))) + 1 ) / 2
+        return np.argmax(scores), {"all_winprobs": scores}
+
 class QDiscriminator(BaseDiscriminator):
     def __init__(self, translator, model, epsilon_greedy):
         self.translator = translator
