@@ -168,6 +168,7 @@ def agent_play(env_name, agent_name):
             agent_actions_str = "".join(str(a) for a in agent_actions.move_phase + agent_actions.spawn_phase)
         elif "move" in request.values:
             if game.phase == Phase.SPAWN:
+                error_msg = "This is the spawn phase, no moves or attacks."
                 pass
             elif game.phase == Phase.MOVE:
                 from_i = int(request.values['move_from_i'])
@@ -184,6 +185,8 @@ def agent_play(env_name, agent_name):
             to_j = int(request.values['spawn_to_j'])
             action = SpawnAction(unit_type, (to_i, to_j))
             _, error_msg = game.process_single_action(action)
+    if (error_msg == None):
+        error_msg = ""
     game_json = game.encode_json()
     print(game_prev_turn_str)
     return render_template(

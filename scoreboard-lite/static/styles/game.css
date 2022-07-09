@@ -1,62 +1,73 @@
+:root {
+    --boring-hex-color: rgb(214, 212, 212);
+    --water-color: rgb(59, 145, 225);
+    --graveyard-color: rgb(28, 28, 28);
+    --team-0-color: rgb(211, 183, 79);
+    --team-1-color: rgb(214, 147, 212);
+
+    --hex-scale: 52px;
+}
+
 .hex {
     float: left;
-    margin-left: 2px;
-    margin-bottom: -13px;
+    font-size: calc(var(--hex-scale) / 2);
+    margin-left: calc(var(--hex-scale) / 25);
+    margin-bottom: calc(var(--hex-scale) / -4);
 }
 .hex .top {
     width: 0;
-    border-bottom: 15px solid rgb(170, 170, 170);
-    border-left: 26px solid transparent;
-    border-right: 26px solid transparent;
+    border-bottom: calc(var(--hex-scale) / (1.732 * 2)) solid var(--boring-hex-color);
+    border-left: calc(var(--hex-scale) / 2) solid transparent;
+    border-right: calc(var(--hex-scale) / 2) solid transparent;
 }
 .hex .middle {
-    width: 52px;
-    height: 30px;
-    background: rgb(170, 170, 170);
+    width: var(--hex-scale);
+    height: calc(var(--hex-scale) / 1.732);
+    background: var(--boring-hex-color);
 }
 .hex .bottom {
     width: 0;
-    border-top: 15px solid rgb(170, 170, 170);
-    border-left: 26px solid transparent;
-    border-right: 26px solid transparent;
+    border-top: calc(var(--hex-scale) / (1.732 * 2)) solid var(--boring-hex-color);
+    border-left: calc(var(--hex-scale) / 2) solid transparent;
+    border-right: calc(var(--hex-scale) / 2) solid transparent;
 }
 
 .hex.water .top {
-    border-bottom: 15px solid rgb(59, 145, 225);
+    border-bottom: calc(var(--hex-scale) / (1.732 * 2)) solid var(--water-color);
 }
 .hex.water .middle {
-    background: rgb(59, 145, 225);
+    background: var(--water-color);
 }
 .hex.water .bottom {
-    border-top: 15px solid rgb(59, 145, 225);
+    border-top: calc(var(--hex-scale) / (1.732 * 2)) solid var(--water-color);
 }
 
 .hex.graveyard .top {
-    border-bottom: 15px solid rgb(28, 28, 28);
+    border-bottom: calc(var(--hex-scale) / (1.732 * 2)) solid var(--graveyard-color);
 }
 .hex.graveyard .middle {
-    background: rgb(28, 28, 28);
+    background: var(--graveyard-color);
 }
 .hex.graveyard .bottom {
-    border-top: 15px solid rgb(28, 28, 28);
+    border-top: calc(var(--hex-scale) / (1.732 * 2)) solid var(--graveyard-color);
 }
 
 .hex.transparent .top {
-    border-bottom: 15px solid transparent;
+    border-bottom: calc(var(--hex-scale) / (1.732 * 2)) solid transparent;
 }
 .hex.transparent .middle {
     text-align: center;
-    line-height: 30px;
+    line-height: calc(var(--hex-scale) / 1.732);
     background: transparent;
 }
 .hex.transparent .middle.color0 {
-    background: rgb(211, 183, 79);
+    background: var(--team-0-color);
 }
 .hex.transparent .middle.color1 {
-    background:rgb(187, 83, 183);
+    background: var(--team-1-color);
 }
 .hex.transparent .bottom {
-    border-top: 15px solid transparent;
+    border-top: calc(var(--hex-scale) / (1.732 * 2)) solid transparent;
 }
 
 .hex-row {
@@ -64,18 +75,43 @@
 }
 
 .hex-row.offset {
-    margin-left: 26px;
+    margin-left: calc(var(--hex-scale) / 2);
 }
 
 button {
-    width: 48px;
-    height: 30px;
+    padding: 0px 0px;
+    border-width: 0px;
     margin-left: 2px;
 }
 
+.unit-button {
+    display: table;
+    width: calc(var(--hex-scale) - 4px);
+    height: calc(var(--hex-scale) / 1.732);
+    font-size: calc(var(--hex-scale) / 2);
+    border-width: 0px;
+    padding: 0px 0px;
+}
+
 .color0 {
-    background:rgb(211, 183, 79);
+    background: var(--team-0-color);
 }
 .color1 {
-    background:rgb(187, 83, 183);
+    background: var(--team-1-color);
+}
+
+.stat {
+    display: table-cell; 
+    vertical-align: middle; 
+    text-align: center; 
+    width: calc((var(--hex-scale) - 4px) / 4);
+    font-size: 10px;
+}
+.unit-name {
+    display: table-cell; 
+    vertical-align: middle; 
+    text-align: center; 
+
+    width: calc((var(--hex-scale) - 4px) / 2);
+    font-size: calc(var(--hex-scale) / 2);
 }
