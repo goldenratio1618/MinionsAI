@@ -142,6 +142,11 @@ class Translator():
                         act = self.untranslate_action((i,j))
                         if game.process_single_move(act, False)[0]:
                             legal[i,j] = True
+                        # Don't allow swapping same units
+                        from_unit = game.board.board[act.from_xy[0]][act.from_xy[0]].unit
+                        to_unit = game.board.board[act.to_xy[0]][act.to_xy[0]].unit
+                        if from_unit is not None and to_unit is not None and from_unit.type == to_unit.type:
+                            legal[i,j] = False
         return legal
 
     def untranslate_all_actions(self):
