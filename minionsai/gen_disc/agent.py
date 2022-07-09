@@ -68,7 +68,7 @@ class GenDiscAgent(Agent):
             num_generators_who_contained_best_action += have_best_action
             if have_best_action:
                 a_generator_who_contained_best_action = my_gen_info["metrics"]
-            pointer += num_rollouts
+            pointer += my_actual_num_rollouts
 
         # Did only one generator contain the best action?
         if num_generators_who_contained_best_action == 0:
