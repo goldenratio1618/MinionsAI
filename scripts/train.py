@@ -32,27 +32,28 @@ import tqdm
 
 logger = logging.getLogger(__name__)
 
-TRAIN_GENERATOR = False
-TRAIN_DISCRIMINATOR = True
-LOAD_DISCRIMINATOR_MODEL = None # os.path.join(get_experiments_directory(), "conveps_repro_0704", "checkpoints", "conveps_repro_iter_400_adapt")
-LOAD_GENERATOR_MODEL = os.path.join(get_experiments_directory(), "tree_2", "checkpoints", "iter_328")
+TRAIN_GENERATOR = True
+TRAIN_DISCRIMINATOR = False
+LOAD_DISCRIMINATOR_MODEL = os.path.join(get_experiments_directory(), "conveps_repro_0704", "checkpoints", "conveps_repro_iter_400_adapt")
+LOAD_GENERATOR_MODEL = None # os.path.join(get_experiments_directory(), "tree_2", "checkpoints", "iter_328")
 
 # How many rollouts do we run of each turn before picking the best
 ROLLOUTS_PER_TURN = 16
-DISC_EPSILON_GREEDY = 0.1
-GEN_EPSILON_GREEDY = 0.02
+DISC_EPSILON_GREEDY = 0.03
+GEN_EPSILON_GREEDY = 0.1
 
 # How many episodes of data do we collect each iteration, before running a few epochs of optimization?
 # Potentially good to use a few times bigger EPISODES_PER_ITERATION than BATCH_SIZE, to minimize correlation within batches
-EPISODES_PER_ITERATION = 256
+EPISODES_PER_ITERATION = 32
 ROLLOUT_PROCS = 4
 
 # Once we've collected the data, how many times do we go over it for optimization (within one iteration)?
 SAMPLE_REUSE = 2
 GEN_SAMPLE_REUSE = 1  # There is so much data, no need to reuse it.
 
-# Frequency of running evals
-EVAL_EVERY = 8
+# During evals, run this many times extra rollouts compared to during rollout generation
+EVAL_COMPUTE_BOOST = 4
+
 # Put iteration numbers here to eval vs past versions of this train run.
 EVAL_VS_PAST_ITERS = []
 # Specific agent instances to eval vs
@@ -61,13 +62,14 @@ EVAL_VS_AGENTS = [
 ]
 # Eval against random up until this iteration
 EVAL_VS_RANDOM_UNTIL = 3
-EVAL_TRIALS = 50
+EVAL_TRIALS = 128
+# Frequency of running evals
+# We want to spend 25% of the time on evals, so:
+EVAL_EVERY = 4 * EVAL_TRIALS * EVAL_COMPUTE_BOOST // EPISODES_PER_ITERATION
+print(f"Going to evaluate every {EVAL_EVERY} iterations")
 
 # Frequency of storing a saved agent
-CHECKPOINT_EVERY = 16
-
-# During evals, run this many times extra rollouts compared to during rollout generation
-EVAL_COMPUTE_BOOST = 4
+CHECKPOINT_EVERY = EVAL_EVERY
 
 # Model Size
 DEPTH = 2
@@ -86,7 +88,7 @@ game_kwargs = {'symmetrize': False}
 # Eval env registered in scoreboard_envs.py
 EVAL_ENV_NAME = 'zombies5x5'
 
-MAX_ITERATIONS = 400
+MAX_ITERATIONS = 512
 
 SEED = 12345
 
@@ -121,6 +123,7 @@ def build_agent():
     else:
         disc_agent = load(LOAD_DISCRIMINATOR_MODEL, already_in_path_ok=True)  # ok if a thread loads this after main has already done so.
         discriminator = disc_agent.discriminator
+        discriminator.epsilon_greedy = DISC_EPSILON_GREEDY
         disc_model = discriminator.model
         disc_model.to(find_device())
     if TRAIN_DISCRIMINATOR or LOAD_DISCRIMINATOR_MODEL:
@@ -142,16 +145,12 @@ def eval_vs_other(agent, eval_agent, name):
     # Hack to temporarily change the agent's rollouts_per_turn & epsilon greedy values
     # TODO - make it easier to set an agent into "eval" mode.
     agent.generators = [(gen, num * EVAL_COMPUTE_BOOST) for gen, num in agent.generators]
-    if TRAIN_DISCRIMINATOR:
-        agent.discriminator.epsilon_greedy = 0.0
-    if TRAIN_GENERATOR:
-        agent.generators[0][0].epsilon_greedy = 0.0
+    agent.discriminator.epsilon_greedy = 0.0
+    agent.generators[0][0].epsilon_greedy = 0.0
     wins, _metrics = run_n_games(ENVS[EVAL_ENV_NAME], [agent, eval_agent], n=EVAL_TRIALS)
     agent.generators = [(gen, num // EVAL_COMPUTE_BOOST) for gen, num in agent.generators]
-    if TRAIN_DISCRIMINATOR:
-        agent.discriminator.epsilon_greedy = DISC_EPSILON_GREEDY
-    if TRAIN_GENERATOR:
-        agent.generators[0][0].epsilon_greedy = GEN_EPSILON_GREEDY
+    agent.discriminator.epsilon_greedy = DISC_EPSILON_GREEDY
+    agent.generators[0][0].epsilon_greedy = GEN_EPSILON_GREEDY
     winrate = wins[0] / EVAL_TRIALS
     metrics_logger.log_metrics({f"eval_winrate/{name}": winrate})
     logger.info(f"Win rate vs {name} = {winrate}")  
@@ -207,23 +206,19 @@ def main(run_name):
             print("====================================")
             logger.info(f"=========== Iteration: {iteration} ===========")
             print("====================================")
-            if iteration % CHECKPOINT_EVERY == 0:
+            if iteration % CHECKPOINT_EVERY == 0 or iteration == MAX_ITERATIONS:
                 with metrics_logger.timing('checkpointing'):
                     logger.info("Saving checkpoint...")
                     # Save with more rollouts_per_turn. TODO - clean up this hack.
                     agent.generators = [(gen, num * EVAL_COMPUTE_BOOST) for gen, num in agent.generators]
-                    if TRAIN_DISCRIMINATOR:
-                        agent.discriminator.epsilon_greedy = 0.0
-                    if TRAIN_GENERATOR:
-                        agent.generators[0][0].epsilon_greedy = 0.0
+                    agent.discriminator.epsilon_greedy = 0.0
+                    agent.generators[0][0].epsilon_greedy = 0.0
                     model_mode_eval()
                     save(agent, os.path.join(checkpoint_dir, f"iter_{iteration}"), copy_code_from=code_dir)
                     model_mode_train()
                     agent.generators = [(gen, num // EVAL_COMPUTE_BOOST) for gen, num in agent.generators]
-                    if TRAIN_DISCRIMINATOR:
-                        agent.discriminator.epsilon_greedy = DISC_EPSILON_GREEDY
-                    if TRAIN_GENERATOR:
-                        agent.generators[0][0].epsilon_greedy = GEN_EPSILON_GREEDY
+                    agent.discriminator.epsilon_greedy = DISC_EPSILON_GREEDY
+                    agent.generators[0][0].epsilon_greedy = GEN_EPSILON_GREEDY
 
             metrics_logger.log_metrics(rollout_stats)
             if TRAIN_DISCRIMINATOR:
@@ -271,7 +266,7 @@ def main(run_name):
                                 loss.backward()
                                 disc_optimizer.step()
                                 if idx in [0, n_batches // 2, n_batches - 1]:
-                                    max_batch_digits = len(str(n_batches))
+                                    max_batch_digits = max(len(str(n_batches)), 3)
                                     metrics_logger.log_metrics({f"disc/loss/epoch_{epoch}/batch_{idx:0>{max_batch_digits}}": loss.item()})
                                 turns_optimized += len(batch_idxes)
             if TRAIN_GENERATOR:
@@ -320,7 +315,7 @@ def main(run_name):
             # agent.epsilon_greedy = EPSILON_GREEEDY * (1 - 0.8 * iteration / MAX_ITERATIONS)
 
         metrics_logger.flush()
-        if iteration % EVAL_EVERY == 0:
+        if iteration % EVAL_EVERY == 0 or iteration == MAX_ITERATIONS:
             with metrics_logger.timing('eval'):
                 logger.info("Evaluating...")
                 model_mode_eval()
