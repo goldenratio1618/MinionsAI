@@ -62,11 +62,11 @@ void set_value(int * board, int value) {
 // return score for given hex
 // metric: weighted sum of inverse distances to graveyards, enemy captain, and board center
 double evaluate_hex(int x, int y, location enemy_captain, location own_captain,
-    int * graveyards, int * zombies, int ignore_captain) {
+    int * graveyards, int * zombies, bool is_captain) {
   double graveyard_score = 1;
   double enemy_captain_score = 0.1;
   double own_captain_score = -0.01;
-  if (ignore_captain) own_captain_score = 0;
+  if (is_captain) own_captain_score = 0;
   double center_score = 0.01;
   double epsilon = 1e-1; // for regulating 1/0
 
@@ -77,8 +77,12 @@ double evaluate_hex(int x, int y, location enemy_captain, location own_captain,
       if (graveyards[xi * BOARD_SIZE + yi]
           && zombies[xi * BOARD_SIZE + yi] == -1
           && (enemy_captain.x != xi || enemy_captain.y != yi)
-          && (own_captain.x != xi || own_captain.y != yi))
-        score += 1.0 / (dist(xi, yi, x, y) + epsilon) * graveyard_score;
+          && (own_captain.x != xi || own_captain.y != yi)) {
+        int distance = dist(xi, yi, x, y);
+        // for captain, being next to graveyard is almost equivalent to being on it (assuming enough money)
+        if (is_captain && distance > 0) distance --;
+        score += 1.0 / (distance + epsilon) * graveyard_score;
+      }
 
   // add enemy captain to score
   score += 1.0 / (dist(x, y, enemy_captain.x, enemy_captain.y) + epsilon) * enemy_captain_score;
