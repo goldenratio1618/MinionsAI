@@ -302,6 +302,9 @@ class Game():
             self.add_to_metric(self.winner, 'wins', 1)
             return
 
+        for unit, _ in self.units_with_locations(color=self.active_player_color):
+            unit.reset_my_turn_start()
+
         self.phase = Phase.MOVE
 
     def process_single_action(self, action: Action) -> Tuple[bool, Optional[str]]:
@@ -451,9 +454,6 @@ class Game():
                 income += 1
         self.money[self.active_player_color] += income
 
-        for unit, _ in self.units_with_locations():
-            unit.reset_spawn_phase_end()
-
     def end_move_phase(self):
         assert self.phase == Phase.MOVE, f"Tried to end move phase during phase {self.phase}"
         self.phase = Phase.SPAWN
@@ -525,18 +525,19 @@ class Unit():
         self.type = unit_type
         self.color = color
         self.curr_health = self.type.defense
-        self.hasMoved = False
-        self.remainingAttack = self.type.attack
+        self.hasMoved = True
+        self.remainingAttack = 0
         self.isExhausted = False
         self.is_soulbound = False
     
     def reset_move_phase_end(self):
+        self.hasMoved = True
+        self.remainingAttack = 0
+
+    def reset_my_turn_start(self):
+        self.curr_health = self.type.defense
         self.hasMoved = False
         self.remainingAttack = self.type.attack
-        self.curr_health = self.type.defense
-
-    def reset_spawn_phase_end(self):
-        pass
 
     def receive_attack(self, attack):
         self.curr_health -= attack

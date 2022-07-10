@@ -115,7 +115,7 @@ function makeUnitButton(interactive, unit, phase) {
     var unitButton = document.createElement("div");
     if (interactive && unit.color == 0) {
         var attackDiv = document.createElement("div");
-        if (phase == "move" && unit.remainingAttack > 0) {
+        if (unit.remainingAttack > 0) {
             attackDiv.innerText = "⚔️";
         }
         attackDiv.setAttribute("class", "stat");
@@ -127,7 +127,7 @@ function makeUnitButton(interactive, unit, phase) {
     unitButton.appendChild(nameDiv);
     if (interactive && unit.color == 0) {
         var moveDiv = document.createElement("div");
-        if (phase == "move" && !unit.hasMoved) {
+        if (!unit.hasMoved) {
             moveDiv.innerText = "➜";
         }
         moveDiv.setAttribute("class", "stat");
