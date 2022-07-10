@@ -32,19 +32,19 @@ import tqdm
 
 logger = logging.getLogger(__name__)
 
-TRAIN_GENERATOR = True
-TRAIN_DISCRIMINATOR = False
-LOAD_DISCRIMINATOR_MODEL = os.path.join(get_experiments_directory(), "conveps_repro_0704", "checkpoints", "conveps_repro_iter_400_adapt")
-LOAD_GENERATOR_MODEL = None # os.path.join(get_experiments_directory(), "gen_convbig396", "checkpoints", "iter_396_adapt")
+TRAIN_GENERATOR = False
+TRAIN_DISCRIMINATOR = True
+LOAD_DISCRIMINATOR_MODEL = None # os.path.join(get_experiments_directory(), "conveps_repro_0704", "checkpoints", "conveps_repro_iter_400_adapt")
+LOAD_GENERATOR_MODEL = os.path.join(get_experiments_directory(), "tree_2", "checkpoints", "iter_328")
 
 # How many rollouts do we run of each turn before picking the best
 ROLLOUTS_PER_TURN = 16
 DISC_EPSILON_GREEDY = 0.1
-GEN_EPSILON_GREEDY = 0.1
+GEN_EPSILON_GREEDY = 0.02
 
 # How many episodes of data do we collect each iteration, before running a few epochs of optimization?
 # Potentially good to use a few times bigger EPISODES_PER_ITERATION than BATCH_SIZE, to minimize correlation within batches
-EPISODES_PER_ITERATION = 32
+EPISODES_PER_ITERATION = 256
 ROLLOUT_PROCS = 4
 
 # Once we've collected the data, how many times do we go over it for optimization (within one iteration)?
@@ -64,7 +64,7 @@ EVAL_VS_RANDOM_UNTIL = 3
 EVAL_TRIALS = 50
 
 # Frequency of storing a saved agent
-CHECKPOINT_EVERY = 4
+CHECKPOINT_EVERY = 16
 
 # During evals, run this many times extra rollouts compared to during rollout generation
 EVAL_COMPUTE_BOOST = 4
@@ -102,7 +102,8 @@ def build_agent():
         generator = AgentGenerator(RandomAIAgent())
     else:
         generator_agent = load(LOAD_GENERATOR_MODEL, already_in_path_ok=True)  # ok if a thread loads this after main has already done so.
-        generator = generator_agent.generator
+        generator = generator_agent.generators[0][0]
+        generator.epsilon_greedy = GEN_EPSILON_GREEDY
         gen_model = generator.model
         gen_model.to(find_device())
 
