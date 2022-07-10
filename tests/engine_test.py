@@ -1,7 +1,9 @@
-from minionsai.action import MoveAction
+from calendar import c
+from minionsai.action import ActionList, MoveAction, SpawnAction
 from minionsai.agent import RandomAIAgent
 from minionsai.engine import BOARD_SIZE, Board, Unit, Game, print_n_games
-from minionsai.unit_type import ZOMBIE
+from minionsai.game_util import seed_everything
+from minionsai.unit_type import NECROMANCER, ZOMBIE
 
 
 def test_board_copy():
@@ -95,11 +97,43 @@ def test_game_encode_json():
     for unit, (i, j) in game.units_with_locations():
         check_units_equivalent(unit, game_copy.board.board[i][j].unit)
 
+def test_game_unit_states():
+    seed_everything(0)
+    for _ in range(5):
+        game = Game()
+        agent = RandomAIAgent()
+        while True:
+            game.next_turn()
+            if game.done:
+                break
+            # All units should be full health
+            for unit, _ in game.units_with_locations(color=game.inactive_player_color):
+                assert unit.curr_health == unit.type.defense
+            # All active units should have their move and attack.
+            for unit, _ in game.units_with_locations(color=game.active_player_color):
+                assert unit.hasMoved == False
+                assert unit.remainingAttack == unit.type.attack
+            # All inactive units should not.
+            for unit, _ in game.units_with_locations(color=game.inactive_player_color):
+                assert unit.hasMoved == True
+                assert unit.remainingAttack == 0
+            
+            action = agent.act(game.copy())
+            game.full_turn(action)
+
+            # No units should have move or attack until we start the next turn.
+            for unit, _ in game.units_with_locations():
+                assert unit.hasMoved == True
+                assert unit.remainingAttack == 0
+
+
+
 def test_print_n_games():
     games = [Game() for _ in range(10)]
     print_n_games(games)
 
 def test_game_hash():
+    seed_everything(0)
     game = Game()
     game.board.board[1][1].unit = Unit(0, ZOMBIE)
     game.next_turn()
@@ -110,9 +144,43 @@ def test_game_hash():
     game_copy_hash = hash(game.copy())
     assert game_hash == game_copy_hash
 
+    seed_everything(0)
     different_game = Game()
     different_game.board.board[1][1].unit = Unit(0, ZOMBIE)
     different_game.next_turn()
     different_game.process_single_action(MoveAction((1, 1), (1, 2)))
     different_game_hash = hash(different_game)
     assert different_game_hash != game_hash
+
+def test_game_same_spawn_vs_move():
+    # Test that in the spawn phase, it doesn't matter if a unit moved or not or was spawned.
+    seed_everything(0)
+    base_game = Game()
+    base_game.board.board[0][0].unit = Unit(0, NECROMANCER)
+    base_game.board.board[1][0].unit = Unit(0, ZOMBIE)
+    base_game.next_turn()
+
+    # Move the zombie and spawn a new one where it was
+    moved_game = base_game.copy()
+    moved_game.full_turn(ActionList([MoveAction((1, 0), (0, 1))], [SpawnAction(ZOMBIE, (1, 0))]))
+    moved_game_hash = hash(moved_game)
+
+    # Spawn a new zombie in the new spot
+    no_moved_game = base_game.copy()
+    no_moved_game.full_turn(ActionList([], [SpawnAction(ZOMBIE, (0, 1))]))
+    no_moved_game_hash = hash(no_moved_game)
+
+    assert moved_game_hash == no_moved_game_hash
+
+    # Should also be the same if the zombie was just there to start with
+    seed_everything(0)
+    started_there_game = Game()
+    started_there_game.board.board[0][0].unit = Unit(0, NECROMANCER)
+    started_there_game.board.board[1][0].unit = Unit(0, ZOMBIE)
+    started_there_game.board.board[0][1].unit = Unit(0, ZOMBIE)
+    started_there_game.money[0] -= 2
+    started_there_game.next_turn()
+    started_there_game.full_turn(ActionList([], []))
+    started_there_game_hash = hash(started_there_game)
+    print_n_games([moved_game, started_there_game])
+    assert started_there_game_hash == moved_game_hash
