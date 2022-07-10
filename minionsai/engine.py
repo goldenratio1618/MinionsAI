@@ -526,7 +526,7 @@ class Unit():
         self.color = color
         self.curr_health = self.type.defense
         self.hasMoved = False
-        self.remainingAttack = 0
+        self.remainingAttack = self.type.attack
         self.isExhausted = False
         self.is_soulbound = False
     
