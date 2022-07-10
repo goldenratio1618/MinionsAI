@@ -532,10 +532,11 @@ class Unit():
     
     def reset_move_phase_end(self):
         self.hasMoved = False
-        self.remainingAttack = 0
+        self.remainingAttack = self.type.attack
+        self.curr_health = self.type.defense
 
     def reset_spawn_phase_end(self):
-        self.isExhausted = False
+        pass
 
     def receive_attack(self, attack):
         self.curr_health -= attack
