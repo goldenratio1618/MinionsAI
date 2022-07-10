@@ -1,4 +1,5 @@
 import json
+import random
 from re import I
 from flask import Flask, redirect, render_template, request, url_for
 from minionsai.action import MoveAction, SpawnAction
@@ -133,8 +134,14 @@ def agent_delete(env_name, agent_name):
 def agent_play(env_name, agent_name):
     _, error_msg = True, ""
     if request.method == 'GET':
+        play_as_second_player = random.random() < 0.5  # TODO make this choosable?
         game = ENVS[env_name]()
         game.next_turn()
+        if play_as_second_player:
+            agent = load(os.path.join(env_agents_dir(env_name), agent_name), test_load_equivalence=False)
+            agent_actions = agent.act(game.copy())
+            game.full_turn(agent_actions)
+            game.next_turn()
         game_reset = game
         game_reset_json = game.encode_json()
         game_prev_turn_str = ""

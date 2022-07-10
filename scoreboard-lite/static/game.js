@@ -28,7 +28,7 @@ var action_in_progress = "";
 
 function clearActiveState() {
     if (selectedButton != null) {
-        selectedButton.setAttribute("class", "");
+        selectedButton.classList.remove("selected");
     }
     action_in_progress = "";
 }
@@ -36,7 +36,8 @@ function clearActiveState() {
 function clickSpawnButton(unit, buttonId) {
     clearActiveState();
     selectedButton = document.getElementById(buttonId);
-    selectedButton.setAttribute("class", "selected");
+    // Add the "selected" class
+    selectedButton.classList.add("selected");
     action_in_progress = "spawn";
 
     document.getElementsByName("spawn_unit_type")[0].value = unit;
@@ -56,7 +57,7 @@ function clickButton(i, j, mouseKey) {
     if (mouseKey == 0) {
         clearActiveState();
         if (game_state.board[i][j].unit != null &&
-            game_state.board[i][j].unit.color == 0) {
+            game_state.board[i][j].unit.color == game_state.active_player_color) {
             selectedButton = clickedHex.children[1].querySelector("button");
             clickedHex.children[1].querySelector("button").setAttribute("class", "selected");
             document.getElementsByName("move_from_i")[0].value = i;
@@ -113,7 +114,7 @@ function makeUnitButton(interactive, unit, phase) {
     var buttonWrapper = document.createElement("button");
     buttonWrapper.setAttribute("class", "wrapper");
     var unitButton = document.createElement("div");
-    if (interactive && unit.color == 0) {
+    if (interactive && unit.color == game_state.active_player_color) {
         var attackDiv = document.createElement("div");
         if (phase == "move" && unit.remainingAttack > 0) {
             attackDiv.innerText = "⚔️";
@@ -125,7 +126,7 @@ function makeUnitButton(interactive, unit, phase) {
     nameDiv.innerText = unit.type[0];
     nameDiv.setAttribute("class", "unit-name");
     unitButton.appendChild(nameDiv);
-    if (interactive && unit.color == 0) {
+    if (interactive && unit.color == game_state.active_player_color) {
         var moveDiv = document.createElement("div");
         if (phase == "move" && !unit.hasMoved) {
             moveDiv.innerText = "➜";
