@@ -15,8 +15,9 @@
       <p>{{error_msg}}</p>
       <div style ="display: table;">
       <div id="side_menu">
+         <h3>Turn: {{game.remaining_turns}}</h3>
          <h3>Spawn</h3>
-         <button id="zombie_spawn"><div class="color0"><h4>Zombie</h4></div></button>
+         <button id="zombie_spawn" class="color{{game.active_player_color}}"><div><h4>Zombie</h4></div></button>
          <br/>
          <br/>
          <form id="the_form" method="post">
