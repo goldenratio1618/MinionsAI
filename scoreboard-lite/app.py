@@ -166,13 +166,14 @@ def agent_play(env_name, agent_name):
                 game.end_spawn_phase()
             game_prev_turn_str = game.pretty_print(do_print=False)
             game.next_turn()
-            agent = load(os.path.join(env_agents_dir(env_name), agent_name), test_load_equivalence=False)
-            agent_actions = agent.act(game.copy())
-            game.full_turn(agent_actions)
-            game.next_turn()
+            if not game.done:
+                agent = load(os.path.join(env_agents_dir(env_name), agent_name), test_load_equivalence=False)
+                agent_actions = agent.act(game.copy())
+                game.full_turn(agent_actions)
+                game.next_turn()
+                agent_actions_str = "".join(str(a) for a in agent_actions.move_phase + agent_actions.spawn_phase)
             game_reset = game
             game_reset_json = game.encode_json()
-            agent_actions_str = "".join(str(a) for a in agent_actions.move_phase + agent_actions.spawn_phase)
         elif "move" in request.values:
             if game.phase == Phase.SPAWN:
                 error_msg = "This is the spawn phase, no moves or attacks."
