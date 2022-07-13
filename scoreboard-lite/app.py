@@ -132,7 +132,8 @@ def agent_delete(env_name, agent_name):
 # TODO better UI!
 @app.route("/env/<env_name>/agent/<agent_name>/play", methods=['GET', 'POST'])
 def agent_play(env_name, agent_name):
-    _, error_msg = True, ""
+    error_msg = ""
+    agent_info = {}
     if request.method == 'GET':
         play_as_second_player = random.random() < 0.5  # TODO make this choosable?
         game = ENVS[env_name]()
@@ -140,6 +141,7 @@ def agent_play(env_name, agent_name):
         if play_as_second_player:
             agent = load(os.path.join(env_agents_dir(env_name), agent_name), test_load_equivalence=False)
             agent_actions = agent.act(game.copy())
+            agent_info = agent.last_action_info()
             game.full_turn(agent_actions)
             game.next_turn()
         game_reset = game
@@ -169,6 +171,7 @@ def agent_play(env_name, agent_name):
             if not game.done:
                 agent = load(os.path.join(env_agents_dir(env_name), agent_name), test_load_equivalence=False)
                 agent_actions = agent.act(game.copy())
+                agent_info = agent.last_action_info()
                 game.full_turn(agent_actions)
                 game.next_turn()
                 agent_actions_str = "".join(str(a) for a in agent_actions.move_phase + agent_actions.spawn_phase)
@@ -208,6 +211,7 @@ def agent_play(env_name, agent_name):
         game_prev_turn_str=game_prev_turn_str,
         agent_actions_str=agent_actions_str,
         error_msg=error_msg,
+        agent_info=agent_info,
         )
 
 

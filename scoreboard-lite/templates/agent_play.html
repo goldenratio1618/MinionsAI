@@ -43,8 +43,14 @@
    <div name="game" id="reset" style="width: 200px; margin-bottom:15px; --hex-scale: 20px;">
    </div>
    <br>
+   {% if "score" in agent_info %}
+   <h3>Agent's Confidence: {{'{:.3f}'.format(agent_info["score"])}}</h3>
+   {% endif %}
+   <br>
    Agent actions:
    {{agent_actions_str}}
+   <br>
+   Agent Full Info: {{agent_info}}
    <br>
    End of your last turn:
    <pre>{{game_prev_turn_str}}</pre>

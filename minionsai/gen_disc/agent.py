@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 from ..experiment_tooling import find_device
 
@@ -22,8 +22,13 @@ class GenDiscAgent(Agent):
         self.verbose_level = verbose_level
 
     def act(self, game):
-        action, _generator_info, _discriminator_info = self.act_with_info(game)
+        action, self.last_action_generator_info, self.last_action_discriminator_info = self.act_with_info(game)
         return action
+
+    def last_action_info(self) -> Dict:
+        return {
+            "score": np.max(self.last_action_discriminator_info["all_winprobs"]).item(),
+        }
     
     def act_with_info(self, game):
         options_action_list = []

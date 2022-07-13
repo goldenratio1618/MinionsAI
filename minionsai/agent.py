@@ -3,6 +3,7 @@ import random
 import subprocess
 import sys
 import glob
+from typing import Dict
 
 from .game_util import adjacent_zombies
 from .action import ActionList, SpawnAction, MoveAction
@@ -25,6 +26,12 @@ class Agent(abc.ABC):
     @abc.abstractmethod
     def act(self, game_copy: Game) -> ActionList:
         raise NotImplementedError()
+
+    def last_action_info(self) -> Dict:
+        """
+        Info or metrics associated with the last action.
+        """
+        return {}
 
     def save_extra(self, directory):
         """
