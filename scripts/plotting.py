@@ -7,12 +7,15 @@ import numpy as np
 
 run_dir = get_experiments_directory()
 runs = [
+    ("disc_from_scratch", os.path.join(run_dir, "disc_from_scratch", "metrics.csv")),
+    ("disc_32epi_3e5lr", os.path.join(run_dir, "disc_32epi_3e5lr", "metrics.csv")),
+
     # # ("test", os.path.join(run_dir, "test", "metrics.csv")),
     # # ("dumbrandom_nostop_t03_eps04", os.path.join(run_dir, "dumbrandom_nostop_t03_eps04", "metrics.csv")),
-    ("gen_conveps400_2", os.path.join(run_dir, "gen_conveps400_2", "metrics.csv")),
-    ("gen_conveps396_3", os.path.join(run_dir, "gen_conveps396_3", "metrics.csv")),
-    ("gen_conveps396_5", os.path.join(run_dir, "gen_conveps396_5", "metrics.csv")),
-    ("gen_convbig396", os.path.join(run_dir, "gen_convbig396", "metrics.csv")),
+    # ("gen_conveps400_2", os.path.join(run_dir, "gen_conveps400_2", "metrics.csv")),
+    # ("gen_conveps396_3", os.path.join(run_dir, "gen_conveps396_3", "metrics.csv")),
+    # ("gen_conveps396_5", os.path.join(run_dir, "gen_conveps396_5", "metrics.csv")),
+    # ("gen_convbig396", os.path.join(run_dir, "gen_convbig396", "metrics.csv")),
 
     # ("conveps_repro_0704", os.path.join(run_dir, "conveps_repro_0704", "metrics.csv")),
     # ("conv_big", os.path.join(run_dir, "conv_big", "metrics.csv")),
@@ -21,13 +24,12 @@ runs = [
     # ("cycle_bot_3", os.path.join(run_dir, "cycle_bot_3", "metrics.csv")),
 ]
 
-# x_axis = "rollouts/games"
-x_axis = "iteration"
+x_axis = "rollouts/games"
+# x_axis = "iteration"
 metrics = [
-    ["gen/loss/epoch_0/batch_0000", "gen/loss/epoch_0/batch_000", "loss/epoch_0/batch_00", "disc/loss/epoch_0/batch_00"], 
-    ["eval_winrate/GenDiscAgent"], 
-    ["eval_winrate/iter_396", "eval_winrate/dfarhi_0613_conveps_256rolls_iter400_adapt"],
-    ["rollouts/game/unique_ending_labels"]
+    ["gen/loss/epoch_0/batch_0000", "gen/loss/epoch_0/batch_000", "disc/loss/epoch_0/batch_000"], 
+    ["eval_winrate/dfarhi_0613_conveps_256rolls_iter400_adapt"],
+    ["timing/iteration"]
 ]
 
 num = len(metrics)
