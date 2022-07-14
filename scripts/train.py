@@ -33,8 +33,8 @@ import tqdm
 logger = logging.getLogger(__name__)
 
 TRAIN_GENERATOR = True
-TRAIN_DISCRIMINATOR = False
-LOAD_DISCRIMINATOR_MODEL = os.path.join(get_experiments_directory(), "conveps_repro_0704", "checkpoints", "conveps_repro_iter_400_adapt")
+TRAIN_DISCRIMINATOR = True
+LOAD_DISCRIMINATOR_MODEL = None # os.path.join(get_experiments_directory(), "conveps_repro_0704", "checkpoints", "conveps_repro_iter_400_adapt")
 LOAD_GENERATOR_MODEL = None # os.path.join(get_experiments_directory(), "tree_2", "checkpoints", "iter_328")
 
 # How many rollouts do we run of each turn before picking the best
@@ -79,7 +79,7 @@ GEN_D_MODEL = 64 * GEN_DEPTH
 
 # Optimizer hparams
 DISC_BATCH_SIZE = EPISODES_PER_ITERATION
-DISC_LR = 1e-4
+DISC_LR = 3e-5
 GEN_BATCH_SIZE = EPISODES_PER_ITERATION * 64
 GEN_LR = 2e-4
 
@@ -88,7 +88,7 @@ game_kwargs = {'symmetrize': False}
 # Eval env registered in scoreboard_envs.py
 EVAL_ENV_NAME = 'zombies5x5'
 
-MAX_ITERATIONS = 512
+MAX_ITERATIONS = 4096
 
 SEED = 12345
 
@@ -131,7 +131,10 @@ def build_agent():
     if TRAIN_GENERATOR or LOAD_GENERATOR_MODEL:
         logger.info(f"Generator model total parameter count: {sum(p.numel() for p in gen_model.parameters() if p.requires_grad):,}")
 
-    agent = GenDiscAgent(discriminator, [(generator, ROLLOUTS_PER_TURN), (AgentGenerator(RandomAIAgent()), 64)])
+    agent = GenDiscAgent(discriminator, [
+        (generator, ROLLOUTS_PER_TURN), 
+        (AgentGenerator(RandomAIAgent()), 64)
+        ])
     return agent
 
 def eval_vs_other_by_path(agent, eval_agent_path):
