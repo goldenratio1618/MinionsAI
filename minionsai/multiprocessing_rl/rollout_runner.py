@@ -84,6 +84,8 @@ class RolloutRunner():
 
         player_metrics = (game.get_metrics(0), game.get_metrics(1))
         if len(disc_trajectories[0].obs) > 0:
+            player_metrics[0]["pfirstturn"] = disc_trajectories[0].maxq[0]
+            player_metrics[1]["pfirstturn"] = disc_trajectories[1].maxq[0]
             player_metrics[winner]["pfinal"] = disc_trajectories[winner].maxq[-1]
             player_metrics[1 - winner]["pfinal"] = 1 - disc_trajectories[1 - winner].maxq[-1]
 
