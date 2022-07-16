@@ -40,4 +40,4 @@ def test_runner_same_as_multiproc():
         assert data_local.num_games == data_multiproc.num_games
         for key in data_local.obs:
             np.testing.assert_allclose(data_local.obs[key], data_multiproc.obs[key]), key
-        np.testing.assert_allclose(data_local.labels, data_multiproc.labels)
+        np.testing.assert_allclose(data_local.next_maxq, data_multiproc.next_maxq)

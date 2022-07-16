@@ -18,7 +18,7 @@ class OptimizerRolloutSource(abc.ABC):
         self.game_kwargs = game_kwargs
         self.lambda_until_episodes = lambda_until_episodes
 
-    def get_rollouts(self, iteration: int) -> RolloutBatch:
+    def get_rollouts(self, iteration: int) -> Dict[str, RolloutBatch]:
         disc_obs = []
         disc_labels = []
 

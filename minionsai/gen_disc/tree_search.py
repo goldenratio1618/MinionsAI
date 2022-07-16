@@ -2,7 +2,7 @@ import abc
 from typing import Any, Callable, List, Tuple
 
 from minionsai.game_util import stack_dicts
-from ..multiprocessing_rl.rollouts_data import TrainingData
+from ..multiprocessing_rl.rollouts_data import RolloutBatch
 import numpy as np
 
 class NodePointer(abc.ABC):
@@ -119,9 +119,10 @@ class DepthFirstTreeSearch:
             else:
                 self._explored_nodes[current_node_hash] = None
                 self._verbose_print("Found terminal node.")
-                return all_actions, node_pointer, TrainingData(
+                return all_actions, node_pointer, RolloutBatch(
                     obs=stack_dicts(training_data['obs']),
                     actions=training_data['actions'],
                     next_maxq=training_data['next_maxq'],
+                    num_games=0,
                 )
                 

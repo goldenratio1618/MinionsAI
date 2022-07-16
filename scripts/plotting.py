@@ -7,7 +7,9 @@ import numpy as np
 
 run_dir = get_experiments_directory()
 runs = [
-    ("disc_from_scratch", os.path.join(run_dir, "disc_from_scratch", "metrics.csv")),
+    ("dual_1", os.path.join(run_dir, "dual_1", "metrics.csv")),
+
+    # ("disc_from_scratch", os.path.join(run_dir, "disc_from_scratch", "metrics.csv")),
     ("disc_32epi_3e5lr", os.path.join(run_dir, "disc_32epi_3e5lr", "metrics.csv")),
 
     # # ("test", os.path.join(run_dir, "test", "metrics.csv")),
@@ -24,11 +26,13 @@ runs = [
     # ("cycle_bot_3", os.path.join(run_dir, "cycle_bot_3", "metrics.csv")),
 ]
 
-x_axis = "rollouts/games"
-# x_axis = "iteration"
+# x_axis = "rollouts/games"
+x_axis = "iteration"
 metrics = [
-    ["gen/loss/epoch_0/batch_0000", "gen/loss/epoch_0/batch_000", "disc/loss/epoch_0/batch_000"], 
+    # ["gen/loss/epoch_0/batch_00", "gen/loss/epoch_0/batch_000"],
+    ["disc/loss/epoch_0/batch_000"], 
     ["eval_winrate/dfarhi_0613_conveps_256rolls_iter400_adapt"],
+    ["generator_strength"],
     ["timing/iteration"]
 ]
 
@@ -36,6 +40,14 @@ num = len(metrics)
 fig, ax = plt.subplots(1, num, figsize=(num * 6, 5))
 
 flat_metrics = [metric  for metrics_list in metrics for metric in metrics_list]
+if any("generator_strength" in x for x in metrics):
+    flat_metrics.extend(["rollouts/game/generators/0/have_best_action", "rollouts/game/generators/1/have_best_action"])
+
+def float_lookup(key, dict):
+    if key not in dict or dict[key] == "":
+        return None
+    return float(dict[key])
+
 for label, csv_path in runs:
 
     # Read data from the csv
@@ -48,10 +60,14 @@ for label, csv_path in runs:
                 continue
             
             for metric in flat_metrics:
-                if metric not in row or row[metric] == "":
-                    data[metric].append(None)
+                if metric == "generator_strength":
+                    gen_str = float_lookup("rollouts/game/generators/0/have_best_action", row)
+                    random_str = float_lookup("rollouts/game/generators/1/have_best_action", row)
+                    if gen_str is not None:
+                        data[metric].append(gen_str - random_str)
                 else:
-                    data[metric].append(float(row[metric]))
+                    data[metric].append(float_lookup(metric, row))
+                
             x.append(float(row[x_axis]))
     # Plot the data
     for i, metrics_this_plot in enumerate(metrics):
@@ -64,8 +80,8 @@ for label, csv_path in runs:
                 ax[i].scatter(filtered_x, filtered_data, alpha=0.5, s=1)
 
             # Smooth using a moving average
-            if len(filtered_data) > 50:
-                smooth_size = 11
+            if len(filtered_data) > 100:
+                smooth_size = 61
                 smoothed = np.convolve(filtered_data, np.ones((smooth_size,)) / smooth_size, mode="valid")
                 filtered_x = filtered_x[(smooth_size - 1)//2:-(smooth_size - 1)//2]
             else:
@@ -79,4 +95,5 @@ for label, csv_path in runs:
         # ax[i].set_xlim(0, 400)
         ax[i].set_ylabel(metric)
         ax[i].legend()
+ax[2].grid(True)
 plt.show()
