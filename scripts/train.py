@@ -251,23 +251,23 @@ def main(run_name):
                                     batch_obs[key] = disc_rollout_batch.obs[key][batch_idxes]
 
                                 # Construct labels from max of next obs
-                                # with th.no_grad():
-                                #     batch_next_obs = {}
-                                #     for key in disc_rollout_batch.next_obs:
-                                #         batch_next_obs[key] = disc_rollout_batch.next_obs[key][batch_idxes]
-                                #     next_maxq = th.sigmoid(disc_model(batch_next_obs))
-                                #     assert next_maxq.shape == (DISC_BATCH_SIZE, 1)  # 30 is num_things
-                                #     next_maxq = th.squeeze(next_maxq, 1)
-                                #     terminal_action = th.from_numpy(disc_rollout_batch.terminal_action[batch_idxes]).to(device)
-                                #     reward = th.from_numpy(disc_rollout_batch.reward[batch_idxes]).to(device)
-                                #     batch_labels = th.where(terminal_action, reward, next_maxq)
-                                #     # For now, just check that they're the same.
-                                #     assert np.allclose(batch_labels.cpu().numpy(), disc_rollout_batch.next_maxq[batch_idxes])
-                                # TODO use new labels
-                                batch_labels = th.from_numpy(disc_rollout_batch.next_maxq[batch_idxes]).to(device)
+                                with th.no_grad():
+                                    batch_next_obs = {}
+                                    for key in disc_rollout_batch.next_obs:
+                                        batch_next_obs[key] = disc_rollout_batch.next_obs[key][batch_idxes]
+                                    next_maxq = th.sigmoid(disc_model(batch_next_obs))
+                                    assert next_maxq.shape == (DISC_BATCH_SIZE, 1)
+                                    terminal_action = th.from_numpy(disc_rollout_batch.terminal_action[batch_idxes]).to(device)
+                                    terminal_action = th.unsqueeze(terminal_action, 1)
+                                    assert terminal_action.shape == (DISC_BATCH_SIZE, 1), terminal_action.shape
+                                    reward = th.from_numpy(disc_rollout_batch.reward[batch_idxes]).to(device)
+                                    reward = th.unsqueeze(reward, 1)
+                                    assert reward.shape == (DISC_BATCH_SIZE, 1), reward.shape
+                                    batch_labels = th.where(terminal_action, reward, next_maxq)
+                                    assert batch_labels.shape == (DISC_BATCH_SIZE, 1), batch_labels.shape
+
                                 disc_optimizer.zero_grad()
                                 disc_logprob = disc_model(batch_obs) # [batch, 1]
-                                batch_labels = th.unsqueeze(batch_labels, 1)
                                 loss = th.nn.BCEWithLogitsLoss()(disc_logprob, batch_labels)
                                 loss.backward()
                                 disc_optimizer.step()
