@@ -100,6 +100,7 @@ def build_agent():
         logger.info(gen_model)
         gen_translator = Translator("generator")
         generator = QGenerator(model=gen_model, translator=gen_translator, epsilon_greedy=GEN_EPSILON_GREEDY)
+        gen_model.eval()
     elif LOAD_GENERATOR_MODEL is None:
         generator = AgentGenerator(RandomAIAgent())
     else:
@@ -108,6 +109,7 @@ def build_agent():
         generator.epsilon_greedy = GEN_EPSILON_GREEDY
         gen_model = generator.model
         gen_model.to(find_device())
+        gen_model.eval()
 
     logger.info("Creating discriminator...")
     if TRAIN_DISCRIMINATOR:
@@ -118,6 +120,8 @@ def build_agent():
 
         disc_translator = Translator("discriminator")
         discriminator = QDiscriminator(translator=disc_translator, model=disc_model, epsilon_greedy=DISC_EPSILON_GREEDY)
+        disc_model.eval()
+
     elif LOAD_DISCRIMINATOR_MODEL is None:
         discriminator = ScriptedDiscriminator()
     else:
@@ -126,6 +130,8 @@ def build_agent():
         discriminator.epsilon_greedy = DISC_EPSILON_GREEDY
         disc_model = discriminator.model
         disc_model.to(find_device())
+        disc_model.eval()
+
     if TRAIN_DISCRIMINATOR or LOAD_DISCRIMINATOR_MODEL:
         logger.info(f"Discriminator model total parameter count: {sum(p.numel() for p in disc_model.parameters() if p.requires_grad):,}")
     if TRAIN_GENERATOR or LOAD_GENERATOR_MODEL:
@@ -180,18 +186,6 @@ def main(run_name):
         gen_model.to(device)
         gen_optimizer = th.optim.Adam(gen_model.parameters(), lr=GEN_LR)
 
-    def model_mode_eval():
-        if TRAIN_DISCRIMINATOR:
-            disc_model.eval()
-        if TRAIN_GENERATOR:
-            gen_model.eval()
-
-    def model_mode_train():
-        if TRAIN_DISCRIMINATOR:
-            disc_model.train()
-        if TRAIN_GENERATOR:
-            gen_model.train()
-
     if ROLLOUT_PROCS == 1:
         rollout_source = InProcessRolloutSource(EPISODES_PER_ITERATION, game_kwargs, agent)
     else:
@@ -216,9 +210,7 @@ def main(run_name):
                     agent.generators = [(gen, num * EVAL_COMPUTE_BOOST) for gen, num in agent.generators]
                     agent.discriminator.epsilon_greedy = 0.0
                     agent.generators[0][0].epsilon_greedy = 0.0
-                    model_mode_eval()
                     save(agent, os.path.join(checkpoint_dir, f"iter_{iteration}"), copy_code_from=code_dir)
-                    model_mode_train()
                     agent.generators = [(gen, num // EVAL_COMPUTE_BOOST) for gen, num in agent.generators]
                     agent.discriminator.epsilon_greedy = DISC_EPSILON_GREEDY
                     agent.generators[0][0].epsilon_greedy = GEN_EPSILON_GREEDY
@@ -237,12 +229,9 @@ def main(run_name):
 
             with metrics_logger.timing('rollouts'):
                 logger.info("Starting rollouts...")
-                model_mode_eval()
-
+                assert not gen_model.training and not disc_model.training, "Shouldn't be training during rollouts."
                 rollout_batch = rollout_source.get_rollouts(iteration=iteration)
-                model_mode_train()
                 rollout_stats['rollouts/games'] += rollout_batch['discriminator'].num_games
-
 
             if TRAIN_DISCRIMINATOR:
                 disc_rollout_batch = rollout_batch['discriminator']
@@ -250,6 +239,7 @@ def main(run_name):
                 rollout_stats['disc/rollouts/turns'] += num_turns
                 with metrics_logger.timing('training/disc'):
                     logger.info("Starting training discriminator...")
+                    disc_model.train()
                     for epoch in range(SAMPLE_REUSE):
                         logger.info(f"  Epoch {epoch}/{SAMPLE_REUSE}...")
                         all_idxes = np.random.permutation(num_turns)
@@ -272,12 +262,15 @@ def main(run_name):
                                     max_batch_digits = max(len(str(n_batches)), 3)
                                     metrics_logger.log_metrics({f"disc/loss/epoch_{epoch}/batch_{idx:0>{max_batch_digits}}": loss.item()})
                                 turns_optimized += len(batch_idxes)
+                    disc_model.eval()
+
             if TRAIN_GENERATOR:
                 gen_rollout_batch = rollout_batch['generator']
                 num_actions = gen_rollout_batch.labels.shape[0]
                 rollout_stats['gen/rollouts/actions'] += num_actions
                 with metrics_logger.timing('training/gen'):
                     logger.info("Starting training generator...")
+                    gen_model.train()
                     for epoch in range(GEN_SAMPLE_REUSE):
                         logger.info(f"  Epoch {epoch}/{GEN_SAMPLE_REUSE}...")
                         all_idxes = np.random.permutation(num_actions)
@@ -313,6 +306,8 @@ def main(run_name):
                                     max_batch_digits = max(len(str(n_batches)), 3)
                                     metrics_logger.log_metrics({f"gen/loss/epoch_{epoch}/batch_{idx:0>{max_batch_digits}}": loss.item()})
                                 gen_actions_optimized += len(batch_idxes)
+                    gen_model.eval()
+
             logger.info(f"Iteration {iteration} complete.")
             iteration += 1
             # agent.epsilon_greedy = EPSILON_GREEEDY * (1 - 0.8 * iteration / MAX_ITERATIONS)
@@ -321,7 +316,6 @@ def main(run_name):
         if iteration % EVAL_EVERY == 0 or iteration == MAX_ITERATIONS:
             with metrics_logger.timing('eval'):
                 logger.info("Evaluating...")
-                model_mode_eval()
                 if iteration < EVAL_VS_RANDOM_UNTIL:
                     eval_agent = RandomAIAgent()
                     eval_vs_other(agent, eval_agent, 'random')
@@ -332,7 +326,6 @@ def main(run_name):
                         eval_vs_other(agent, eval_agent, name=eval_agent.__class__.__name__)
                 for iter in EVAL_VS_PAST_ITERS:
                     eval_vs_other_by_path(agent, os.path.join(checkpoint_dir, f"iter_{iter}"))
-                model_mode_train()
 
 
 if __name__ == "__main__":
