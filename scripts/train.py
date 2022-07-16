@@ -310,7 +310,7 @@ def main(run_name):
                                 loss.backward()
                                 gen_optimizer.step()
                                 if idx in range(0, n_batches, 50):
-                                    max_batch_digits = len(str(n_batches))
+                                    max_batch_digits = max(len(str(n_batches)), 3)
                                     metrics_logger.log_metrics({f"gen/loss/epoch_{epoch}/batch_{idx:0>{max_batch_digits}}": loss.item()})
                                 gen_actions_optimized += len(batch_idxes)
             logger.info(f"Iteration {iteration} complete.")
