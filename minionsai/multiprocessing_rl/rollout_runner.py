@@ -7,7 +7,6 @@ import numpy as np
 import random
 
 from .rollouts_data import RolloutEpisode, RolloutTrajectory
-from .td_lambda import smooth_labels
 from ..engine import Game
 
 
@@ -34,9 +33,8 @@ class RolloutRunner():
         seed_everything(seed)
 
         game = self.make_game()
-        disc_trajectories = [RolloutTrajectory(obs=[], maxq=[], actions=None) for _ in range(2)]
-        # disc_obs_buffers = [[], []]  # one for each player
-        # disc_label_buffers = [[], []]  # one for each player
+        disc_trajectories = [RolloutTrajectory(obs=[], maxq=[], actions=None, previous_next_obs=[]) for _ in range(2)]
+
         all_gen_obs = []
         all_gen_labels = []
         all_gen_actions = []
@@ -52,8 +50,10 @@ class RolloutRunner():
                 # In this case we're optimizing the discriminator.
                 # TODO have a better way to know if we're optimizing than checking info dict keys.
                 disc_obs = disc_info["chosen_final_obs"]
+                disc_best_obs = disc_info["best_final_obs"]
                 max_winprob = disc_info["max_winprob"]
                 disc_trajectories[active_player].obs.append(disc_obs)
+                disc_trajectories[active_player].previous_next_obs.append(disc_best_obs)
                 disc_trajectories[active_player].maxq.append(max_winprob)
             if "training_datas" in gen_info[0]:
                 # Then we're training the generator also

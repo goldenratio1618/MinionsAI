@@ -69,6 +69,16 @@ class RolloutTrajectory:
     obs: List[Dict[str, np.array]]
     maxq: List[float]
     actions: List[np.array]
+    # The obs to use as "next_obs" for the previous state
+    # By default this will just be obs
+    previous_next_obs: Optional[List[Dict[str, np.array]]]  
+
+    @property
+    def _resolved_previous_next_obs(self):
+        if self.previous_next_obs is None:
+            return self.obs
+        else:
+            return self.previous_next_obs
 
     def assemble(self, final_reward: float, lam=None) -> RolloutBatch:
         """
@@ -83,11 +93,11 @@ class RolloutTrajectory:
 
         return RolloutBatch(
             obs=stack_dicts(self.obs),
-            next_obs=stack_dicts(self.obs[1:] + [null_obs]),
+            next_obs=stack_dicts(self._resolved_previous_next_obs[1:] + [null_obs]),
             actions=actions,
             next_maxq=next_maxq,
             terminal_action=np.array([0] * (len(self.obs) - 1) + [1], dtype=np.bool),
-            reward=np.array([0.0] * (len(self.obs) - 1) + [final_reward]),
+            reward=np.array([0.0] * (len(self.obs) - 1) + [final_reward], dtype=np.float32),
         )
 
 @dataclass
