@@ -8,7 +8,6 @@ Then agent checkpoints & logs are saved in <your experiments dir>/MinionsAI/my_r
 
 import argparse
 from collections import defaultdict
-import random
 from minionsai.action_bot.model import MinionsActionBot
 from minionsai.experiment_tooling import find_device, get_experiments_directory, setup_directory
 from minionsai.game_util import seed_everything
@@ -80,6 +79,9 @@ GEN_D_MODEL = 8 * GEN_DEPTH
 # Optimizer hparams
 DISC_BATCH_SIZE = EPISODES_PER_ITERATION
 DISC_LR = 3e-5
+DISC_EMA_HORIZON_ITERATIONS = 20 # 2.5% of 2000 iterations, rounded down a bit to be conservative
+DISC_EMA_HORIZON_BATCHES = 20 * 4 * EPISODES_PER_ITERATION / DISC_BATCH_SIZE * SAMPLE_REUSE * DISC_EMA_HORIZON_ITERATIONS
+DISC_EMA_DECAY = 1 - 1 / DISC_EMA_HORIZON_BATCHES
 GEN_BATCH_SIZE = EPISODES_PER_ITERATION * 64
 GEN_LR = 2e-4
 
@@ -92,17 +94,19 @@ MAX_ITERATIONS = 4
 
 SEED = 12345
 
-def build_agent():
+def build_agents():
     logger.info("Creating generator...")
     if TRAIN_GENERATOR:
         gen_model = MinionsActionBot(d_model=GEN_D_MODEL, depth=GEN_DEPTH)
         logger.info("Generator model initialized:")
         logger.info(gen_model)
         gen_translator = Translator("generator")
-        generator = QGenerator(model=gen_model, translator=gen_translator, epsilon_greedy=GEN_EPSILON_GREEDY)
         gen_model.eval()
+        rollout_generator = QGenerator(model=gen_model, translator=gen_translator, epsilon_greedy=GEN_EPSILON_GREEDY)
+        eval_generator = QGenerator(model=gen_model, translator=gen_translator, epsilon_greedy=0.0)
     elif LOAD_GENERATOR_MODEL is None:
-        generator = AgentGenerator(RandomAIAgent())
+        gen_model = None
+        eval_generator = rollout_generator = AgentGenerator(RandomAIAgent())
     else:
         generator_agent = load(LOAD_GENERATOR_MODEL, already_in_path_ok=True)  # ok if a thread loads this after main has already done so.
         generator = generator_agent.generators[0][0]
@@ -110,6 +114,7 @@ def build_agent():
         gen_model = generator.model
         gen_model.to(find_device())
         gen_model.eval()
+        eval_generator = rollout_generator = generator
 
     logger.info("Creating discriminator...")
     if TRAIN_DISCRIMINATOR:
@@ -119,11 +124,13 @@ def build_agent():
         logger.info(f"Discriminator model total parameter count: {sum(p.numel() for p in disc_model.parameters() if p.requires_grad):,}")
 
         disc_translator = Translator("discriminator")
-        discriminator = QDiscriminator(translator=disc_translator, model=disc_model, epsilon_greedy=DISC_EPSILON_GREEDY)
         disc_model.eval()
+        rollout_discriminator = QDiscriminator(translator=disc_translator, model=disc_model, epsilon_greedy=DISC_EPSILON_GREEDY)
+        eval_discriminator = QDiscriminator(translator=disc_translator, model=disc_model, epsilon_greedy=0.0)
 
     elif LOAD_DISCRIMINATOR_MODEL is None:
-        discriminator = ScriptedDiscriminator()
+        disc_model = None
+        eval_discriminator = rollout_discriminator = ScriptedDiscriminator()
     else:
         disc_agent = load(LOAD_DISCRIMINATOR_MODEL, already_in_path_ok=True)  # ok if a thread loads this after main has already done so.
         discriminator = disc_agent.discriminator
@@ -131,35 +138,37 @@ def build_agent():
         disc_model = discriminator.model
         disc_model.to(find_device())
         disc_model.eval()
+        eval_discriminator = rollout_discriminator = discriminator
 
     if TRAIN_DISCRIMINATOR or LOAD_DISCRIMINATOR_MODEL:
         logger.info(f"Discriminator model total parameter count: {sum(p.numel() for p in disc_model.parameters() if p.requires_grad):,}")
     if TRAIN_GENERATOR or LOAD_GENERATOR_MODEL:
         logger.info(f"Generator model total parameter count: {sum(p.numel() for p in gen_model.parameters() if p.requires_grad):,}")
 
-    agent = GenDiscAgent(discriminator, [
-        (generator, ROLLOUTS_PER_TURN), 
+    rollout_agent = GenDiscAgent(rollout_discriminator, [
+        (rollout_generator, ROLLOUTS_PER_TURN), 
         (AgentGenerator(RandomAIAgent()), 64)
         ])
+
+    eval_agent = GenDiscAgent(eval_discriminator, [
+        (eval_generator, ROLLOUTS_PER_TURN * EVAL_COMPUTE_BOOST), 
+        (AgentGenerator(RandomAIAgent()), 64 * EVAL_COMPUTE_BOOST)
+        ])
+    return gen_model, disc_model, rollout_agent, eval_agent
+
+def build_agent():
+    _, _, agent, _ = build_agents()
     return agent
 
-def eval_vs_other_by_path(agent, eval_agent_path):
-    logger.info(f"Looking for eval agent at {eval_agent_path}...")
-    if os.path.exists(eval_agent_path):
-        agent_name = os.path.basename(eval_agent_path)
-        eval_agent = load(eval_agent_path)
-        eval_vs_other(agent, eval_agent, agent_name)
+def eval_vs_other_by_path(agent, eval_opponent_path):
+    logger.info(f"Looking for eval agent at {eval_opponent_path}...")
+    if os.path.exists(eval_opponent_path):
+        agent_name = os.path.basename(eval_opponent_path)
+        eval_opponent = load(eval_opponent_path)
+        eval_vs_other(agent, eval_opponent, agent_name)
 
-def eval_vs_other(agent, eval_agent, name):
-    # Hack to temporarily change the agent's rollouts_per_turn & epsilon greedy values
-    # TODO - make it easier to set an agent into "eval" mode.
-    agent.generators = [(gen, num * EVAL_COMPUTE_BOOST) for gen, num in agent.generators]
-    agent.discriminator.epsilon_greedy = 0.0
-    agent.generators[0][0].epsilon_greedy = 0.0
-    wins, _metrics = run_n_games(ENVS[EVAL_ENV_NAME], [agent, eval_agent], n=EVAL_TRIALS)
-    agent.generators = [(gen, num // EVAL_COMPUTE_BOOST) for gen, num in agent.generators]
-    agent.discriminator.epsilon_greedy = DISC_EPSILON_GREEDY
-    agent.generators[0][0].epsilon_greedy = GEN_EPSILON_GREEDY
+def eval_vs_other(agent, eval_opponent, name):
+    wins, _metrics = run_n_games(ENVS[EVAL_ENV_NAME], [agent, eval_opponent], n=EVAL_TRIALS)
     winrate = wins[0] / EVAL_TRIALS
     metrics_logger.log_metrics({f"eval_winrate/{name}": winrate})
     logger.info(f"Win rate vs {name} = {winrate}")  
@@ -173,23 +182,20 @@ def main(run_name):
 
     device = find_device()
 
-    agent = build_agent()
+    gen_model, disc_model, rollout_agent, eval_agent = build_agents()
     if TRAIN_DISCRIMINATOR:
-        disc_model = agent.discriminator.model
         disc_model.to(device)
         disc_optimizer = th.optim.Adam(disc_model.parameters(), lr=DISC_LR)
 
     if TRAIN_GENERATOR:
         # Assume we train the first generator.
-        train_gen, rollouts_per_turn = agent.generators[0]
-        gen_model = train_gen.model
         gen_model.to(device)
         gen_optimizer = th.optim.Adam(gen_model.parameters(), lr=GEN_LR)
 
     if ROLLOUT_PROCS == 1:
-        rollout_source = InProcessRolloutSource(EPISODES_PER_ITERATION, game_kwargs, agent)
+        rollout_source = InProcessRolloutSource(EPISODES_PER_ITERATION, game_kwargs, rollout_agent)
     else:
-        rollout_source = MultiProcessRolloutSource(build_agent, agent, EPISODES_PER_ITERATION, game_kwargs, ROLLOUT_PROCS, 
+        rollout_source = MultiProcessRolloutSource(build_agent, rollout_agent, EPISODES_PER_ITERATION, game_kwargs, ROLLOUT_PROCS, 
                                     train_generator=TRAIN_GENERATOR, train_discriminator=TRAIN_DISCRIMINATOR)
 
     iteration = 0
@@ -206,14 +212,7 @@ def main(run_name):
             if iteration % CHECKPOINT_EVERY == 0 or iteration == MAX_ITERATIONS:
                 with metrics_logger.timing('checkpointing'):
                     logger.info("Saving checkpoint...")
-                    # Save with more rollouts_per_turn. TODO - clean up this hack.
-                    agent.generators = [(gen, num * EVAL_COMPUTE_BOOST) for gen, num in agent.generators]
-                    agent.discriminator.epsilon_greedy = 0.0
-                    agent.generators[0][0].epsilon_greedy = 0.0
-                    save(agent, os.path.join(checkpoint_dir, f"iter_{iteration}"), copy_code_from=code_dir)
-                    agent.generators = [(gen, num // EVAL_COMPUTE_BOOST) for gen, num in agent.generators]
-                    agent.discriminator.epsilon_greedy = DISC_EPSILON_GREEDY
-                    agent.generators[0][0].epsilon_greedy = GEN_EPSILON_GREEDY
+                    save(eval_agent, os.path.join(checkpoint_dir, f"iter_{iteration}"), copy_code_from=code_dir)
 
             metrics_logger.log_metrics(rollout_stats)
             if TRAIN_DISCRIMINATOR:
@@ -331,15 +330,15 @@ def main(run_name):
             with metrics_logger.timing('eval'):
                 logger.info("Evaluating...")
                 if iteration < EVAL_VS_RANDOM_UNTIL:
-                    eval_agent = RandomAIAgent()
-                    eval_vs_other(agent, eval_agent, 'random')
-                for eval_agent in EVAL_VS_AGENTS:
-                    if isinstance(eval_agent, str):
-                        eval_vs_other_by_path(agent, eval_agent)
-                    elif isinstance(eval_agent, Agent):                  
-                        eval_vs_other(agent, eval_agent, name=eval_agent.__class__.__name__)
+                    eval_opponent = RandomAIAgent()
+                    eval_vs_other(eval_agent, eval_opponent, 'random')
+                for eval_opponent in EVAL_VS_AGENTS:
+                    if isinstance(eval_opponent, str):
+                        eval_vs_other_by_path(eval_agent, eval_opponent)
+                    elif isinstance(eval_opponent, Agent):                  
+                        eval_vs_other(eval_agent, eval_opponent, name=eval_opponent.__class__.__name__)
                 for iter in EVAL_VS_PAST_ITERS:
-                    eval_vs_other_by_path(agent, os.path.join(checkpoint_dir, f"iter_{iter}"))
+                    eval_vs_other_by_path(eval_agent, os.path.join(checkpoint_dir, f"iter_{iter}"))
 
 
 if __name__ == "__main__":
