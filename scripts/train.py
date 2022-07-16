@@ -251,19 +251,19 @@ def main(run_name):
                                 for key in disc_rollout_batch.obs:
                                     batch_obs[key] = disc_rollout_batch.obs[key][batch_idxes]
 
-                                # # Construct labels from max of next obs
+                                # Construct labels from max of next obs
                                 # with th.no_grad():
                                 #     batch_next_obs = {}
                                 #     for key in disc_rollout_batch.next_obs:
                                 #         batch_next_obs[key] = disc_rollout_batch.next_obs[key][batch_idxes]
-                                #     next_allqs = disc_model(batch_next_obs)
-                                #     # Max over the last two dims which are the action dimensions.
-                                #     next_maxq = th.max(th.max(next_allqs, axis=-1)[0], axis=-1)[0]
+                                #     next_maxq = th.sigmoid(disc_model(batch_next_obs))
+                                #     assert next_maxq.shape == (DISC_BATCH_SIZE, 1)  # 30 is num_things
+                                #     next_maxq = th.squeeze(next_maxq, 1)
                                 #     terminal_action = th.from_numpy(disc_rollout_batch.terminal_action[batch_idxes]).to(device)
                                 #     reward = th.from_numpy(disc_rollout_batch.reward[batch_idxes]).to(device)
                                 #     batch_labels = th.where(terminal_action, reward, next_maxq)
-                                #     # For now, just check that they're the same.
-                                #     assert np.allclose(batch_labels.cpu().numpy(), disc_rollout_batch.next_maxq[batch_idxes])
+                                    # For now, just check that they're the same.
+                                    # assert np.allclose(batch_labels.cpu().numpy(), disc_rollout_batch.next_maxq[batch_idxes])
                                 # TODO use new labels
                                 batch_labels = th.from_numpy(disc_rollout_batch.next_maxq[batch_idxes]).to(device)
                                 disc_optimizer.zero_grad()
