@@ -207,13 +207,11 @@ class Translator():
         if actions is not None:
             assert actions.shape == (num, 2)
             transposed_actions = Translator.transpose_actions(actions)
-            all_actions = np.concatenate([actions, transposed_actions], axis=0)
-            assert all_actions.shape == (num * 2, 2), all_actions.shape
-            rotated_actions = Translator.rotate_actions(all_actions)
-            all_actions = np.concatenate([all_actions, rotated_actions], axis=0)
-            assert all_actions.shape == (num * 4, 2), all_actions.shape
+            rotated_actions = Translator.rotate_actions(actions)
+            rotated_flipped = Translator.rotate_actions(transposed_actions)
+            all_actions = [actions, transposed_actions, rotated_actions, rotated_flipped]
         else:
-            all_actions = None
+            all_actions = [None] * 4
         
 
         new_obs = []
