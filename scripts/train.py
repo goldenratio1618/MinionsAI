@@ -235,7 +235,7 @@ def main(run_name):
 
             if TRAIN_DISCRIMINATOR:
                 disc_rollout_batch = rollout_batch['discriminator']
-                num_turns = disc_rollout_batch.labels.shape[0]
+                num_turns = disc_rollout_batch.next_maxq.shape[0]
                 rollout_stats['disc/rollouts/turns'] += num_turns
                 with metrics_logger.timing('training/disc'):
                     logger.info("Starting training discriminator...")
@@ -250,7 +250,7 @@ def main(run_name):
                                 batch_obs = {}
                                 for key in disc_rollout_batch.obs:
                                     batch_obs[key] = disc_rollout_batch.obs[key][batch_idxes]
-                                batch_labels = disc_rollout_batch.labels[batch_idxes]
+                                batch_labels = disc_rollout_batch.next_maxq[batch_idxes]
                                 batch_labels = th.from_numpy(batch_labels).to(device)
                                 disc_optimizer.zero_grad()
                                 disc_logprob = disc_model(batch_obs) # [batch, 1]
@@ -266,7 +266,7 @@ def main(run_name):
 
             if TRAIN_GENERATOR:
                 gen_rollout_batch = rollout_batch['generator']
-                num_actions = gen_rollout_batch.labels.shape[0]
+                num_actions = gen_rollout_batch.next_maxq.shape[0]
                 rollout_stats['gen/rollouts/actions'] += num_actions
                 with metrics_logger.timing('training/gen'):
                     logger.info("Starting training generator...")
@@ -281,7 +281,7 @@ def main(run_name):
                                 batch_obs = {}
                                 for key in gen_rollout_batch.obs:
                                     batch_obs[key] = gen_rollout_batch.obs[key][batch_idxes]
-                                batch_labels = gen_rollout_batch.labels[batch_idxes]
+                                batch_labels = gen_rollout_batch.next_maxq[batch_idxes]
                                 batch_labels = th.from_numpy(batch_labels).to(device)
                                 assert batch_labels.shape == (GEN_BATCH_SIZE,)
                                 batch_actions = gen_rollout_batch.actions[batch_idxes]

@@ -13,7 +13,7 @@ class RolloutBatch:
     """
     obs: Dict[str, np.array]
     actions: np.array
-    labels: np.array
+    next_maxq: np.array
     num_games: int
 
 @dataclass
@@ -28,9 +28,3 @@ class RolloutEpisode:
     gen_labels: np.array  # Shape [N,]
     player_metrics: List[Dict]  # len 2, one per player
     global_metrics: Dict
-
-@dataclass
-class TrainingData:
-    obs: Dict[str, np.ndarray]
-    actions: np.ndarray
-    next_maxq: np.ndarray
