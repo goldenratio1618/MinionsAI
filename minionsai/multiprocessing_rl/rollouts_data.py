@@ -32,11 +32,11 @@ class RolloutBatch:
         num_transitions = len(self)
         for k, v in self.obs.items():
             assert v.shape[0] == num_transitions, (k, v.shape, num_transitions)
-        # TODO uncomment
-        # for k, v in self.next_obs.items():
-        #     assert v.shape[0] == num_transitions, (k, v.shape, num_transitions)
-        # TODO handle short trajectories in rollouts
-        # assert self.next_maxq.shape == (num_transitions,), (self.next_maxq.shape, num_transitions)
+        # TODO remove all these escape hatches; -1, None, etc.
+        if self.next_obs is not None:
+            for k, v in self.next_obs.items():
+                assert v.shape[0] == num_transitions, (k, v.shape, num_transitions)
+        assert self.next_maxq.shape == (num_transitions - 1,) or self.next_maxq.shape == (num_transitions,), (self.next_maxq.shape, num_transitions)
         assert self.actions is None or self.actions.shape == (num_transitions, 2), (self.actions.shape, num_transitions)
         assert self.terminal_action is None or self.terminal_action.shape == (num_transitions,), (self.terminal_action.shape, num_transitions)
         assert self.reward is None or self.reward.shape == (num_transitions,), (self.reward.shape, num_transitions)

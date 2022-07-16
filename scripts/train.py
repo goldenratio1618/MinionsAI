@@ -262,8 +262,8 @@ def main(run_name):
                                 #     terminal_action = th.from_numpy(disc_rollout_batch.terminal_action[batch_idxes]).to(device)
                                 #     reward = th.from_numpy(disc_rollout_batch.reward[batch_idxes]).to(device)
                                 #     batch_labels = th.where(terminal_action, reward, next_maxq)
-                                    # For now, just check that they're the same.
-                                    # assert np.allclose(batch_labels.cpu().numpy(), disc_rollout_batch.next_maxq[batch_idxes])
+                                #     # For now, just check that they're the same.
+                                #     assert np.allclose(batch_labels.cpu().numpy(), disc_rollout_batch.next_maxq[batch_idxes])
                                 # TODO use new labels
                                 batch_labels = th.from_numpy(disc_rollout_batch.next_maxq[batch_idxes]).to(device)
                                 disc_optimizer.zero_grad()
