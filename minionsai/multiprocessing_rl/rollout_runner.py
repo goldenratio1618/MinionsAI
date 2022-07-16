@@ -6,7 +6,7 @@ import torch as th
 import numpy as np
 import random
 
-from .rollouts_data import RolloutEpisode
+from .rollouts_data import RolloutEpisode, RolloutTrajectory
 from .td_lambda import smooth_labels
 from ..engine import Game
 
@@ -34,8 +34,9 @@ class RolloutRunner():
         seed_everything(seed)
 
         game = self.make_game()
-        disc_obs_buffers = [[], []]  # one for each player
-        disc_label_buffers = [[], []]  # one for each player
+        disc_trajectories = [RolloutTrajectory(obs=[], maxq=[], actions=None) for _ in range(2)]
+        # disc_obs_buffers = [[], []]  # one for each player
+        # disc_label_buffers = [[], []]  # one for each player
         all_gen_obs = []
         all_gen_labels = []
         all_gen_actions = []
@@ -52,8 +53,8 @@ class RolloutRunner():
                 # TODO have a better way to know if we're optimizing than checking info dict keys.
                 disc_obs = disc_info["chosen_final_obs"]
                 max_winprob = disc_info["max_winprob"]
-                disc_obs_buffers[active_player].append(disc_obs)
-                disc_label_buffers[active_player].append(max_winprob)
+                disc_trajectories[active_player].obs.append(disc_obs)
+                disc_trajectories[active_player].maxq.append(max_winprob)
             if "training_datas" in gen_info[0]:
                 # Then we're training the generator also
                 # TODO have a better way to know if we're optimizing than checking info dict keys.
@@ -82,25 +83,14 @@ class RolloutRunner():
         winner = game.winner
 
         player_metrics = (game.get_metrics(0), game.get_metrics(1))
-        if len(disc_obs_buffers[0]) > 0:
-            player_metrics[winner]["pfinal"] = disc_label_buffers[winner][-1]
-            player_metrics[1 - winner]["pfinal"] = 1 - disc_label_buffers[1 - winner][-1]
+        if len(disc_trajectories[0].obs) > 0:
+            player_metrics[winner]["pfinal"] = disc_trajectories[winner].maxq[-1]
+            player_metrics[1 - winner]["pfinal"] = 1 - disc_trajectories[1 - winner].maxq[-1]
 
-        winner_obs = disc_obs_buffers[winner]
-        loser_obs = disc_obs_buffers[1 - winner]
+        disc_winner_batch = disc_trajectories[winner].assemble(final_reward=1.0, lam=self.hparams['lambda'])
+        disc_loser_batch = disc_trajectories[1 - winner].assemble(final_reward=0.0, lam=self.hparams['lambda'])
 
-        disc_label_buffers[winner].append(1)
-        disc_label_buffers[1 - winner].append(0)
-        winner_disc_labels = disc_label_buffers[winner][1:]
-        loser_disc_labels = disc_label_buffers[1 - winner][1:]
-
-        if self.hparams.get('lambda', None) is not None:
-            winner_disc_labels = smooth_labels(winner_disc_labels, self.hparams['lambda'])
-            loser_disc_labels = smooth_labels(loser_disc_labels, self.hparams['lambda'])
-
-        all_disc_obs = winner_obs + loser_obs
-        all_disc_labels = np.concatenate([winner_disc_labels, loser_disc_labels])
-
+        disc_batch=disc_winner_batch + disc_loser_batch
 
         if len(all_gen_obs) > 0:
             all_gen_obs = stack_dicts(all_gen_obs)
@@ -116,12 +106,11 @@ class RolloutRunner():
             for i, metrics_dict in enumerate(gen_metrics):
                 for key, list_of_values in metrics_dict.items():
                     # check that we have the right number
-                    assert len(list_of_values) == len(all_disc_labels)
+                    assert len(list_of_values) == len(disc_batch.next_maxq)
                     mean = sum(list_of_values) / len(list_of_values)
                     global_metrics[f"generators/{i}/{key}"] = mean
         result = RolloutEpisode(
-            disc_obs=all_disc_obs, 
-            disc_labels=all_disc_labels, 
+            disc_rollout_batch=disc_batch,
             gen_obs=all_gen_obs,
             gen_labels=all_gen_labels,
             gen_actions=all_gen_actions,
