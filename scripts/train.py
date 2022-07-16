@@ -38,14 +38,14 @@ LOAD_DISCRIMINATOR_MODEL = None # os.path.join(get_experiments_directory(), "con
 LOAD_GENERATOR_MODEL = None # os.path.join(get_experiments_directory(), "tree_2", "checkpoints", "iter_328")
 
 # How many rollouts do we run of each turn before picking the best
-ROLLOUTS_PER_TURN = 16
+ROLLOUTS_PER_TURN = 4
 DISC_EPSILON_GREEDY = 0.03
 GEN_EPSILON_GREEDY = 0.1
 
 # How many episodes of data do we collect each iteration, before running a few epochs of optimization?
 # Potentially good to use a few times bigger EPISODES_PER_ITERATION than BATCH_SIZE, to minimize correlation within batches
-EPISODES_PER_ITERATION = 32
-ROLLOUT_PROCS = 4
+EPISODES_PER_ITERATION = 2
+ROLLOUT_PROCS = 1
 
 # Once we've collected the data, how many times do we go over it for optimization (within one iteration)?
 SAMPLE_REUSE = 2
@@ -62,7 +62,7 @@ EVAL_VS_AGENTS = [
 ]
 # Eval against random up until this iteration
 EVAL_VS_RANDOM_UNTIL = 3
-EVAL_TRIALS = 128
+EVAL_TRIALS = 4
 # Frequency of running evals
 # We want to spend 25% of the time on evals, so:
 EVAL_EVERY = 4 * EVAL_TRIALS * EVAL_COMPUTE_BOOST // EPISODES_PER_ITERATION
@@ -73,9 +73,9 @@ CHECKPOINT_EVERY = EVAL_EVERY
 
 # Model Size
 DEPTH = 2
-D_MODEL = 64 * DEPTH
+D_MODEL = 8 * DEPTH
 GEN_DEPTH = 1
-GEN_D_MODEL = 64 * GEN_DEPTH
+GEN_D_MODEL = 8 * GEN_DEPTH
 
 # Optimizer hparams
 DISC_BATCH_SIZE = EPISODES_PER_ITERATION
@@ -88,7 +88,7 @@ game_kwargs = {'symmetrize': False}
 # Eval env registered in scoreboard_envs.py
 EVAL_ENV_NAME = 'zombies5x5'
 
-MAX_ITERATIONS = 4096
+MAX_ITERATIONS = 4
 
 SEED = 12345
 
