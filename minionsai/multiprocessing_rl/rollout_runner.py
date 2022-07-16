@@ -67,7 +67,7 @@ class RolloutRunner():
                 assert ending_labels.shape == (rollouts_per_turn, ), ending_labels.shape
 
                 for traj_training_data, label in zip(training_datas, ending_labels):
-                    traj_training_data.next_maxq.append(label)
+                    traj_training_data.next_maxq = np.concatenate([traj_training_data.next_maxq, [label]])
                 all_gen_obs.append(stack_dicts([t.obs for t in training_datas]))
 
                 gen_labels = np.concatenate([np.array(t.next_maxq) for t in training_datas])

@@ -121,8 +121,10 @@ class DepthFirstTreeSearch:
                 self._verbose_print("Found terminal node.")
                 return all_actions, node_pointer, RolloutBatch(
                     obs=stack_dicts(training_data['obs']),
-                    actions=training_data['actions'],
-                    next_maxq=training_data['next_maxq'],
-                    num_games=0,
+                    next_obs = None,  # TODO
+                    terminal_action=None,
+                    reward=None,
+                    actions=np.array(training_data['actions']),
+                    next_maxq=np.array(training_data['next_maxq']),
                 )
                 
