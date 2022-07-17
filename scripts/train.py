@@ -8,7 +8,9 @@ Then agent checkpoints & logs are saved in <your experiments dir>/MinionsAI/my_r
 
 import argparse
 from collections import defaultdict
+from functools import partial
 from minionsai.action_bot.model import MinionsActionBot
+from minionsai.ema import ema_avg
 from minionsai.experiment_tooling import find_device, get_experiments_directory, setup_directory
 from minionsai.game_util import seed_everything
 from minionsai.gen_disc.agent import GenDiscAgent
@@ -23,6 +25,7 @@ from minionsai.agent import Agent, CLIAgent, RandomAIAgent
 from minionsai.agent_saveload import load, save
 from minionsai.scoreboard_envs import ENVS
 import torch as th
+from torch.optim.swa_utils import AveragedModel
 import numpy as np
 import os
 import logging
@@ -102,6 +105,7 @@ def build_agents():
         logger.info(gen_model)
         gen_translator = Translator("generator")
         gen_model.eval()
+        gen_model.to(find_device())
         rollout_generator = QGenerator(model=gen_model, translator=gen_translator, epsilon_greedy=GEN_EPSILON_GREEDY)
         eval_generator = QGenerator(model=gen_model, translator=gen_translator, epsilon_greedy=0.0)
     elif LOAD_GENERATOR_MODEL is None:
@@ -124,12 +128,16 @@ def build_agents():
         logger.info(f"Discriminator model total parameter count: {sum(p.numel() for p in disc_model.parameters() if p.requires_grad):,}")
 
         disc_translator = Translator("discriminator")
+        disc_model.to(find_device())
         disc_model.eval()
-        rollout_discriminator = QDiscriminator(translator=disc_translator, model=disc_model, epsilon_greedy=DISC_EPSILON_GREEDY)
-        eval_discriminator = QDiscriminator(translator=disc_translator, model=disc_model, epsilon_greedy=0.0)
+        disc_model_ema = AveragedModel(disc_model, avg_fn=partial(ema_avg, decay=DISC_EMA_DECAY))
+        disc_model_ema.to(find_device())
+        disc_model_ema.update_parameters(disc_model)
+        rollout_discriminator = QDiscriminator(translator=disc_translator, model=disc_model_ema, epsilon_greedy=DISC_EPSILON_GREEDY)
+        eval_discriminator = QDiscriminator(translator=disc_translator, model=disc_model_ema, epsilon_greedy=0.0)
 
     elif LOAD_DISCRIMINATOR_MODEL is None:
-        disc_model = None
+        disc_model = disc_model_ema = None
         eval_discriminator = rollout_discriminator = ScriptedDiscriminator()
     else:
         disc_agent = load(LOAD_DISCRIMINATOR_MODEL, already_in_path_ok=True)  # ok if a thread loads this after main has already done so.
@@ -139,6 +147,7 @@ def build_agents():
         disc_model.to(find_device())
         disc_model.eval()
         eval_discriminator = rollout_discriminator = discriminator
+        disc_model_ema = None
 
     if TRAIN_DISCRIMINATOR or LOAD_DISCRIMINATOR_MODEL:
         logger.info(f"Discriminator model total parameter count: {sum(p.numel() for p in disc_model.parameters() if p.requires_grad):,}")
@@ -154,10 +163,10 @@ def build_agents():
         (eval_generator, ROLLOUTS_PER_TURN * EVAL_COMPUTE_BOOST), 
         (AgentGenerator(RandomAIAgent()), 64 * EVAL_COMPUTE_BOOST)
         ])
-    return gen_model, disc_model, rollout_agent, eval_agent
+    return gen_model, disc_model, disc_model_ema, rollout_agent, eval_agent
 
 def build_agent():
-    _, _, agent, _ = build_agents()
+    _, _, _, agent, _ = build_agents()
     return agent
 
 def eval_vs_other_by_path(agent, eval_opponent_path):
@@ -182,14 +191,12 @@ def main(run_name):
 
     device = find_device()
 
-    gen_model, disc_model, rollout_agent, eval_agent = build_agents()
+    gen_model, disc_model, disc_model_ema, rollout_agent, eval_agent = build_agents()
     if TRAIN_DISCRIMINATOR:
-        disc_model.to(device)
         disc_optimizer = th.optim.Adam(disc_model.parameters(), lr=DISC_LR)
 
     if TRAIN_GENERATOR:
         # Assume we train the first generator.
-        gen_model.to(device)
         gen_optimizer = th.optim.Adam(gen_model.parameters(), lr=GEN_LR)
 
     if ROLLOUT_PROCS == 1:
@@ -271,6 +278,7 @@ def main(run_name):
                                 loss = th.nn.BCEWithLogitsLoss()(disc_logprob, batch_labels)
                                 loss.backward()
                                 disc_optimizer.step()
+                                disc_model_ema.update_parameters(disc_model)
                                 if idx in [0, n_batches // 2, n_batches - 1]:
                                     max_batch_digits = max(len(str(n_batches)), 3)
                                     metrics_logger.log_metrics({f"disc/loss/epoch_{epoch}/batch_{idx:0>{max_batch_digits}}": loss.item()})
