@@ -55,20 +55,27 @@ class OptimizerRolloutSource(abc.ABC):
                         player_metrics_accumulated[color][key].append(this_color_metrics[key])
                 for key in set(global_metrics_accumulated.keys()).union(set(rollout_episode.global_metrics.keys())):
                     global_metrics_accumulated[key].append(rollout_episode.global_metrics[key])
-        gen_obs = stack_dicts(gen_obs) # {k: np.concatenate([s[k] for s in gen_obs], axis=0) for k in gen_obs[0]}
-        gen_rollout_batch = RolloutBatch(
-                obs=gen_obs, 
-                next_obs=gen_obs,  # TODO this is wrong
-                actions=np.concatenate(gen_actions, axis=0), 
-                next_maxq=np.concatenate(gen_labels, axis=0),
-                terminal_action=None, # TODO
-                reward=None, # TODO
-            )
-        if len(disc_rollout_batch) > 0:
-            disc_rollout_batch = disc_rollout_batch.add_symmetries()
+        gen_obs = stack_dicts(gen_obs)
+        
+        # TODO get these flags from somewhere rather than deducing it here?
+        train_generator = len(gen_obs) > 0  
+        train_discriminator = disc_rollout_batch is not None
 
-        # If we aren't training the generator, they're all empty
-        if len(gen_obs['board']) > 0:
+        if train_generator:
+            gen_rollout_batch = RolloutBatch(
+                    obs=gen_obs, 
+                    next_obs=gen_obs,  # TODO this is wrong
+                    actions=np.concatenate(gen_actions, axis=0), 
+                    next_maxq=np.concatenate(gen_labels, axis=0),
+                    terminal_action=None, # TODO
+                    reward=None, # TODO
+                )
+        else:
+            gen_rollout_batch = None
+
+        if train_discriminator:
+            disc_rollout_batch = disc_rollout_batch.add_symmetries()
+        if train_generator:
             gen_rollout_batch = gen_rollout_batch.add_symmetries()
 
         metrics_logger.log_metrics({k: sum(v)/self.episodes_per_iteration for k, v in global_metrics_accumulated.items()}, prefix=f'rollouts/game')

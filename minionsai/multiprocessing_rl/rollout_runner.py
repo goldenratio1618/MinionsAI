@@ -65,7 +65,7 @@ class RolloutRunner():
 
                 all_ending_labels = disc_info["all_winprobs"]  # This is shape [total rollouts_per_turn]
                 ending_labels = all_ending_labels[:rollouts_per_turn]
-                assert ending_labels.shape == (rollouts_per_turn, ), ending_labels.shape
+                assert ending_labels.shape == (rollouts_per_turn,), ending_labels.shape
 
                 for traj_training_data, label in zip(training_datas, ending_labels):
                     traj_training_data.next_maxq = np.concatenate([traj_training_data.next_maxq, [label]])
@@ -82,19 +82,25 @@ class RolloutRunner():
                         accumulator[key].append(value)
         winner = game.winner
 
+        # TODO: get these flags from somewhere rather than deducing them here.
+        train_generator = len(all_gen_obs) > 0
+        train_discriminator = len(disc_trajectories[0].obs) > 0
+
         player_metrics = (game.get_metrics(0), game.get_metrics(1))
-        if len(disc_trajectories[0].obs) > 0:
+        if train_discriminator:
             player_metrics[0]["pfirstturn"] = disc_trajectories[0].maxq[0]
             player_metrics[1]["pfirstturn"] = disc_trajectories[1].maxq[0]
             player_metrics[winner]["pfinal"] = disc_trajectories[winner].maxq[-1]
             player_metrics[1 - winner]["pfinal"] = 1 - disc_trajectories[1 - winner].maxq[-1]
 
-        disc_winner_batch = disc_trajectories[winner].assemble(final_reward=1.0, lam=self.hparams['lambda'])
-        disc_loser_batch = disc_trajectories[1 - winner].assemble(final_reward=0.0, lam=self.hparams['lambda'])
+            disc_winner_batch = disc_trajectories[winner].assemble(final_reward=1.0, lam=self.hparams['lambda'])
+            disc_loser_batch = disc_trajectories[1 - winner].assemble(final_reward=0.0, lam=self.hparams['lambda'])
 
-        disc_batch=disc_winner_batch + disc_loser_batch
+            disc_batch=disc_winner_batch + disc_loser_batch
+        else:
+            disc_batch = None
 
-        if len(all_gen_obs) > 0:
+        if train_generator:
             all_gen_obs = stack_dicts(all_gen_obs)
             all_gen_labels = np.concatenate(all_gen_labels)
             all_gen_actions = np.concatenate(all_gen_actions)
@@ -102,12 +108,17 @@ class RolloutRunner():
             assert all_gen_labels.shape == (num,), all_gen_labels.shape
             assert all_gen_actions.shape == (num, 2), all_gen_actions.shape
             for key, value in all_gen_obs.items():
-                assert value.shape[0] == num, (key, value.shape) 
+                assert value.shape[0] == num, (key, value.shape)
+        else:
+            all_gen_obs = {}
+            all_gen_labels = []
+            all_gen_actions = []
         global_metrics = {}
         if len(gen_metrics[0]) > 0:
             for i, metrics_dict in enumerate(gen_metrics):
+                # i is the index of the generator in agent.generators list.
                 for key, list_of_values in metrics_dict.items():
-                    # check that we have the right number
+                    # check that we have the right number; one per turn of the game.
                     assert len(list_of_values) == len(disc_batch.next_maxq)
                     mean = sum(list_of_values) / len(list_of_values)
                     global_metrics[f"generators/{i}/{key}"] = mean
