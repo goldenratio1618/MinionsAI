@@ -115,8 +115,6 @@ class RolloutEpisode:
     Data class for storing one episode of data.
     """
     disc_rollout_batch: RolloutBatch
-    gen_obs: List[Dict[str, np.array]]
-    gen_actions: np.array  # shape [N, 2]
-    gen_labels: np.array  # Shape [N,]
+    gen_rollout_batch: RolloutBatch
     player_metrics: List[Dict]  # len 2, one per player
     global_metrics: Dict

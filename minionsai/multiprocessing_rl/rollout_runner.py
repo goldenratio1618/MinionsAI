@@ -106,9 +106,7 @@ class RolloutRunner():
                     global_metrics[f"generators/{i}/{key}"] = mean
         result = RolloutEpisode(
             disc_rollout_batch=disc_batch,
-            gen_obs=gen_rollout_batch.obs,
-            gen_labels=gen_rollout_batch.next_maxq,
-            gen_actions=gen_rollout_batch.actions,
+            gen_rollout_batch=gen_rollout_batch,
             global_metrics = global_metrics,
             player_metrics=player_metrics)
 
