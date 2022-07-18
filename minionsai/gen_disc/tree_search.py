@@ -2,7 +2,7 @@ import abc
 from typing import Any, Callable, List, Tuple
 
 from minionsai.game_util import stack_dicts
-from ..multiprocessing_rl.rollouts_data import RolloutBatch
+from ..multiprocessing_rl.rollouts_data import RolloutBatch, RolloutTrajectory
 import numpy as np
 
 class NodePointer(abc.ABC):
@@ -49,18 +49,13 @@ class DepthFirstTreeSearch:
             print(msg)
 
     def run_trajectory(self, extra_training_data=None, epsilon_greedy=0.0, max_retries=100):
-        if extra_training_data is not None:
-            training_data = extra_training_data
-        else:
-            training_data = {
-                "obs": [],
-                "actions": [],
-                "next_maxq": [],
-            }
-
         if len(self._unexplored_branches) == 0 and self._explored_root:
             # We've explored the entire tree already.
-            return [], None, training_data
+            return [], None, extra_training_data, None
+        # Start with one nan in maxq list since we add maxq after we explore the next node,
+        # So we need to do this so they stay aligned properly
+        # The first maxq is never read anyway.
+        trajectory = RolloutTrajectory(obs=[], maxq=[np.nan], actions=[], previous_next_obs=None)
 
         node_pointer = self._root()
         if not self._explored_root:
@@ -79,8 +74,8 @@ class DepthFirstTreeSearch:
         for action in all_actions:
             node_pointer.take_action(action)
         while True:
-            training_data['obs'].append(obs)
-            training_data['actions'].append(next_action)
+            trajectory.obs.append(obs)
+            trajectory.actions.append(next_action)
 
             all_actions.append(next_action)
             node_pointer.take_action(next_action)
@@ -92,15 +87,21 @@ class DepthFirstTreeSearch:
                 if maxq is None:
                     # This is a terminal node, and we don't know its maxq
                     # So we can't use this transition.
-                    training_data['obs'].pop()
-                    training_data['actions'].pop()
+                    trajectory.obs.pop()
+                    trajectory.actions.pop()
                 else:
-                    training_data['next_maxq'].append(maxq)
+                    new_rollout_data = trajectory.assemble(final_reward=maxq)
+                    if extra_training_data is None:
+                        extra_training_data = new_rollout_data
+                    else:
+                        extra_training_data = extra_training_data + new_rollout_data
+
                 self._verbose_print(f"Found another way to duplicate node {current_node_hash}; trying again.")
+
                 if max_retries == 0:
                     # print("Max retries reached.")
-                    return [], None, training_data
-                return self.run_trajectory(extra_training_data=training_data, epsilon_greedy=epsilon_greedy, max_retries=max_retries - 1)
+                    return [], None, extra_training_data, None
+                return self.run_trajectory(extra_training_data=extra_training_data, epsilon_greedy=epsilon_greedy, max_retries=max_retries - 1)
             self._verbose_print(f"{current_node_hash} not in explored_nodes {self._explored_nodes}")
             
             current_node_actions = all_actions.copy()
@@ -114,17 +115,10 @@ class DepthFirstTreeSearch:
                     if i != best_idx:
                         self._unexplored_branches.append((q_estimate, obs, current_node_actions, action))
                 self._explored_nodes[current_node_hash] = maxq
-                training_data['next_maxq'].append(maxq)
+                trajectory.maxq.append(maxq)
                 self._verbose_print(f"Best idx is {best_idx}; maxq is {maxq}")
             else:
                 self._explored_nodes[current_node_hash] = None
                 self._verbose_print("Found terminal node.")
-                return all_actions, node_pointer, RolloutBatch(
-                    obs=stack_dicts(training_data['obs']),
-                    next_obs = None,  # TODO
-                    terminal_action=None,
-                    reward=None,
-                    actions=np.array(training_data['actions']),
-                    next_maxq=np.array(training_data['next_maxq']),
-                )
+                return all_actions, node_pointer, extra_training_data, trajectory
                 

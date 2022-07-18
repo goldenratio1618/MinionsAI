@@ -3,6 +3,7 @@ import numpy as np
 from typing import Any, Dict, List, Optional, Tuple
 import torch as th
 
+from ..multiprocessing_rl.rollouts_data import RolloutBatch, RolloutTrajectory
 from ..gen_disc.tree_search import DepthFirstTreeSearch, NodePointer
 from ..game_util import sigmoid, stack_dicts
 from ..engine import Game, print_n_games
@@ -46,18 +47,6 @@ class QGenerator(BaseGenerator):
         self.translator = translator
         self.epsilon_greedy = epsilon_greedy
 
-    def translate_many(self, games):
-        obs = []
-        valid_actions = []
-        for game in games:
-            this_obs = self.translator.translate(game)
-            obs.append(this_obs)
-            this_valid = self.translator.valid_actions(game)  # TODO implement this
-            valid_actions.append(this_valid)
-        obs = stack_dicts(obs)
-        valid_actions = np.array(valid_actions)
-        return obs, valid_actions
-
     def propose_n_actions(self, game, n):
         action_lists, final_game_states, trajectory_training_datas = self.tree_search(game, n)
         return action_lists, final_game_states, trajectory_training_datas
@@ -65,19 +54,22 @@ class QGenerator(BaseGenerator):
     def tree_search(self, game, num_trajectories):
         action_lists = []
         final_game_states = []
-        training_datas = []
+        extra_rollout_batches: List[Optional[RolloutBatch]] = []
+        trajectories: List[RolloutTrajectory] = []
         tree_search = DepthFirstTreeSearch(lambda: QGeneratorTreeSearchNode(game.copy(), self.translator, self.model))
         for _ in range(num_trajectories):
-            numpy_actions, final_node, training_data = tree_search.run_trajectory(epsilon_greedy=self.epsilon_greedy)
+            numpy_actions, final_node, this_extra_rollout_batch, trajectory = tree_search.run_trajectory(epsilon_greedy=self.epsilon_greedy)
             if final_node is None:
+                assert trajectory is None
                 break
             action_lists.append(ActionList.from_single_list(
                 [self.translator.untranslate_action(action) for action in numpy_actions]
             ))
             final_game_states.append(final_node.game)
-            training_datas.append(training_data)
+            trajectories.append(trajectory)
+            extra_rollout_batches.append(this_extra_rollout_batch)
         # print(sum([len(d.next_maxq) for d in training_datas]))
-        return action_lists, final_game_states, {"training_datas": training_datas}
+        return action_lists, final_game_states, {"extra_rollout_batches": extra_rollout_batches, 'trajectories': trajectories}
 
 class QGeneratorTreeSearchNode(NodePointer):
     def __init__(self, game, translator, model):
