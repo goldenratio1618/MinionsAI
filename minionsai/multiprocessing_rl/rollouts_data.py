@@ -64,6 +64,15 @@ class RolloutBatch:
         assert len(separate_batches) == 4
         return separate_batches[0] + separate_batches[1] + separate_batches[2] + separate_batches[3]
 
+    @staticmethod
+    def optional_add(rb1: Optional["RolloutBatch"], rb2: Optional["RolloutBatch"]) -> Optional["RolloutBatch"]:
+        if rb1 is None:
+            return rb2
+        elif rb2 is None:
+            return rb1
+        else:
+            return rb1 + rb2
+
 @dataclass
 class RolloutTrajectory:
     obs: List[Dict[str, np.array]]
