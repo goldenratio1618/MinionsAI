@@ -1,7 +1,7 @@
 from dataclasses import dataclass
-from minionsai.discriminator_only.translator import Translator
-from minionsai.game_util import stack_dicts
-from minionsai.multiprocessing_rl.td_lambda import smooth_labels
+from ..discriminator_only.translator import Translator
+from ..game_util import stack_dicts
+from ..multiprocessing_rl.td_lambda import smooth_labels
 
 
 import numpy as np
@@ -32,11 +32,11 @@ class RolloutBatch:
         num_transitions = len(self)
         for k, v in self.obs.items():
             assert v.shape[0] == num_transitions, (k, v.shape, num_transitions)
-        # TODO remove all these escape hatches; -1, None, etc.
+        # TODO remove all these if-not-none escape hatches
         if self.next_obs is not None:
             for k, v in self.next_obs.items():
                 assert v.shape[0] == num_transitions, (k, v.shape, num_transitions)
-        assert self.next_maxq.shape == (num_transitions - 1,) or self.next_maxq.shape == (num_transitions,), (self.next_maxq.shape, num_transitions)
+        assert self.next_maxq.shape == (num_transitions,), (self.next_maxq.shape, num_transitions)
         assert self.actions is None or self.actions.shape == (num_transitions, 2), (self.actions.shape, num_transitions)
         assert self.terminal_action is None or self.terminal_action.shape == (num_transitions,), (self.terminal_action.shape, num_transitions)
         assert self.reward is None or self.reward.shape == (num_transitions,), (self.reward.shape, num_transitions)
@@ -114,7 +114,7 @@ class RolloutEpisode:
     """
     Data class for storing one episode of data.
     """
-    disc_rollout_batch: RolloutBatch
-    gen_rollout_batch: RolloutBatch
+    disc_rollout_batch: Optional[RolloutBatch]
+    gen_rollout_batch: Optional[RolloutBatch]
     player_metrics: List[Dict]  # len 2, one per player
     global_metrics: Dict

@@ -1,8 +1,6 @@
 import abc
 from collections import defaultdict
 from typing import Dict
-from minionsai.game_util import stack_dicts
-import numpy as np
 import tqdm
 
 from .rollouts_data import RolloutBatch, RolloutEpisode
