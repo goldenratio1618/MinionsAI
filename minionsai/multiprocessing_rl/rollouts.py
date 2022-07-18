@@ -21,9 +21,7 @@ class OptimizerRolloutSource(abc.ABC):
 
     def get_rollouts(self, iteration: int) -> Dict[str, RolloutBatch]:
         disc_rollout_batch = None
-        gen_obs = []
-        gen_labels = []
-        gen_actions = []
+        gen_rollout_batch = None
 
         games = 0
         player_metrics_accumulated = (defaultdict(list), defaultdict(list))
@@ -40,38 +38,18 @@ class OptimizerRolloutSource(abc.ABC):
             with metrics_logger.timing('single_episode'):
 
                 rollout_episode = self.next_rollout(iteration, idx)
-                if disc_rollout_batch is None:
-                    # First episode
-                    disc_rollout_batch = rollout_episode.disc_rollout_batch
-                else:
-                    disc_rollout_batch += rollout_episode.disc_rollout_batch
-                gen_obs.append(rollout_episode.gen_obs)
-                assert rollout_episode.gen_actions == [] or rollout_episode.gen_actions.shape == (rollout_episode.gen_labels.shape[0], 2)
-                gen_labels.append(rollout_episode.gen_labels)
-                gen_actions.append(rollout_episode.gen_actions)
+                disc_rollout_batch = RolloutBatch.optional_add(disc_rollout_batch, rollout_episode.disc_rollout_batch)
+                gen_rollout_batch = RolloutBatch.optional_add(gen_rollout_batch, rollout_episode.gen_rollout_batch)
                 games += 1
                 for color, this_color_metrics in enumerate(rollout_episode.player_metrics):
                     for key in set(player_metrics_accumulated[color].keys()).union(set(this_color_metrics.keys())):
                         player_metrics_accumulated[color][key].append(this_color_metrics[key])
                 for key in set(global_metrics_accumulated.keys()).union(set(rollout_episode.global_metrics.keys())):
                     global_metrics_accumulated[key].append(rollout_episode.global_metrics[key])
-        gen_obs = stack_dicts(gen_obs)
         
         # TODO get these flags from somewhere rather than deducing it here?
-        train_generator = len(gen_obs) > 0  
+        train_generator = gen_rollout_batch is not None
         train_discriminator = disc_rollout_batch is not None
-
-        if train_generator:
-            gen_rollout_batch = RolloutBatch(
-                    obs=gen_obs, 
-                    next_obs=gen_obs,  # TODO this is wrong
-                    actions=np.concatenate(gen_actions, axis=0), 
-                    next_maxq=np.concatenate(gen_labels, axis=0),
-                    terminal_action=None, # TODO
-                    reward=None, # TODO
-                )
-        else:
-            gen_rollout_batch = None
 
         if train_discriminator:
             disc_rollout_batch = disc_rollout_batch.add_symmetries()
