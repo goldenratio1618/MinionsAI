@@ -1,10 +1,7 @@
 
 from collections import defaultdict
 from typing import List, Optional
-from minionsai.gen_disc.generator import QGenerator
-from ..game_util import seed_everything, stack_dicts
-import torch as th
-import numpy as np
+from ..game_util import seed_everything
 import random
 
 from .rollouts_data import RolloutBatch, RolloutEpisode, RolloutTrajectory

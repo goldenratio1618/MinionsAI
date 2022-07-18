@@ -1,8 +1,7 @@
 import abc
 from typing import Any, Callable, List, Tuple
 
-from minionsai.game_util import stack_dicts
-from ..multiprocessing_rl.rollouts_data import RolloutBatch, RolloutTrajectory
+from ..multiprocessing_rl.rollouts_data import RolloutTrajectory
 import numpy as np
 
 class NodePointer(abc.ABC):
@@ -90,6 +89,7 @@ class DepthFirstTreeSearch:
                     trajectory.obs.pop()
                     trajectory.actions.pop()
                 else:
+                    # TODO: really we shouldn't mark this as a terminal action; instead it should just point to the obs from that node.
                     new_rollout_data = trajectory.assemble(final_reward=maxq)
                     if extra_training_data is None:
                         extra_training_data = new_rollout_data
