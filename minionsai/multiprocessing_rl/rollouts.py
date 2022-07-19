@@ -12,10 +12,9 @@ class OptimizerRolloutSource(abc.ABC):
     """
     A source of rollout data from the optimizer's point of view
     """
-    def __init__(self, episodes_per_iteration, game_kwargs, lambda_until_episodes=5000) -> None:
+    def __init__(self, episodes_per_iteration, game_kwargs) -> None:
         self.episodes_per_iteration = episodes_per_iteration
         self.game_kwargs = game_kwargs
-        self.lambda_until_episodes = lambda_until_episodes
 
     def get_rollouts(self, iteration: int) -> Dict[str, RolloutBatch]:
         disc_rollout_batch = None
@@ -24,10 +23,7 @@ class OptimizerRolloutSource(abc.ABC):
         games = 0
         player_metrics_accumulated = (defaultdict(list), defaultdict(list))
         global_metrics_accumulated = defaultdict(list)
-        # Early in training use td-lambda to reduce variance of gradients
-        # Late in training, turn this off since it introduces a bias when epsilon-greedy actions are taken.
-        lam = None if iteration * self.episodes_per_iteration >= self.lambda_until_episodes else 1 - iteration * self.episodes_per_iteration / self.lambda_until_episodes
-        hparams = {"lambda": lam}
+        hparams = {}
         metrics_logger.log_metrics(hparams)
 
         self.launch_rollouts(iteration, hparams)
@@ -73,8 +69,8 @@ class InProcessRolloutSource(OptimizerRolloutSource):
     """
     Runs rollouts in the main process
     """
-    def __init__(self, episodes_per_iteration, game_kwargs, agent, lambda_until_episodes=5000) -> None:
-        super().__init__(episodes_per_iteration, game_kwargs, lambda_until_episodes)
+    def __init__(self, episodes_per_iteration, game_kwargs, agent) -> None:
+        super().__init__(episodes_per_iteration, game_kwargs)
         self.runner = RolloutRunner(game_kwargs, agent)
 
     def next_rollout(self, iteration, episode_idx) -> RolloutEpisode:

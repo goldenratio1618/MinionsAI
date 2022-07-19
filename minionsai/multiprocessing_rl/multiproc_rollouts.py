@@ -69,8 +69,8 @@ class MultiProcessRolloutSource(OptimizerRolloutSource):
     """
     Starts multiple worker processes to run rollouts in parallel
     """
-    def __init__(self, agent_fn, main_thread_agent, episodes_per_iteration, game_kwargs, num_procs=4, lambda_until_episodes=5000, device=None, train_generator=False, train_discriminator=False):
-        super().__init__(episodes_per_iteration, game_kwargs, lambda_until_episodes)
+    def __init__(self, agent_fn, main_thread_agent, episodes_per_iteration, game_kwargs, num_procs=4, device=None, train_generator=False, train_discriminator=False):
+        super().__init__(episodes_per_iteration, game_kwargs)
         if device is None:
             device = find_device()
         self.iteration = -1

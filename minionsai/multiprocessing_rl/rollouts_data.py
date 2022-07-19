@@ -1,8 +1,6 @@
 from dataclasses import dataclass
 from ..discriminator_only.translator import Translator
 from ..game_util import stack_dicts
-from ..multiprocessing_rl.td_lambda import smooth_labels
-
 
 import numpy as np
 from typing import List, Dict, Optional
@@ -89,14 +87,12 @@ class RolloutTrajectory:
         else:
             return self.previous_next_obs
 
-    def assemble(self, final_reward: float, lam=None) -> RolloutBatch:
+    def assemble(self, final_reward: float) -> RolloutBatch:
         """
         Assembles a RolloutBatch from this trajectory.
         """
         null_obs = {k: np.zeros_like(v) for k, v in self.obs[0].items()}
         next_maxq=np.array(self.maxq[1:] + [final_reward])
-        if lam is not None:
-            next_maxq = smooth_labels(next_maxq, lam)
 
         actions = np.array(self.actions) if self.actions is not None else None
 
