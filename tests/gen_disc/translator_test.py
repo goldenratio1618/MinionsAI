@@ -1,5 +1,5 @@
 from minionsai.discriminator_only.translator import Translator
-from minionsai.engine import BOARD_SIZE
+from minionsai.engine import BOARD_SIZE, Game
 import numpy as np
 
 def test_transpose_actions():
@@ -22,3 +22,16 @@ def test_rotate_actions():
          ])
     rotated_actions = Translator.rotate_actions(actions)
     np.testing.assert_equal(rotated_actions, [[3, 10], [25, 23], [24, 21]])
+
+def test_valid_actions():
+    game = Game()
+    game.next_turn()
+    translator = Translator(mode="generator")
+    actions = translator.valid_actions(game)
+    
+    expected = np.zeros_like(actions)
+    expected[0, 1] = True
+    expected[0, 5] = True
+    expected[25, 25] = True
+
+    np.testing.assert_equal(actions, expected)
