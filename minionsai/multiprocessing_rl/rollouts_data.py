@@ -101,7 +101,7 @@ class RolloutTrajectory:
             next_obs=stack_dicts(self._resolved_previous_next_obs[1:] + [null_obs]),
             actions=actions,
             next_maxq=next_maxq,
-            terminal_action=np.array([0] * (len(self.obs) - 1) + [1], dtype=np.bool),
+            terminal_action=np.array([0] * (len(self.obs) - 1) + [1], dtype=bool),
             reward=np.array([0.0] * (len(self.obs) - 1) + [final_reward], dtype=np.float32),
         )
 

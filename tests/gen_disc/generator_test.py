@@ -55,8 +55,8 @@ def test_qgenerator_tree_search_first_turn_all():
     game.next_turn()
     model=MockModelUpperLeft()
     generator = QGenerator(translator=Translator(mode='generator'), model=model, epsilon_greedy=0)
-    action_lists, final_game_states, training_datas = generator.tree_search(game, num_trajectories=20)
+    action_lists, final_game_states, training_data = generator.tree_search(game, num_trajectories=20)
     # At the first turn, there are 13 possible actions (Necro in corner with 2 zombie spots; necro on either side with 4 zombie spots each; necro in any of the 3 spots with no zombies)
     assert len(action_lists) == 13
     assert len(final_game_states) == 13
-    assert len(training_datas) == 13
+    assert len(training_data['trajectories']) == 13

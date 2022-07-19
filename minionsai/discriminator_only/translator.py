@@ -55,7 +55,6 @@ class Translator():
         self.possibly_legal_actions = self.get_possible_legal_actions()
         self.untranslated_actions = self.untranslate_all_actions()
 
-
     def translate(self, game: Game):
         board_obs = [] # [num_hexes, 3 (location, terrain, unit_type)]
         for (i, j), hex in game.board.hexes():
@@ -95,8 +94,6 @@ class Translator():
             # legal_actions = [self.valid_actions(game).flatten()]
             # d['legal_actions'] = np.array([])
         return d
-
-
 
     def get_possible_legal_actions(self):
         possibly_legal = np.zeros((self.num_things, self.num_things), bool)

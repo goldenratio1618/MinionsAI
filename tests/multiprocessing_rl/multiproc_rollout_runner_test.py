@@ -17,7 +17,7 @@ def agent_fn():
     disc_model = MinionsDiscriminator(depth=1, d_model=8)
     disc_model.to('cpu')
     discriminator = QDiscriminator(Translator(mode="discriminator"), disc_model, epsilon_greedy=0.5)
-    agent = GenDiscAgent(discriminator, generator, rollouts_per_turn=2)
+    agent = GenDiscAgent(discriminator, [(generator, 2)])
     return agent
 
 def test_runner_same_as_multiproc():
@@ -37,7 +37,6 @@ def test_runner_same_as_multiproc():
         data_local: RolloutBatch = local_rollouts.get_rollouts(iter)["discriminator"]
         data_multiproc: RolloutBatch = multiproc_rollouts.get_rollouts(iter)["discriminator"]
         
-        assert data_local.num_games == data_multiproc.num_games
         for key in data_local.obs:
             np.testing.assert_allclose(data_local.obs[key], data_multiproc.obs[key]), key
         np.testing.assert_allclose(data_local.next_maxq, data_multiproc.next_maxq)
