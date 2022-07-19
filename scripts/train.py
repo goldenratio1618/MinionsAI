@@ -278,11 +278,12 @@ def main(run_name):
                                 loss = th.nn.BCEWithLogitsLoss()(disc_logprob, batch_labels)
                                 loss.backward()
                                 disc_optimizer.step()
-                                disc_model_ema.update_parameters(disc_model)
                                 if idx in [0, n_batches // 2, n_batches - 1]:
                                     max_batch_digits = max(len(str(n_batches)), 3)
                                     metrics_logger.log_metrics({f"disc/loss/epoch_{epoch}/batch_{idx:0>{max_batch_digits}}": loss.item()})
                                 turns_optimized += len(batch_idxes)
+                            with metrics_logger.timing("ema/disc"):
+                                disc_model_ema.update_parameters(disc_model)
                     disc_model.eval()
 
             if TRAIN_GENERATOR:
