@@ -235,7 +235,9 @@ def main(run_name):
 
             with metrics_logger.timing('rollouts'):
                 logger.info("Starting rollouts...")
-                assert not gen_model.training and not disc_model.training, "Shouldn't be training during rollouts."
+                assert (gen_model is None or not gen_model.training) and \
+                    (disc_model is None or not disc_model.training), \
+                    "Shouldn't be training during rollouts."
                 rollout_batch = rollout_source.get_rollouts(iteration=iteration)
                 # rollout_stats['rollouts/games'] += rollout_batch['discriminator'].num_games
 
