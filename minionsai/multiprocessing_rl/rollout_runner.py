@@ -85,8 +85,8 @@ class RolloutRunner():
             player_metrics[winner]["pfinal"] = disc_trajectories[winner].maxq[-1]
             player_metrics[1 - winner]["pfinal"] = 1 - disc_trajectories[1 - winner].maxq[-1]
 
-            disc_winner_batch = disc_trajectories[winner].assemble(final_reward=1.0, lam=self.hparams['lambda'])
-            disc_loser_batch = disc_trajectories[1 - winner].assemble(final_reward=0.0, lam=self.hparams['lambda'])
+            disc_winner_batch = disc_trajectories[winner].assemble(final_reward=1.0)
+            disc_loser_batch = disc_trajectories[1 - winner].assemble(final_reward=0.0)
 
             disc_batch=disc_winner_batch + disc_loser_batch
         else:
