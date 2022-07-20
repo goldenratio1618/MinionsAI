@@ -41,14 +41,14 @@ def test_qgenerator_tree_search_first_turn_1():
     recreated_game = Game()
     recreated_game.next_turn()
     recreated_game.full_turn(ActionList([MoveAction((0, 0), (0, 1))], [SpawnAction(ZOMBIE, (0, 0))]))
-    assert hash(final_game_states[0]) == hash(recreated_game), final_game_states[0].pretty_print() + "\n\n" + recreated_game.pretty_print()
+    assert final_game_states[0].checksum() == recreated_game.checksum(), final_game_states[0].pretty_print() + "\n\n" + recreated_game.pretty_print()
 
     # Because we're following mockmodel, next best action should be: (0 5), (25 25) (25 0) (25 25)
     seed_everything(3)
     recreated_game = Game()
     recreated_game.next_turn()
     recreated_game.full_turn(ActionList([MoveAction((0, 0), (1, 0))], [SpawnAction(ZOMBIE, (0, 0))]))
-    assert hash(final_game_states[1]) == hash(recreated_game), final_game_states[1].pretty_print() + "\n\n" + recreated_game.pretty_print()
+    assert final_game_states[1].checksum() == recreated_game.checksum(), final_game_states[1].pretty_print() + "\n\n" + recreated_game.pretty_print()
 
 def test_qgenerator_tree_search_first_turn_all():
     game = Game(money=(2, 4))

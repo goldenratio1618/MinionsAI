@@ -138,10 +138,10 @@ def test_game_hash():
     game.board.board[1][1].unit = Unit(0, ZOMBIE)
     game.next_turn()
     game.process_single_action(MoveAction((1, 1), (2, 1)))
-    game_hash = hash(game)
-    second_game_hash = hash(game)
+    game_hash = game.checksum()
+    second_game_hash = game.checksum()
     assert game_hash == second_game_hash
-    game_copy_hash = hash(game.copy())
+    game_copy_hash = game.copy().checksum()
     assert game_hash == game_copy_hash
 
     seed_everything(0)
@@ -149,7 +149,7 @@ def test_game_hash():
     different_game.board.board[1][1].unit = Unit(0, ZOMBIE)
     different_game.next_turn()
     different_game.process_single_action(MoveAction((1, 1), (1, 2)))
-    different_game_hash = hash(different_game)
+    different_game_hash = different_game.checksum()
     assert different_game_hash != game_hash
 
 def test_game_same_spawn_vs_move():
@@ -163,12 +163,12 @@ def test_game_same_spawn_vs_move():
     # Move the zombie and spawn a new one where it was
     moved_game = base_game.copy()
     moved_game.full_turn(ActionList([MoveAction((1, 0), (0, 1))], [SpawnAction(ZOMBIE, (1, 0))]))
-    moved_game_hash = hash(moved_game)
+    moved_game_hash = moved_game.checksum()
 
     # Spawn a new zombie in the new spot
     no_moved_game = base_game.copy()
     no_moved_game.full_turn(ActionList([], [SpawnAction(ZOMBIE, (0, 1))]))
-    no_moved_game_hash = hash(no_moved_game)
+    no_moved_game_hash = no_moved_game.checksum()
 
     assert moved_game_hash == no_moved_game_hash
 
@@ -181,6 +181,6 @@ def test_game_same_spawn_vs_move():
     started_there_game.money[0] -= 2
     started_there_game.next_turn()
     started_there_game.full_turn(ActionList([], []))
-    started_there_game_hash = hash(started_there_game)
+    started_there_game_hash = started_there_game.checksum()
     print_n_games([moved_game, started_there_game])
     assert started_there_game_hash == moved_game_hash

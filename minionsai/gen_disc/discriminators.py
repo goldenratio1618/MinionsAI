@@ -1,5 +1,4 @@
 import abc
-from audioop import reverse
 from typing import Dict, List, Optional, Tuple
 
 from ..game_util import adjacent_zombies, equal_np_dicts, sigmoid, stack_dicts
@@ -119,7 +118,7 @@ class HumanDiscriminator(BaseDiscriminator):
 
 class HashDiscriminiator(BaseDiscriminator):
     def choose_option(self, games: List[Game]) -> Tuple[int, Optional[Dict]]:
-        scores = np.array([hash(g) for g in games])
+        scores = np.array([g.checksum() for g in games])
         # Convert them to between 0 and 1
         scores = ((scores / np.max(np.abs(scores))) + 1 ) / 2
         return np.argmax(scores), {"all_winprobs": scores}

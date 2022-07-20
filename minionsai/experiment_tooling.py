@@ -30,6 +30,17 @@ def find_device():
     logger.info("=========================")
     return device
 
+def configure_logger(filename, exists_ok=False, also_stdout=True):
+    if os.path.exists(filename):
+        if not exists_ok:
+            raise ValueError(f"Log file {filename} already exists")
+        else:
+            os.remove(filename)
+    logging.basicConfig(filename=filename, level=logging.DEBUG, 
+                        format='[%(levelname)s %(asctime)s] %(name)s: %(message)s')
+    if also_stdout:
+        logging.getLogger().addHandler(logging.StreamHandler())
+
 def setup_directory(run_name):
     """
     Set up logging and checkpoint directories for a run.
@@ -47,9 +58,7 @@ def setup_directory(run_name):
     os.makedirs(checkpoint_dir)
 
     ####### Configure logger #######
-    logging.basicConfig(filename=os.path.join(run_directory, 'logs.txt'), level=logging.DEBUG, 
-                        format='[%(levelname)s %(asctime)s] %(name)s: %(message)s')
-    logging.getLogger().addHandler(logging.StreamHandler())
+    configure_logger(os.path.join(run_directory, 'logs.txt'))
 
     metrics_logger.configure(os.path.join(run_directory, 'metrics.csv'))
 

@@ -5,8 +5,7 @@ import torch as th
 
 from ..multiprocessing_rl.rollouts_data import RolloutBatch, RolloutTrajectory
 from ..gen_disc.tree_search import DepthFirstTreeSearch, NodePointer
-from ..game_util import sigmoid, stack_dicts
-from ..engine import Game, print_n_games
+from ..engine import Game
 from ..action import ActionList
 from ..agent import Agent
 
@@ -78,7 +77,7 @@ class QGeneratorTreeSearchNode(NodePointer):
         self.translator = translator
 
     def hash_node(self):
-        return hash(self.game)
+        return self.game.checksum()
 
     def evaluate_node(self) -> Tuple[Any, List[Any], List[float]]:
         obs = self.translator.translate(self.game)
