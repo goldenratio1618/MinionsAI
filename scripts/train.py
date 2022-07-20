@@ -35,8 +35,8 @@ import tqdm
 logger = logging.getLogger(__name__)
 
 TRAIN_GENERATOR = True
-TRAIN_DISCRIMINATOR = True
-LOAD_DISCRIMINATOR_MODEL = None # os.path.join(get_experiments_directory(), "conveps_repro_0704", "checkpoints", "conveps_repro_iter_400_adapt")
+TRAIN_DISCRIMINATOR = False
+LOAD_DISCRIMINATOR_MODEL = os.path.join(get_experiments_directory(), "caseymc_20220718_ema_iter_3008_256rolls")
 LOAD_GENERATOR_MODEL = None # os.path.join(get_experiments_directory(), "tree_2", "checkpoints", "iter_328")
 
 # How many rollouts do we run of each turn before picking the best
