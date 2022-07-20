@@ -1,8 +1,10 @@
 from collections import defaultdict
 import enum
 from functools import lru_cache
+import json
 import random
 from typing import Iterator, Optional, Tuple, List
+import hashlib
 from .unit_type import UnitType, NECROMANCER, ZOMBIE, unit_type_from_name
 from .action import ActionType, Action, ActionList, MoveAction, SpawnAction
 import numpy as np
@@ -28,6 +30,9 @@ def adjacent_hexes(x, y) -> Tuple:
         hex_list.append((x,y+1))
         if x > 0: hex_list.append((x-1,y+1))
     return tuple(hex_list)
+
+def deterministic_hash(*args):
+    return hashlib.sha256(json.dumps(args).encode()).hexdigest()
 
 class Board():
     def __init__(self, water_locs, graveyard_locs):
@@ -215,14 +220,14 @@ class Game():
                 scores[unit.color] += unit.type.cost
         return scores
         
-    def __hash__(self):
+    def checksum(self):
         board_tuple = tuple((
             self.board.board[i][j].is_water, 
             self.board.board[i][j].is_graveyard,
-            None if self.board.board[i][j].unit is None else hash(self.board.board[i][j].unit),
+            None if self.board.board[i][j].unit is None else self.board.board[i][j].unit.checksum(),
             )
             for i in range(BOARD_SIZE) for j in range(BOARD_SIZE))
-        return hash((board_tuple, tuple(self.money), self.active_player_color, self.phase, self.remaining_turns))
+        return deterministic_hash(board_tuple, tuple(self.money), self.active_player_color, self.phase, self.remaining_turns)
 
     @property
     def winner(self) -> int:
@@ -281,6 +286,10 @@ class Game():
             row_strs[1] += phase
         else:
             row_strs[-2] += phase
+
+        turns_str = f"T{self.remaining_turns}"
+        row_strs[0] = turns_str + row_strs[0][len(turns_str):]
+
         result = "\n".join(row_strs)
         if do_print: print(result)
         return result
@@ -578,8 +587,8 @@ class Unit():
         u.is_soulbound = self.is_soulbound
         return u
 
-    def __hash__(self) -> int:
-        return hash((self.color, self.type.name, self.curr_health, self.hasMoved, self.remainingAttack, self.isExhausted, self.is_soulbound))
+    def checksum(self) -> int:
+        return deterministic_hash(self.color, self.type.name, self.curr_health, self.hasMoved, self.remainingAttack, self.isExhausted, self.is_soulbound)
 
 def print_n_games(games):
     width = 15

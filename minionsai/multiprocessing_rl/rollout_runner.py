@@ -98,7 +98,8 @@ class RolloutRunner():
                 # i is the index of the generator in agent.generators list.
                 for key, list_of_values in metrics_dict.items():
                     # check that we have the right number; one per turn of the game.
-                    assert len(list_of_values) == len(disc_batch.next_maxq)
+                    if disc_batch is not None:
+                        assert len(list_of_values) == len(disc_batch.next_maxq)
                     mean = sum(list_of_values) / len(list_of_values)
                     global_metrics[f"generators/{i}/{key}"] = mean
         result = RolloutEpisode(

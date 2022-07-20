@@ -3,10 +3,13 @@ import multiprocessing as mp
 
 from ..gen_disc.agent import GenDiscAgent
 
-from ..experiment_tooling import find_device
+from ..experiment_tooling import configure_logger, find_device
 from .rollout_runner import RolloutRunner
 from .rollouts_data import RolloutEpisode
 from .rollouts import OptimizerRolloutSource
+import os
+import logging
+logger = logging.getLogger(__name__)
 
 def worker_proc_main(*args):
     """
@@ -19,7 +22,10 @@ class Worker():
     """
     Worker process that runs rollouts
     """
-    def __init__(self, rank: int, game_kwargs, agent_fn, requests_queue: mp.Queue, episodes_queue: mp.Queue, iteration_info_queue: mp.Queue, device):
+    def __init__(self, rank: int, game_kwargs, agent_fn, 
+                    requests_queue: mp.Queue, episodes_queue: mp.Queue, iteration_info_queue: mp.Queue, 
+                    device, logs_filename: str):
+        configure_logger(logs_filename, also_stdout=False)
         self.rank = rank
         self.requests_queue = requests_queue
         self.episodes_queue = episodes_queue
@@ -40,10 +46,13 @@ class Worker():
         return self.requests_queue.get()
 
     def update_for_new_iteration(self, iteration: int) -> None:
-        self.iteration = iteration
+        logger.info(f"Updating to new iteration: {self.iteration} -> {iteration}")
         info_iter, hparams, models_state = self.iteration_info_queue.get()
+        self.iteration = info_iter
         if info_iter < iteration:
-            raise ValueError(f"Worker {self.rank} received request for iteration {iteration} but found info for iteration {info_iter}")
+            # This can happen if somehow this worker missed an entire iteration
+            logger.warning(f"This worker seems to have missed an entire iteration, since we received a request for an episode from iteration {iteration}, but the next iteration in the queue is {info_iter}. Hoping we can just update again and it will be ok.")
+            self.update_for_new_iteration(iteration)
         if info_iter > iteration:
             # TODO this might not be an error; maybe we are just processing a stale request.
             raise ValueError(f"Worker {self.rank} received request for iteration {iteration} but found info for iteration {info_iter}")
@@ -58,10 +67,14 @@ class Worker():
 
     def run(self):
         while True:
+            logger.info("Worker waiting for new request... ")
             iteration, episode_idx = self.wait_for_request()
+            logger.info(f"Worker {self.rank} found request: {iteration}, {episode_idx}")
             if iteration != self.iteration:
                 self.update_for_new_iteration(iteration)
-            self.episodes_queue.put((iteration, episode_idx, self.runner.single_rollout(iteration, episode_idx)))
+            result = self.runner.single_rollout(iteration, episode_idx)
+            logger.info("Done with episode.")
+            self.episodes_queue.put((iteration, episode_idx, result))
             import sys
             sys.stdout.flush()
 
@@ -69,7 +82,8 @@ class MultiProcessRolloutSource(OptimizerRolloutSource):
     """
     Starts multiple worker processes to run rollouts in parallel
     """
-    def __init__(self, agent_fn, main_thread_agent, episodes_per_iteration, game_kwargs, num_procs=4, device=None, train_generator=False, train_discriminator=False):
+    def __init__(self, agent_fn, main_thread_agent, episodes_per_iteration, game_kwargs, logs_directory,
+                num_procs=4, device=None, train_generator=False, train_discriminator=False):
         super().__init__(episodes_per_iteration, game_kwargs)
         if device is None:
             device = find_device()
@@ -99,7 +113,9 @@ class MultiProcessRolloutSource(OptimizerRolloutSource):
         for rank in range(num_procs):
             iteration_info_queue = mp.Queue()
             self.iteration_info_queues.append(iteration_info_queue)
-            proc = mp.Process(target=worker_proc_main, args=(rank, self.game_kwargs, self.agent_fn, self.requests_queue, self.episodes_queue, iteration_info_queue, device), daemon=True)
+            proc = mp.Process(
+                target=worker_proc_main, 
+                args=(rank, self.game_kwargs, self.agent_fn, self.requests_queue, self.episodes_queue, iteration_info_queue, device, os.path.join(logs_directory, f"logs_rollout_proc_{rank}.txt")), daemon=True)
             self.procs.append(proc)
         for p in self.procs:
             p.start()

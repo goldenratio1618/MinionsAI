@@ -55,7 +55,7 @@ class GenDiscAgent(Agent):
 
             # Count how many unique states each generator proposed.
             # We assume that different states would have slightly different win probabilities.
-            my_game_hashes = [hash(game) for game in options_states[pointer:pointer + my_actual_num_rollouts]]
+            my_game_hashes = [game.checksum() for game in options_states[pointer:pointer + my_actual_num_rollouts]]
             my_unique_options = np.unique(my_game_hashes).size / my_actual_num_rollouts
 
             # Check which generators proposed the chosen action (or one equivalent)

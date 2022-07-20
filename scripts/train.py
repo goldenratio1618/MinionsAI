@@ -202,8 +202,8 @@ def main(run_name):
     if ROLLOUT_PROCS == 1:
         rollout_source = InProcessRolloutSource(EPISODES_PER_ITERATION, game_kwargs, rollout_agent)
     else:
-        rollout_source = MultiProcessRolloutSource(build_agent, rollout_agent, EPISODES_PER_ITERATION, game_kwargs, ROLLOUT_PROCS, 
-                                    train_generator=TRAIN_GENERATOR, train_discriminator=TRAIN_DISCRIMINATOR)
+        rollout_source = MultiProcessRolloutSource(build_agent, rollout_agent, episodes_per_iteration=EPISODES_PER_ITERATION, game_kwargs=game_kwargs, num_procs=ROLLOUT_PROCS, 
+                logs_directory=os.path.dirname(checkpoint_dir), train_generator=TRAIN_GENERATOR, train_discriminator=TRAIN_DISCRIMINATOR)
 
     iteration = 0
     turns_optimized = 0
