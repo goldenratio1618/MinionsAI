@@ -31,7 +31,7 @@ class RolloutRunner():
         seed_everything(seed)
 
         game = self.make_game()
-        disc_trajectories = [RolloutTrajectory(obs=[], maxq=[], actions=None, previous_next_obs=[]) for _ in range(2)]
+        disc_trajectory = RolloutTrajectory(obs=[], maxq=[], actions=None, previous_next_obs=[])
         gen_rollout_batch: Optional[RolloutBatch] = None
         gen_metrics = [defaultdict(list) for _ in self.agent.generators]  # one for each generator, dict of key: array of measured values.
         while True:
@@ -47,9 +47,9 @@ class RolloutRunner():
                 disc_obs = disc_info["chosen_final_obs"]
                 disc_best_obs = disc_info["best_final_obs"]
                 max_winprob = disc_info["max_winprob"]
-                disc_trajectories[active_player].obs.append(disc_obs)
-                disc_trajectories[active_player].previous_next_obs.append(disc_best_obs)
-                disc_trajectories[active_player].maxq.append(max_winprob)
+                disc_trajectory.obs.append(disc_obs)
+                disc_trajectory.previous_next_obs.append(disc_best_obs)
+                disc_trajectory.maxq.append(max_winprob)
             if "trajectories" in gen_info[0]:
                 # Then we're training the generator also
                 # TODO have a better way to know if we're optimizing than checking info dict keys.
@@ -76,19 +76,19 @@ class RolloutRunner():
         winner = game.winner
 
         # TODO: get this flags from somewhere rather than deducing here.
-        train_discriminator = len(disc_trajectories[0].obs) > 0
+        train_discriminator = len(disc_trajectory.obs) > 0
 
         player_metrics = (game.get_metrics(0), game.get_metrics(1))
         if train_discriminator:
-            player_metrics[0]["pfirstturn"] = disc_trajectories[0].maxq[0]
-            player_metrics[1]["pfirstturn"] = disc_trajectories[1].maxq[0]
-            player_metrics[winner]["pfinal"] = disc_trajectories[winner].maxq[-1]
-            player_metrics[1 - winner]["pfinal"] = 1 - disc_trajectories[1 - winner].maxq[-1]
+            player_metrics[0]["pfirstturn"] = disc_trajectory.maxq[0]
+            player_metrics[1]["pfirstturn"] = disc_trajectory.maxq[1]
+            player_metrics[0]["pfinal"] = disc_trajectory.maxq[-2] if game.winner == 0 else 1 - disc_trajectory.maxq[-2]
+            player_metrics[1]["pfinal"] = disc_trajectory.maxq[-1] if game.winner == 1 else 1 - disc_trajectory.maxq[-1]
+            
+            last_player = (len(disc_trajectory.obs) + 1) % 2
+            final_reward_for_nonlast_player = (game.winner!=last_player)
+            disc_batch = disc_trajectory.assemble(final_reward=final_reward_for_nonlast_player)
 
-            disc_winner_batch = disc_trajectories[winner].assemble(final_reward=1.0)
-            disc_loser_batch = disc_trajectories[1 - winner].assemble(final_reward=0.0)
-
-            disc_batch=disc_winner_batch + disc_loser_batch
         else:
             disc_batch = None
 

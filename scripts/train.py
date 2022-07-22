@@ -274,6 +274,7 @@ def main(run_name):
                                     assert reward.shape == (DISC_BATCH_SIZE, 1), reward.shape
                                     batch_labels = th.where(terminal_action, reward, next_maxq)
                                     assert batch_labels.shape == (DISC_BATCH_SIZE, 1), batch_labels.shape
+                                    batch_labels = 1 - batch_labels  # since next_maxq is from the opponent's point of view.
 
                                 disc_optimizer.zero_grad()
                                 disc_logprob = disc_model(batch_obs) # [batch, 1]
