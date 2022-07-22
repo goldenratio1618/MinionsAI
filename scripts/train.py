@@ -27,6 +27,7 @@ from minionsai.scoreboard_envs import ENVS
 import torch as th
 from torch.optim.swa_utils import AveragedModel
 import numpy as np
+import pytest
 import os
 import logging
 from minionsai.metrics_logger import metrics_logger
@@ -96,6 +97,10 @@ EVAL_ENV_NAME = 'zombies5x5'
 MAX_ITERATIONS = 4096
 
 SEED = 12345
+
+# Slow startup stuff
+RUN_TESTS = True
+SAVE_AGENT_0 = True
 
 def build_agents():
     logger.info("Creating generator...")
@@ -186,6 +191,13 @@ def main(run_name):
     seed_everything(SEED)
     assert TRAIN_DISCRIMINATOR or TRAIN_GENERATOR, "What are you doing?"
 
+    # Use pytest to run all the tests
+    if RUN_TESTS:
+        result = pytest.main([os.path.join(os.path.dirname(os.path.dirname(__file__)), "tests/")])
+        if result != 0:
+            logger.error("Tests failed")
+            return
+
     checkpoint_dir, code_dir = setup_directory(run_name)
     logger.info(f"Starting run {run_name}")
 
@@ -216,7 +228,7 @@ def main(run_name):
             print("====================================")
             logger.info(f"=========== Iteration: {iteration} ===========")
             print("====================================")
-            if iteration % CHECKPOINT_EVERY == 0 or iteration == MAX_ITERATIONS:
+            if (iteration % CHECKPOINT_EVERY == 0 or iteration == MAX_ITERATIONS) and (iteration > 0 or SAVE_AGENT_0):
                 with metrics_logger.timing('checkpointing'):
                     logger.info("Saving checkpoint...")
                     save(eval_agent, os.path.join(checkpoint_dir, f"iter_{iteration}"), copy_code_from=code_dir)
