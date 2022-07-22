@@ -85,9 +85,9 @@ class RolloutRunner():
             player_metrics[0]["pfinal"] = disc_trajectory.maxq[-2] if game.winner == 0 else 1 - disc_trajectory.maxq[-2]
             player_metrics[1]["pfinal"] = disc_trajectory.maxq[-1] if game.winner == 1 else 1 - disc_trajectory.maxq[-1]
             
-            last_player = len(disc_trajectory) % 2
-
-            disc_batch = disc_trajectory[winner].assemble(final_reward=game.winner==last_player)
+            last_player = (len(disc_trajectory.obs) + 1) % 2
+            final_reward_for_nonlast_player = (game.winner!=last_player)
+            disc_batch = disc_trajectory.assemble(final_reward=final_reward_for_nonlast_player)
 
         else:
             disc_batch = None
