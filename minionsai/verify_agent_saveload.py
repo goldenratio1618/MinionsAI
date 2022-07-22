@@ -55,6 +55,7 @@ def verify_agent_saveload(agent, game_fn, num_games=10, mode='full') -> List[Act
     return success
 
 def verify_all_modes(agent, game_fn, num_games=30):
+    print("Seeding test...")
     success = verify_agent_saveload(agent, game_fn, num_games, mode='seed')
     if success:
         print("Passed seeding test.")
@@ -64,6 +65,7 @@ def verify_all_modes(agent, game_fn, num_games=30):
         print("Aborting saveload test.")
         return False
 
+    print("Save_extra/load_extra test...")
     success = verify_agent_saveload(agent, game_fn, num_games, mode='save')
     if success:
         print("Passed save_extra / load_extra test.")
@@ -73,15 +75,16 @@ def verify_all_modes(agent, game_fn, num_games=30):
         print("Aborting saveload test.")
         return False
 
+    print("Full saveload test...")
     success = verify_agent_saveload(agent, game_fn, num_games, mode='full')
     if success:
         print("SUCCESS!")
         print("All tests passed!")
-        return True
     else:
         print("FAILURE!")
         print("Saveload test failed; your agent does not match after full code serialization & deserialization.")
         return False
+    return True
 
 def compare_agents(agent0, agent1, game_fn, num_games):
     actions_take_1 = play_n_recording_actions(game_fn, (agent0, NullAgent()), num_games)
