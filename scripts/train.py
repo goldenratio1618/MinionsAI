@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 TRAIN_GENERATOR = True
 TRAIN_DISCRIMINATOR = False
-LOAD_DISCRIMINATOR_MODEL = os.path.join(get_experiments_directory(), "caseymc_20220718_ema_iter_3008_256rolls")
+LOAD_DISCRIMINATOR_MODEL = os.path.join(get_experiments_directory(), "1turn", "checkpoints", "iter_1728")
 LOAD_GENERATOR_MODEL = None # os.path.join(get_experiments_directory(), "tree_2", "checkpoints", "iter_328")
 
 # How many rollouts do we run of each turn before picking the best
@@ -86,7 +86,7 @@ DISC_EMA_HORIZON_ITERATIONS = 20 # 2.5% of 2000 iterations, rounded down a bit t
 DISC_EMA_HORIZON_BATCHES = 20 * 4 * EPISODES_PER_ITERATION / DISC_BATCH_SIZE * SAMPLE_REUSE * DISC_EMA_HORIZON_ITERATIONS
 DISC_EMA_DECAY = 1 - 1 / DISC_EMA_HORIZON_BATCHES
 GEN_BATCH_SIZE = EPISODES_PER_ITERATION * 64
-GEN_LR = 2e-4
+GEN_LR = 1e-4
 
 # kwargs to create a game (passed to Game)
 game_kwargs = {'symmetrize': False}
